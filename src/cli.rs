@@ -21,4 +21,6 @@ pub enum Commands {
     Purge,
     /// Install launch agents and perform backup+clean
     Install,
+    /// Create symlinks for dotfiles
+    Link,
 }

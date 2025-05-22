@@ -1,9 +1,10 @@
 use crate::logger::log;
+use crate::tasks::paths::get_backup_path;
 use crate::utils::run_cmd;
 use std::fs;
 
 pub fn run() {
-    let backup_dir = dirs::home_dir().unwrap().join("maintenance/backups");
+    let backup_dir = get_backup_path();
     fs::create_dir_all(&backup_dir).unwrap();
 
     println!("🔁 Backing up packages...");
