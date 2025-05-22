@@ -8,16 +8,34 @@ pub fn run() {
     let bin_path = which("mntn").expect("mntn binary not found in PATH");
     println!("📦 Using binary: {}", bin_path.display());
 
-    let agents = vec![
-        ("com.mntn.backup", vec!["backup"], 3600),
-        ("com.mntn.clean", vec!["clean"], 86400),
+    let mut agents = vec![
+        ("com.mntn.backup", vec!["backup"], 3600), // Hourly
+        ("com.mntn.clean", vec!["clean"], 86400),  // Daily
     ];
+
+    if let Ok(topgrade_path) = which("topgrade") {
+        println!("📦 Found topgrade: {}", topgrade_path.display());
+        agents.push(("com.mntn.topgrade", vec![], 86400)); // Daily
+    } else {
+        println!("⚠️ topgrade not found, skipping launch agent installation.");
+        log("topgrade not found, skipping launch agent installation.");
+    }
 
     for (label, args, interval) in agents {
         let plist_path = dirs::home_dir()
             .unwrap()
             .join("Library/LaunchAgents")
             .join(format!("{}.plist", label));
+
+        let program = if label == "com.mntn.topgrade" {
+            which("topgrade")
+                .expect("topgrade binary not found")
+                .to_str()
+                .unwrap()
+                .to_string()
+        } else {
+            bin_path.to_str().unwrap().to_string()
+        };
 
         let content = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -30,7 +48,7 @@ pub fn run() {
   <key>ProgramArguments</key>
   <array>
     <string>{}</string>
-    <string>{}</string>
+    {}
   </array>
   <key>StartInterval</key>
   <integer>{}</integer>
@@ -43,8 +61,11 @@ pub fn run() {
 </dict>
 </plist>"#,
             label,
-            bin_path.display(),
-            args[0],
+            program,
+            args.iter()
+                .map(|arg| format!("<string>{}</string>", arg))
+                .collect::<Vec<_>>()
+                .join("\n    "),
             interval,
             label,
             label

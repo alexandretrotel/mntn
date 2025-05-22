@@ -1,7 +1,11 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "mntn", version = "1.0.0", about = "Rust-based macOS maintenance CLI")]
+#[command(
+    name = "mntn",
+    version = "1.0.0",
+    about = "Rust-based macOS maintenance CLI"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,

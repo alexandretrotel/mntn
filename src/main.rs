@@ -1,7 +1,7 @@
 mod cli;
 mod logger;
-mod utils;
 mod tasks;
+mod utils;
 
 use clap::Parser;
 use cli::{Cli, Commands};

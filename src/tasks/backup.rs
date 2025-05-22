@@ -1,6 +1,6 @@
-use std::fs;
-use crate::utils::run_cmd;
 use crate::logger::log;
+use crate::utils::run_cmd;
+use std::fs;
 
 pub fn run() {
     let backup_dir = dirs::home_dir().unwrap().join("maintenance/backups");
@@ -11,7 +11,10 @@ pub fn run() {
 
     let files = vec![
         ("bun.txt", run_cmd("bun", &["pm", "ls", "-g"])),
-        ("npm.json", run_cmd("npm", &["ls", "-g", "--depth=0", "--json"])),
+        (
+            "npm.json",
+            run_cmd("npm", &["ls", "-g", "--depth=0", "--json"]),
+        ),
         ("uv.txt", run_cmd("uv", &["pip", "freeze"])),
         ("brew.txt", run_cmd("brew", &["leaves"])),
         ("cargo.txt", {
@@ -21,7 +24,10 @@ pub fn run() {
                 .collect::<Vec<_>>()
                 .join("\n")
         }),
-        ("go.txt", run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"])),
+        (
+            "go.txt",
+            run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"]),
+        ),
     ];
 
     for (name, content) in files {

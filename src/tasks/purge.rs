@@ -28,7 +28,8 @@ pub fn run() {
                 continue;
             }
 
-            let label_output = run_cmd("defaults", &["read", plist_path.to_str().unwrap(), "Label"]);
+            let label_output =
+                run_cmd("defaults", &["read", plist_path.to_str().unwrap(), "Label"]);
             let label = label_output.trim();
 
             let loaded = run_cmd("launchctl", &["list"]);
