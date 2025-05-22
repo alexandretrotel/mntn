@@ -34,7 +34,7 @@ pub fn run() {
         let space = calculate_dir_size(&path).unwrap_or(0);
         total_space_saved += space;
 
-        let _ = run_cmd("rm", &["-rf", &expanded]);
+        let _ = run_cmd("sudo", &["rm", "-rf", &expanded]);
     }
 
     let _ = run_cmd("qlmanage", &["-r", "cache"]);
