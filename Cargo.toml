@@ -2,6 +2,8 @@
 name = "mntn"
 version = "1.0.0"
 edition = "2024"
+description = "Rust-based macOS maintenance CLI"
+license = "MIT"
 
 [[bin]]
 name = "mntn"
