@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "mntn",
-    version = "1.0.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Rust-based macOS maintenance CLI"
 )]
 pub struct Cli {
