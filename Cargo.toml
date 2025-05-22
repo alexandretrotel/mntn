@@ -11,6 +11,5 @@ path = "src/main.rs"
 chrono = "0.4.41"
 clap = { version = "4.5.38", features = ["derive"] }
 dirs = "6.0.0"
-serde_json = "1.0.140"
 shellexpand = "3.1.1"
 which = "7.0.3"

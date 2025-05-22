@@ -12,7 +12,6 @@ pub fn run() {
         "~/Library/LaunchAgents",
         "/Library/LaunchAgents",
         "/Library/LaunchDaemons",
-        "/System/Library/LaunchDaemons",
     ];
 
     for raw_path in paths {

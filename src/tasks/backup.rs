@@ -12,19 +12,10 @@ pub fn run() {
 
     let files = vec![
         ("bun.txt", run_cmd("bun", &["pm", "ls", "-g"])),
-        (
-            "npm.json",
-            run_cmd("npm", &["ls", "-g", "--depth=0", "--json"]),
-        ),
+        ("npm.txt", run_cmd("npm", &["ls", "-g"])),
         ("uv.txt", run_cmd("uv", &["pip", "freeze"])),
         ("brew.txt", run_cmd("brew", &["leaves"])),
-        ("cargo.txt", {
-            run_cmd("cargo", &["install", "--list"])
-                .lines()
-                .filter(|l| !l.is_empty() && !l.contains(' '))
-                .collect::<Vec<_>>()
-                .join("\n")
-        }),
+        ("cargo.txt", { run_cmd("cargo", &["install", "--list"]) }),
         (
             "go.txt",
             run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"]),
