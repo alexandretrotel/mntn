@@ -1,6 +1,6 @@
 [package]
 name = "mntn"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "Rust-based macOS maintenance CLI"
 license = "MIT"
@@ -13,5 +13,6 @@ path = "src/main.rs"
 chrono = "0.4.41"
 clap = { version = "4.5.38", features = ["derive"] }
 dirs = "6.0.0"
+glob = "0.3.2"
 shellexpand = "3.1.1"
 which = "7.0.3"

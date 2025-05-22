@@ -1,5 +1,7 @@
+use std::path::Path;
+
 use crate::logger::log;
-use crate::utils::run_cmd;
+use crate::utils::{bytes_to_human_readable, calculate_dir_size, run_cmd};
 use shellexpand::tilde;
 
 pub fn run() {
@@ -19,12 +21,25 @@ pub fn run() {
         "/Volumes/*/.Trashes",
     ];
 
+    let mut total_space_saved: u64 = 0;
+
     for dir in dirs {
         let expanded = tilde(dir).to_string();
+        let path = Path::new(&expanded);
+
+        if !path.exists() {
+            continue;
+        }
+
+        let space = calculate_dir_size(&path).unwrap_or(0);
+        total_space_saved += space;
+
         let _ = run_cmd("rm", &["-rf", &expanded]);
     }
 
     let _ = run_cmd("qlmanage", &["-r", "cache"]);
-    println!("✅ System cleaned.");
-    log("Clean complete");
+
+    let space_saved_str = bytes_to_human_readable(total_space_saved);
+    println!("✅ System cleaned. Freed {}.", space_saved_str);
+    log(&format!("Clean complete. Freed {}.", space_saved_str));
 }
