@@ -1,1 +1,15 @@
-/target
+/target/**
+
+# FeedYourAI
+feedyourai.txt
+
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+Cargo.lock
+.DS_Store
+uv.lock
+node_modules/**
+dist/**
+build/**
