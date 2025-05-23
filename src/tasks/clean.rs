@@ -25,9 +25,20 @@ pub fn run() {
 
     for dir in dirs {
         let expanded = tilde(dir).to_string();
-        for entry in glob(&expanded).unwrap().filter_map(Result::ok) {
+        let entries = match glob(&expanded) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in entries.filter_map(Result::ok) {
             if !entry.exists() {
                 continue;
+            }
+
+            if let Ok(metadata) = entry.symlink_metadata() {
+                if metadata.file_type().is_symlink() {
+                    continue;
+                }
             }
 
             let space = calculate_dir_size(&entry).unwrap_or(0);
