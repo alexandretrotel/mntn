@@ -1,4 +1,4 @@
-use std::path::Path;
+use glob::glob;
 
 use crate::logger::log;
 use crate::utils::{bytes_to_human_readable, calculate_dir_size, run_cmd};
@@ -25,16 +25,16 @@ pub fn run() {
 
     for dir in dirs {
         let expanded = tilde(dir).to_string();
-        let path = Path::new(&expanded);
+        for entry in glob(&expanded).unwrap().filter_map(Result::ok) {
+            if !entry.exists() {
+                continue;
+            }
 
-        if !path.exists() {
-            continue;
+            let space = calculate_dir_size(&entry).unwrap_or(0);
+            total_space_saved += space;
+
+            let _ = run_cmd("sudo", &["rm", "-rf", entry.to_str().unwrap()]);
         }
-
-        let space = calculate_dir_size(&path).unwrap_or(0);
-        total_space_saved += space;
-
-        let _ = run_cmd("sudo", &["rm", "-rf", &expanded]);
     }
 
     let _ = run_cmd("qlmanage", &["-r", "cache"]);
