@@ -3,7 +3,6 @@ use crate::tasks::paths::get_symlink_backup_path;
 use shellexpand::tilde;
 use std::fs::{self};
 use std::path::Path;
-use std::process;
 
 pub fn run() {
     println!("🔗 Creating symlinks...");
@@ -36,30 +35,51 @@ pub fn run() {
 
         // Special case for VSCode settings.json
         if target_path.exists() && !target_path.is_symlink() && !source_path.exists() {
-            log(&format!(
-                "Copying {} to {}",
-                target_path.display(),
-                source_path.display()
-            ));
-
-            // Create parent directories for source if they don't exist
-            if let Some(parent) = source_path.parent() {
-                fs::create_dir_all(parent).expect("Failed to create parent directories for source");
-            }
-
-            // Copy the target file to source
-            if let Err(e) = fs::copy(&target_path, &source_path) {
-                println!(
-                    "Failed to copy {} to {}: {}",
+            if target_path.is_file() {
+                log(&format!(
+                    "Copying {} to {}",
                     target_path.display(),
-                    source_path.display(),
-                    e
+                    source_path.display()
+                ));
+
+                if let Some(parent) = source_path.parent() {
+                    fs::create_dir_all(parent)
+                        .expect("Failed to create parent directories for source");
+                }
+
+                if let Err(e) = fs::copy(&target_path, &source_path) {
+                    println!(
+                        "Failed to copy file {} to {}: {}",
+                        target_path.display(),
+                        source_path.display(),
+                        e
+                    );
+                    log(&format!(
+                        "Failed to copy file {} to {}: {}",
+                        target_path.display(),
+                        source_path.display(),
+                        e
+                    ));
+                    continue;
+                }
+            } else if target_path.is_dir() {
+                println!(
+                    "Skipping copy of directory {}: Source does not exist and copying directories is not supported",
+                    target_path.display()
                 );
                 log(&format!(
-                    "Failed to copy {} to {}: {}",
-                    target_path.display(),
-                    source_path.display(),
-                    e
+                    "Skipping copy of directory {}: Source does not exist and copying directories is not supported",
+                    target_path.display()
+                ));
+                continue;
+            } else {
+                println!(
+                    "Unknown target type for {}. Skipping.",
+                    target_path.display()
+                );
+                log(&format!(
+                    "Unknown target type for {}. Skipping.",
+                    target_path.display()
                 ));
                 continue;
             }
@@ -67,12 +87,11 @@ pub fn run() {
 
         // Check if source exists
         if !source_path.exists() {
-            println!("Error: {} does not exist", source_path.display());
             log(&format!(
-                "Error: Source {} does not exist",
+                "Warning: Source {} does not exist. Skipping...",
                 source_path.display()
             ));
-            process::exit(1);
+            continue;
         }
 
         // Check if target is already a correct symlink
