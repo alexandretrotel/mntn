@@ -1,59 +1,75 @@
 use crate::logger::log;
 use crate::utils::run_cmd;
+use inquire::MultiSelect;
 use shellexpand::tilde;
 use std::fs;
-use std::io::{self, Write};
 
 pub fn run() {
-    println!("🧼 Purging unused launch agents and daemons...");
-    log("Starting purge");
+    println!("🧼 Listing all launch agents and daemons...");
+    log("Starting plist listing");
 
-    let paths = vec![
-        "~/Library/LaunchAgents",
-        "/Library/LaunchAgents",
-        "/Library/LaunchDaemons",
+    let targets = vec![
+        ("User LaunchAgents", "~/Library/LaunchAgents"),
+        ("System LaunchAgents", "/Library/LaunchAgents"),
+        ("System LaunchDaemons", "/Library/LaunchDaemons"),
     ];
 
-    for raw_path in paths {
+    let mut plist_files = Vec::new();
+
+    for (group, raw_path) in &targets {
         let path = tilde(raw_path).to_string();
-        let entries = fs::read_dir(&path);
-        if entries.is_err() {
-            continue;
-        }
-
-        for entry in entries.unwrap().flatten() {
-            let plist_path = entry.path();
-            if plist_path.extension().and_then(|s| s.to_str()) != Some("plist") {
-                continue;
-            }
-
-            let label_output =
-                run_cmd("defaults", &["read", plist_path.to_str().unwrap(), "Label"]);
-            let label = label_output.trim();
-
-            let loaded = run_cmd("launchctl", &["list"]);
-            if label.is_empty() || !loaded.contains(label) {
-                println!("Unused: {}", plist_path.display());
-                print!("Delete this file? [y/N]: ");
-                io::stdout().flush().unwrap();
-
-                let mut confirm = String::new();
-                io::stdin().read_line(&mut confirm).unwrap();
-
-                if confirm.trim().eq_ignore_ascii_case("y") {
-                    let _ = std::process::Command::new("sudo")
-                        .arg("rm")
-                        .arg("-f")
-                        .arg(plist_path.to_str().unwrap())
-                        .status();
-                    log(&format!("Purged: {}", plist_path.display()));
-                } else {
-                    log(&format!("Skipped: {}", plist_path.display()));
+        if let Ok(entries) = fs::read_dir(&path) {
+            for entry in entries.flatten() {
+                let plist_path = entry.path();
+                if plist_path.extension().and_then(|s| s.to_str()) != Some("plist") {
+                    continue;
                 }
+
+                let label = run_cmd(
+                    "defaults",
+                    &["read", plist_path.to_str().unwrap_or(""), "Label"],
+                )
+                .trim()
+                .to_string();
+
+                let display_label = if !label.is_empty() {
+                    format!("[{}] {}", group, label)
+                } else {
+                    let fallback = plist_path
+                        .file_name()
+                        .and_then(|f| f.to_str())
+                        .unwrap_or("unknown.plist");
+                    format!("[{}] {}", group, fallback)
+                };
+
+                plist_files.push((display_label, plist_path));
             }
         }
     }
 
-    log("Purge complete");
-    println!("✅ Purge complete.");
+    if plist_files.is_empty() {
+        println!("📁 No .plist files found.");
+        log("No .plist files found.");
+        return;
+    }
+
+    let options: Vec<String> = plist_files.iter().map(|(label, _)| label.clone()).collect();
+
+    let to_delete = MultiSelect::new("Select .plist files to delete:", options.clone())
+        .prompt()
+        .unwrap_or_default();
+
+    for selected in to_delete {
+        if let Some((_, path)) = plist_files.iter().find(|(label, _)| label == &selected) {
+            let _ = std::process::Command::new("sudo")
+                .arg("rm")
+                .arg("-f")
+                .arg(path)
+                .status();
+            log(&format!("Deleted: {}", path.display()));
+        }
+    }
+
+    log("Plist deletion complete");
+    println!("✅ Selected files deleted.");
 }

@@ -16,6 +16,7 @@ pub fn run() {
     let links = vec![
         ("~/dotfiles/.zshrc", "~/.zshrc"),
         ("~/dotfiles/.vimrc", "~/.vimrc"),
+        ("~/dotfiles/vim_runtime", "~/.vim_runtime"),
         ("~/dotfiles/config", "~/.config"),
         (
             "~/dotfiles/config/lporg",
@@ -63,14 +64,46 @@ pub fn run() {
                     continue;
                 }
             } else if target_path.is_dir() {
-                println!(
-                    "Skipping copy of directory {}: Source does not exist and copying directories is not supported",
-                    target_path.display()
-                );
                 log(&format!(
-                    "Skipping copy of directory {}: Source does not exist and copying directories is not supported",
-                    target_path.display()
+                    "Copying directory {} to {}",
+                    target_path.display(),
+                    source_path.display()
                 ));
+
+                if let Some(parent) = source_path.parent() {
+                    if let Err(e) = fs::create_dir_all(parent) {
+                        println!(
+                            "Failed to create parent directories for {}: {}",
+                            source_path.display(),
+                            e
+                        );
+                        log(&format!(
+                            "Failed to create parent directories for {}: {}",
+                            source_path.display(),
+                            e
+                        ));
+                        continue;
+                    }
+                }
+
+                let mut options = fs_extra::dir::CopyOptions::new();
+                options.copy_inside = true; // copy contents, not root dir itself
+                if let Err(e) = fs_extra::dir::copy(&target_path, &source_path, &options) {
+                    println!(
+                        "Failed to copy directory {} to {}: {}",
+                        target_path.display(),
+                        source_path.display(),
+                        e
+                    );
+                    log(&format!(
+                        "Failed to copy directory {} to {}: {}",
+                        target_path.display(),
+                        source_path.display(),
+                        e
+                    ));
+                    continue;
+                }
+
                 continue;
             } else {
                 println!(
