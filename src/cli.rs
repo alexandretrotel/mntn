@@ -23,4 +23,6 @@ pub enum Commands {
     Install,
     /// Create symlinks for dotfiles
     Link,
+    /// Remove an app bundle and its related files
+    Delete,
 }
