@@ -15,6 +15,7 @@ pub fn run() {
         ("npm.txt", run_cmd("npm", &["ls", "-g"])),
         ("uv.txt", run_cmd("uv", &["pip", "freeze"])),
         ("brew.txt", run_cmd("brew", &["leaves"])),
+        ("brew-cask.txt", run_cmd("brew", &["list", "--cask"])),
         ("cargo.txt", { run_cmd("cargo", &["install", "--list"]) }),
         (
             "go.txt",
