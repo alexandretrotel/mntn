@@ -50,6 +50,9 @@ pub fn run() {
 
     let _ = run_cmd("qlmanage", &["-r", "cache"]);
 
+    println!("🍺 Running brew cleanup...");
+    let _ = run_cmd("brew", &["cleanup"]);
+
     let space_saved_str = bytes_to_human_readable(total_space_saved);
     println!("✅ System cleaned. Freed {}.", space_saved_str);
     log(&format!("Clean complete. Freed {}.", space_saved_str));
