@@ -1,4 +1,8 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs::{self},
+    path::Path,
+    process::Command,
+};
 
 pub fn run_cmd(cmd: &str, args: &[&str]) -> String {
     let output = Command::new(cmd)
