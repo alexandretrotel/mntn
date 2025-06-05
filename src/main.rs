@@ -5,7 +5,7 @@ mod utils;
 
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
-use tasks::{backup, clean, delete, install, link, purge};
+use tasks::{backup, biometric_sudo, clean, delete, install, link, purge};
 
 fn main() {
     let cli = Cli::parse();
@@ -17,6 +17,7 @@ fn main() {
         Some(Commands::Link) => link::run(),
         Some(Commands::Delete) => delete::run(),
         Some(Commands::Install) => install::run(),
+        Some(Commands::BiometricSudo) => biometric_sudo::run(),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }

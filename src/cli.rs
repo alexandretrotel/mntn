@@ -25,4 +25,6 @@ pub enum Commands {
     Link,
     /// Remove an app bundle and its related files
     Delete,
+    /// Use Touch ID to enable sudo in your terminal
+    BiometricSudo,
 }

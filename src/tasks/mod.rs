@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod biometric_sudo;
 pub mod clean;
 pub mod delete;
 pub mod install;
