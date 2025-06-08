@@ -5,12 +5,12 @@ use std::{
 };
 
 pub fn run_cmd(cmd: &str, args: &[&str]) -> String {
-    let output = Command::new(cmd)
-        .args(args)
-        .output()
-        .expect("Failed to run command");
+    let output = Command::new(cmd).args(args).output();
 
-    String::from_utf8_lossy(&output.stdout).to_string()
+    match output {
+        Ok(output) => String::from_utf8_lossy(&output.stdout).to_string(),
+        Err(_) => String::new(),
+    }
 }
 
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {

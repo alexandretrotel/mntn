@@ -10,21 +10,29 @@ pub fn run() {
     println!("🔁 Backing up packages...");
     log("Starting backup");
 
-    let files = vec![
-        ("bun.txt", run_cmd("bun", &["pm", "ls", "-g"])),
-        ("npm.txt", run_cmd("npm", &["ls", "-g"])),
-        ("uv.txt", run_cmd("uv", &["pip", "freeze"])),
-        ("brew.txt", run_cmd("brew", &["leaves"])),
-        ("brew-cask.txt", run_cmd("brew", &["list", "--cask"])),
-        ("cargo.txt", { run_cmd("cargo", &["install", "--list"]) }),
+    let files: Vec<(&str, Box<dyn Fn() -> String>)> = vec![
+        ("bun.txt", Box::new(|| run_cmd("bun", &["pm", "ls", "-g"]))),
+        ("npm.txt", Box::new(|| run_cmd("npm", &["ls", "-g"]))),
+        ("uv.txt", Box::new(|| run_cmd("uv", &["pip", "freeze"]))),
+        ("brew.txt", Box::new(|| run_cmd("brew", &["leaves"]))),
+        (
+            "brew-cask.txt",
+            Box::new(|| run_cmd("brew", &["list", "--cask"])),
+        ),
+        (
+            "cargo.txt",
+            Box::new(|| run_cmd("cargo", &["install", "--list"])),
+        ),
         (
             "go.txt",
-            run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"]),
+            Box::new(|| run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"])),
         ),
     ];
 
-    for (name, content) in files {
-        fs::write(backup_dir.join(name), content).unwrap();
+    for (name, cmd_fn) in files {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (cmd_fn)()));
+        let content = result.unwrap_or_else(|_| String::new());
+        let _ = fs::write(backup_dir.join(name), content);
     }
 
     println!("✅ Backup complete.");
