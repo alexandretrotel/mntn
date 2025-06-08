@@ -13,6 +13,21 @@ pub fn run() {
     let files: Vec<(&str, Box<dyn Fn() -> String>)> = vec![
         ("bun.txt", Box::new(|| run_cmd("bun", &["pm", "ls", "-g"]))),
         ("npm.txt", Box::new(|| run_cmd("npm", &["ls", "-g"]))),
+        ("pnpm.txt", Box::new(|| run_cmd("pnpm", &["ls", "-g"]))),
+        (
+            "yarn.txt",
+            Box::new(|| run_cmd("yarn", &["global", "list"])),
+        ),
+        (
+            "pip.txt",
+            Box::new(|| run_cmd("pip", &["list", "--format=freeze"])),
+        ),
+        ("pipx.txt", Box::new(|| run_cmd("pipx", &["list"]))),
+        ("gem.txt", Box::new(|| run_cmd("gem", &["list"]))),
+        (
+            "composer.txt",
+            Box::new(|| run_cmd("composer", &["global", "show"])),
+        ),
         ("uv.txt", Box::new(|| run_cmd("uv", &["pip", "freeze"]))),
         ("brew.txt", Box::new(|| run_cmd("brew", &["leaves"]))),
         (
