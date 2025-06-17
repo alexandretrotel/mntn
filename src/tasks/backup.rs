@@ -14,6 +14,55 @@ fn get_vscode_settings_path() -> Option<PathBuf> {
     }
 }
 
+fn get_vscode_keybindings_path() -> Option<PathBuf> {
+    let home_dir = dirs::home_dir()?;
+    let vscode_path = home_dir.join("Library/Application Support/Code/User/keybindings.json");
+    if vscode_path.exists() {
+        Some(vscode_path)
+    } else {
+        None
+    }
+}
+
+fn get_cursor_settings_path() -> Option<PathBuf> {
+    let home_dir = dirs::home_dir()?;
+    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/settings.json");
+    if cursor_path.exists() {
+        Some(cursor_path)
+    } else {
+        None
+    }
+}
+
+fn get_cursor_keybindings_path() -> Option<PathBuf> {
+    let home_dir = dirs::home_dir()?;
+    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/keybindings.json");
+    if cursor_path.exists() {
+        Some(cursor_path)
+    } else {
+        None
+    }
+}
+
+fn backup_editor_file(path: Option<PathBuf>, backup_name: &str, backup_dir: &PathBuf) {
+    if let Some(file_path) = path {
+        match fs::read_to_string(&file_path) {
+            Ok(contents) => {
+                let _ = fs::write(backup_dir.join(backup_name), contents);
+                println!("🔁 Backed up {}", backup_name);
+                log(&format!("Backed up {}", backup_name));
+            }
+            Err(e) => {
+                println!("⚠️ Failed to read {}: {}", backup_name, e);
+                log(&format!("Failed to read {}: {}", backup_name, e));
+            }
+        }
+    } else {
+        println!("⚠️ {} not found.", backup_name);
+        log(&format!("{} not found", backup_name));
+    }
+}
+
 pub fn run() {
     let backup_dir = get_backup_path();
     fs::create_dir_all(&backup_dir).unwrap();
@@ -61,22 +110,27 @@ pub fn run() {
         let _ = fs::write(backup_dir.join(name), content);
     }
 
-    if let Some(vscode_settings_path) = get_vscode_settings_path() {
-        match fs::read_to_string(&vscode_settings_path) {
-            Ok(contents) => {
-                let _ = fs::write(backup_dir.join("vscode-settings.json"), contents);
-                println!("🔁 Backed up VSCode settings.json");
-                log("Backed up VSCode settings.json");
-            }
-            Err(e) => {
-                println!("⚠️ Failed to read VSCode settings.json: {}", e);
-                log("Failed to read VSCode settings.json");
-            }
-        }
-    } else {
-        println!("⚠️ VSCode settings.json not found.");
-        log("VSCode settings.json not found");
-    }
+    // Backup editor configuration files
+    backup_editor_file(
+        get_vscode_settings_path(),
+        "vscode-settings.json",
+        &backup_dir,
+    );
+    backup_editor_file(
+        get_vscode_keybindings_path(),
+        "vscode-keybindings.json",
+        &backup_dir,
+    );
+    backup_editor_file(
+        get_cursor_settings_path(),
+        "cursor-settings.json",
+        &backup_dir,
+    );
+    backup_editor_file(
+        get_cursor_keybindings_path(),
+        "cursor-keybindings.json",
+        &backup_dir,
+    );
 
     println!("✅ Backup complete.");
     log("Backup complete");
