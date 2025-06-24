@@ -162,7 +162,7 @@ pub fn run() {
     );
     backup_binary_file(
         get_iterm_preferences_path(),
-        "iterm-preferences.plist",
+        "com.googlecode.iterm2.plist",
         &backup_dir,
     );
 
