@@ -73,6 +73,25 @@ fn backup_editor_file(path: Option<PathBuf>, backup_name: &str, backup_dir: &Pat
     }
 }
 
+fn backup_binary_file(path: Option<PathBuf>, backup_name: &str, backup_dir: &PathBuf) {
+    if let Some(file_path) = path {
+        match fs::read(&file_path) {
+            Ok(contents) => {
+                let _ = fs::write(backup_dir.join(backup_name), contents);
+                println!("🔁 Backed up {}", backup_name);
+                log(&format!("Backed up {}", backup_name));
+            }
+            Err(e) => {
+                println!("⚠️ Failed to read {}: {}", backup_name, e);
+                log(&format!("Failed to read {}: {}", backup_name, e));
+            }
+        }
+    } else {
+        println!("⚠️ {} not found.", backup_name);
+        log(&format!("{} not found", backup_name));
+    }
+}
+
 pub fn run() {
     let backup_dir = get_backup_path();
     fs::create_dir_all(&backup_dir).unwrap();
@@ -141,7 +160,7 @@ pub fn run() {
         "cursor-keybindings.json",
         &backup_dir,
     );
-    backup_editor_file(
+    backup_binary_file(
         get_iterm_preferences_path(),
         "iterm-preferences.plist",
         &backup_dir,
