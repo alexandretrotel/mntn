@@ -56,7 +56,7 @@ fn get_iterm_preferences_path() -> Option<PathBuf> {
 
 fn get_ghostty_config_path() -> Option<PathBuf> {
     let home_dir = dirs::home_dir()?;
-    let ghostty_path = home_dir.join(".config/ghostty/config");
+    let ghostty_path = home_dir.join("Library/Application Support/com.mitchellh.ghostty/config");
     if ghostty_path.exists() {
         Some(ghostty_path)
     } else {
