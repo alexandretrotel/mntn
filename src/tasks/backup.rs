@@ -54,6 +54,16 @@ fn get_iterm_preferences_path() -> Option<PathBuf> {
     }
 }
 
+fn get_ghostty_config_path() -> Option<PathBuf> {
+    let home_dir = dirs::home_dir()?;
+    let ghostty_path = home_dir.join(".config/ghostty/config");
+    if ghostty_path.exists() {
+        Some(ghostty_path)
+    } else {
+        None
+    }
+}
+
 fn backup_editor_file(path: Option<PathBuf>, backup_name: &str, backup_dir: &PathBuf) {
     if let Some(file_path) = path {
         match fs::read_to_string(&file_path) {
@@ -162,9 +172,10 @@ pub fn run() {
     );
     backup_binary_file(
         get_iterm_preferences_path(),
-        "com.googlecode.iterm2.plist",
+        "iterm-preferences.plist",
         &backup_dir,
     );
+    backup_editor_file(get_ghostty_config_path(), "ghostty-config", &backup_dir);
 
     println!("✅ Backup complete.");
     log("Backup complete");
