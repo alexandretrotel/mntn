@@ -1,68 +1,11 @@
 use crate::logger::log;
 use crate::tasks::paths::get_backup_path;
-use crate::utils::run_cmd;
+use crate::utils::{
+    get_cursor_keybindings_path, get_cursor_settings_path, get_ghostty_config_path,
+    get_iterm_preferences_path, get_vscode_keybindings_path, get_vscode_settings_path, run_cmd,
+};
 use std::fs;
 use std::path::PathBuf;
-
-fn get_vscode_settings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let vscode_path = home_dir.join("Library/Application Support/Code/User/settings.json");
-    if vscode_path.exists() {
-        Some(vscode_path)
-    } else {
-        None
-    }
-}
-
-fn get_vscode_keybindings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let vscode_path = home_dir.join("Library/Application Support/Code/User/keybindings.json");
-    if vscode_path.exists() {
-        Some(vscode_path)
-    } else {
-        None
-    }
-}
-
-fn get_cursor_settings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/settings.json");
-    if cursor_path.exists() {
-        Some(cursor_path)
-    } else {
-        None
-    }
-}
-
-fn get_cursor_keybindings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/keybindings.json");
-    if cursor_path.exists() {
-        Some(cursor_path)
-    } else {
-        None
-    }
-}
-
-fn get_iterm_preferences_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let iterm_path = home_dir.join("Library/Preferences/com.googlecode.iterm2.plist");
-    if iterm_path.exists() {
-        Some(iterm_path)
-    } else {
-        None
-    }
-}
-
-fn get_ghostty_config_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let ghostty_path = home_dir.join("Library/Application Support/com.mitchellh.ghostty/config");
-    if ghostty_path.exists() {
-        Some(ghostty_path)
-    } else {
-        None
-    }
-}
 
 fn backup_editor_file(path: Option<PathBuf>, backup_name: &str, backup_dir: &PathBuf) {
     if let Some(file_path) = path {

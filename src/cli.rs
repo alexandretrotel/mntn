@@ -27,4 +27,6 @@ pub enum Commands {
     Delete,
     /// Use Touch ID to enable sudo in your terminal
     BiometricSudo,
+    /// Restore everything from your backup
+    Restore,
 }
