@@ -64,12 +64,6 @@ pub fn run() {
             "pip.txt",
             Box::new(|| run_cmd("pip", &["list", "--format=freeze"])),
         ),
-        ("pipx.txt", Box::new(|| run_cmd("pipx", &["list"]))),
-        ("gem.txt", Box::new(|| run_cmd("gem", &["list"]))),
-        (
-            "composer.txt",
-            Box::new(|| run_cmd("composer", &["global", "show"])),
-        ),
         ("uv.txt", Box::new(|| run_cmd("uv", &["pip", "freeze"]))),
         ("brew.txt", Box::new(|| run_cmd("brew", &["leaves"]))),
         (
