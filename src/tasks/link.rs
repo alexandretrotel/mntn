@@ -8,11 +8,9 @@ pub fn run() {
     println!("🔗 Creating symlinks...");
     log("Starting symlink creation");
 
-    // Define backup directory for existing files
     let backup_dir = get_symlink_backup_path();
     fs::create_dir_all(&backup_dir).expect("Failed to create backup directory");
 
-    // Define source-target pairs
     let links = vec![
         ("~/dotfiles/.zshrc", "~/.zshrc"),
         ("~/dotfiles/.vimrc", "~/.vimrc"),
@@ -34,7 +32,6 @@ pub fn run() {
         let source_path = Path::new(&source_path);
         let target_path = Path::new(&target_path);
 
-        // Special case for VSCode settings.json
         if target_path.exists() && !target_path.is_symlink() && !source_path.exists() {
             if target_path.is_file() {
                 log(&format!(
@@ -118,7 +115,6 @@ pub fn run() {
             }
         }
 
-        // Check if source exists
         if !source_path.exists() {
             log(&format!(
                 "Warning: Source {} does not exist. Skipping...",
@@ -127,7 +123,6 @@ pub fn run() {
             continue;
         }
 
-        // Check if target is already a correct symlink
         if target_path.is_symlink() {
             match fs::read_link(&target_path) {
                 Ok(existing_link) => {
@@ -171,7 +166,6 @@ pub fn run() {
             }
         }
 
-        // Backup existing file if it’s not a symlink
         if target_path.exists() && !target_path.is_symlink() {
             let target_file_name = target_path
                 .file_name()
@@ -198,7 +192,6 @@ pub fn run() {
             }
         }
 
-        // Create or update symlink
         if let Err(e) = std::os::unix::fs::symlink(&source_path, &target_path) {
             println!(
                 "Failed to link {} to {}: {}",

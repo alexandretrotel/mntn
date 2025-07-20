@@ -1,8 +1,7 @@
 use crate::logger::log;
 use crate::tasks::paths::get_backup_path;
 use crate::utils::{
-    get_cursor_keybindings_path, get_cursor_settings_path, get_ghostty_config_path,
-    get_iterm_preferences_path, get_vscode_keybindings_path, get_vscode_settings_path, run_cmd,
+    get_ghostty_config_path, get_vscode_keybindings_path, get_vscode_settings_path, run_cmd,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -10,40 +9,6 @@ use std::path::PathBuf;
 fn restore_editor_file(backup_path: &PathBuf, target_path: Option<PathBuf>, file_name: &str) {
     if let Some(target) = target_path {
         if let Ok(contents) = fs::read_to_string(backup_path) {
-            if let Some(parent) = target.parent() {
-                if let Err(e) = fs::create_dir_all(parent) {
-                    println!("⚠️ Failed to create directory for {}: {}", file_name, e);
-                    log(&format!(
-                        "Failed to create directory for {}: {}",
-                        file_name, e
-                    ));
-                    return;
-                }
-            }
-
-            match fs::write(&target, contents) {
-                Ok(_) => {
-                    println!("✅ Restored {}", file_name);
-                    log(&format!("Restored {}", file_name));
-                }
-                Err(e) => {
-                    println!("⚠️ Failed to restore {}: {}", file_name, e);
-                    log(&format!("Failed to restore {}: {}", file_name, e));
-                }
-            }
-        } else {
-            println!("⚠️ Failed to read backup file for {}", file_name);
-            log(&format!("Failed to read backup file for {}", file_name));
-        }
-    } else {
-        println!("⚠️ Target path not found for {}", file_name);
-        log(&format!("Target path not found for {}", file_name));
-    }
-}
-
-fn restore_binary_file(backup_path: &PathBuf, target_path: Option<PathBuf>, file_name: &str) {
-    if let Some(target) = target_path {
-        if let Ok(contents) = fs::read(backup_path) {
             if let Some(parent) = target.parent() {
                 if let Err(e) = fs::create_dir_all(parent) {
                     println!("⚠️ Failed to create directory for {}: {}", file_name, e);
@@ -172,8 +137,6 @@ pub fn run() {
     let editor_files = vec![
         ("vscode-settings.json", get_vscode_settings_path()),
         ("vscode-keybindings.json", get_vscode_keybindings_path()),
-        ("cursor-settings.json", get_cursor_settings_path()),
-        ("cursor-keybindings.json", get_cursor_keybindings_path()),
         ("ghostty-config", get_ghostty_config_path()),
     ];
 
@@ -181,17 +144,6 @@ pub fn run() {
         let backup_path = backup_dir.join(backup_name);
         if backup_path.exists() {
             restore_editor_file(&backup_path, target_path, backup_name);
-        } else {
-            println!("ℹ️ No backup found for {}", backup_name);
-        }
-    }
-
-    let binary_files = vec![("iterm-preferences.plist", get_iterm_preferences_path())];
-
-    for (backup_name, target_path) in binary_files {
-        let backup_path = backup_dir.join(backup_name);
-        if backup_path.exists() {
-            restore_binary_file(&backup_path, target_path, backup_name);
         } else {
             println!("ℹ️ No backup found for {}", backup_name);
         }

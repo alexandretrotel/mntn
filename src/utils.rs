@@ -4,6 +4,21 @@ use std::{
     process::Command,
 };
 
+/// Runs a system command with the given arguments and returns its standard output as a `String`.
+///
+/// If the command fails to run, returns an empty string.
+///
+/// # Arguments
+///
+/// * `cmd` - The command to run (e.g., "ls", "echo").
+/// * `args` - A slice of argument strings to pass to the command.
+///
+/// # Examples
+///
+/// ```
+/// let output = run_cmd("echo", &["hello"]);
+/// assert_eq!(output.trim(), "hello");
+/// ```
 pub fn run_cmd(cmd: &str, args: &[&str]) -> String {
     let output = Command::new(cmd).args(args).output();
 
@@ -13,6 +28,27 @@ pub fn run_cmd(cmd: &str, args: &[&str]) -> String {
     }
 }
 
+/// Recursively calculates the total size in bytes of the given directory or file path.
+///
+/// Symlinks are ignored and contribute zero to the total size to avoid cycles.
+///
+/// Returns `None` if the path metadata cannot be accessed or read.
+///
+/// # Arguments
+///
+/// * `path` - The file or directory path to measure.
+///
+/// # Returns
+///
+/// * `Some(size_in_bytes)` if successful.
+/// * `None` if the path does not exist or cannot be accessed.
+///
+/// # Examples
+///
+/// ```
+/// let size = calculate_dir_size(Path::new("/some/path")).unwrap_or(0);
+/// println!("Size: {} bytes", size);
+/// ```
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     if path.is_symlink() {
         return Some(0);
@@ -34,6 +70,24 @@ pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     Some(size)
 }
 
+/// Converts a byte count into a human-readable string with units (bytes, KB, MB, GB).
+///
+/// Uses base 1024 for unit conversion.
+///
+/// # Arguments
+///
+/// * `bytes` - The number of bytes to convert.
+///
+/// # Returns
+///
+/// A formatted string representing the size in an appropriate unit with two decimal places.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(bytes_to_human_readable(1024), "1.00 KB");
+/// assert_eq!(bytes_to_human_readable(500), "500 bytes");
+/// ```
 pub fn bytes_to_human_readable(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
@@ -50,6 +104,26 @@ pub fn bytes_to_human_readable(bytes: u64) -> String {
     }
 }
 
+/// Returns the path to the VSCode user settings file on macOS, if it exists.
+///
+/// Looks for `~/Library/Application Support/Code/User/settings.json`.
+///
+/// # Returns
+///
+/// * `Some(PathBuf)` if the settings file exists.
+/// * `None` if the file does not exist or the home directory cannot be determined.
+///
+/// # Note
+///
+/// This path is specific to macOS.
+///
+/// # Examples
+///
+/// ```
+/// if let Some(path) = get_vscode_settings_path() {
+///     println!("VSCode settings at {:?}", path);
+/// }
+/// ```
 pub fn get_vscode_settings_path() -> Option<PathBuf> {
     let home_dir = dirs::home_dir()?;
     let vscode_path = home_dir.join("Library/Application Support/Code/User/settings.json");
@@ -60,6 +134,26 @@ pub fn get_vscode_settings_path() -> Option<PathBuf> {
     }
 }
 
+/// Returns the path to the VSCode user keybindings file on macOS, if it exists.
+///
+/// Looks for `~/Library/Application Support/Code/User/keybindings.json`.
+///
+/// # Returns
+///
+/// * `Some(PathBuf)` if the keybindings file exists.
+/// * `None` if the file does not exist or the home directory cannot be determined.
+///
+/// # Note
+///
+/// This path is specific to macOS.
+///
+/// # Examples
+///
+/// ```
+/// if let Some(path) = get_vscode_keybindings_path() {
+///     println!("VSCode keybindings at {:?}", path);
+/// }
+/// ```
 pub fn get_vscode_keybindings_path() -> Option<PathBuf> {
     let home_dir = dirs::home_dir()?;
     let vscode_path = home_dir.join("Library/Application Support/Code/User/keybindings.json");
@@ -70,36 +164,26 @@ pub fn get_vscode_keybindings_path() -> Option<PathBuf> {
     }
 }
 
-pub fn get_cursor_settings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/settings.json");
-    if cursor_path.exists() {
-        Some(cursor_path)
-    } else {
-        None
-    }
-}
-
-pub fn get_cursor_keybindings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let cursor_path = home_dir.join("Library/Application Support/Cursor/User/keybindings.json");
-    if cursor_path.exists() {
-        Some(cursor_path)
-    } else {
-        None
-    }
-}
-
-pub fn get_iterm_preferences_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
-    let iterm_path = home_dir.join("Library/Preferences/com.googlecode.iterm2.plist");
-    if iterm_path.exists() {
-        Some(iterm_path)
-    } else {
-        None
-    }
-}
-
+/// Returns the path to the Ghostty configuration file on macOS, if it exists.
+///
+/// Looks for `~/Library/Application Support/com.mitchellh.ghostty/config`.
+///
+/// # Returns
+///
+/// * `Some(PathBuf)` if the config file exists.
+/// * `None` if the file does not exist or the home directory cannot be determined.
+///
+/// # Note
+///
+/// This path is specific to macOS.
+///
+/// # Examples
+///
+/// ```
+/// if let Some(path) = get_ghostty_config_path() {
+///     println!("Ghostty config at {:?}", path);
+/// }
+/// ```
 pub fn get_ghostty_config_path() -> Option<PathBuf> {
     let home_dir = dirs::home_dir()?;
     let ghostty_path = home_dir.join("Library/Application Support/com.mitchellh.ghostty/config");
