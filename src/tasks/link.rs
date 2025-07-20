@@ -1,15 +1,35 @@
 use crate::logger::log;
 use crate::tasks::paths::get_symlink_backup_path;
+use crate::utils::{backup_existing_target, copy_dir_to_source, copy_file_to_source};
 use shellexpand::tilde;
-use std::fs::{self};
-use std::path::Path;
+use std::fs;
+use std::path::PathBuf;
 
+/// Creates symbolic links for dotfiles and configuration directories from `~/dotfiles`
+/// to the appropriate system/user paths (e.g., `~/.zshrc`, `~/Library/...`).
+///
+/// ## Behavior
+/// - Ensures a backup directory exists (via `get_symlink_backup_path()`).
+/// - For each pair of source and target:
+///     - If the source does not exist but the target does, copies the target to the source.
+///     - If the target exists and is not a correct symlink, backs it up.
+///     - If the target is a symlink pointing elsewhere, removes it.
+///     - Creates a symlink from the source to the target path.
+/// - All failures are logged, and the function proceeds with remaining links.
+///
+/// ## Notes
+/// - Logs are written via the `log()` utility.
+/// - Errors do not panic the program but are gracefully logged and skipped.
 pub fn run() {
     println!("🔗 Creating symlinks...");
     log("Starting symlink creation");
 
     let backup_dir = get_symlink_backup_path();
-    fs::create_dir_all(&backup_dir).expect("Failed to create backup directory");
+    if let Err(e) = fs::create_dir_all(&backup_dir) {
+        println!("Failed to create backup directory: {e}");
+        log(&format!("Failed to create backup directory: {e}"));
+        return;
+    }
 
     let links = vec![
         ("~/dotfiles/.zshrc", "~/.zshrc"),
@@ -26,139 +46,77 @@ pub fn run() {
         ),
     ];
 
-    for (source, target) in links {
-        let source_path = tilde(source).to_string();
-        let target_path = tilde(target).to_string();
-        let source_path = Path::new(&source_path);
-        let target_path = Path::new(&target_path);
+    for (src, dst) in links {
+        let source = PathBuf::from(tilde(src).to_string());
+        let target = PathBuf::from(tilde(dst).to_string());
 
-        if target_path.exists() && !target_path.is_symlink() && !source_path.exists() {
-            if target_path.is_file() {
-                log(&format!(
-                    "Copying {} to {}",
-                    target_path.display(),
-                    source_path.display()
-                ));
-
-                if let Some(parent) = source_path.parent() {
-                    fs::create_dir_all(parent)
-                        .expect("Failed to create parent directories for source");
-                }
-
-                if let Err(e) = fs::copy(&target_path, &source_path) {
-                    println!(
-                        "Failed to copy file {} to {}: {}",
-                        target_path.display(),
-                        source_path.display(),
-                        e
-                    );
+        if target.exists() && !target.is_symlink() && !source.exists() {
+            if target.is_file() {
+                if let Err(e) = copy_file_to_source(&target, &source) {
                     log(&format!(
-                        "Failed to copy file {} to {}: {}",
-                        target_path.display(),
-                        source_path.display(),
+                        "Failed to copy file {} to source {}: {}",
+                        target.display(),
+                        source.display(),
                         e
                     ));
                     continue;
                 }
-            } else if target_path.is_dir() {
+            } else if target.is_dir() {
+                if let Err(e) = copy_dir_to_source(&target, &source) {
+                    log(&format!(
+                        "Failed to copy directory {} to source {}: {}",
+                        target.display(),
+                        source.display(),
+                        e
+                    ));
+                    continue;
+                }
+            } else {
                 log(&format!(
-                    "Copying directory {} to {}",
-                    target_path.display(),
-                    source_path.display()
+                    "Unknown target type for {}. Skipping.",
+                    target.display()
                 ));
+                continue;
+            }
+        }
 
-                if let Some(parent) = source_path.parent() {
-                    if let Err(e) = fs::create_dir_all(parent) {
-                        println!(
-                            "Failed to create parent directories for {}: {}",
-                            source_path.display(),
-                            e
-                        );
+        if !source.exists() {
+            log(&format!(
+                "Warning: Source {} does not exist. Skipping...",
+                source.display()
+            ));
+            continue;
+        }
+
+        if target.is_symlink() {
+            match fs::read_link(&target) {
+                Ok(existing) if existing == source => {
+                    log(&format!(
+                        "Symlink {} already correctly points to {}",
+                        target.display(),
+                        source.display()
+                    ));
+                    continue;
+                }
+                Ok(existing) => {
+                    log(&format!(
+                        "Removing incorrect symlink {} → {}",
+                        target.display(),
+                        existing.display()
+                    ));
+                    if let Err(e) = fs::remove_file(&target) {
                         log(&format!(
-                            "Failed to create parent directories for {}: {}",
-                            source_path.display(),
+                            "Failed to remove incorrect symlink {}: {}",
+                            target.display(),
                             e
                         ));
                         continue;
                     }
                 }
-
-                let mut options = fs_extra::dir::CopyOptions::new();
-                options.copy_inside = true; // copy contents, not root dir itself
-                if let Err(e) = fs_extra::dir::copy(&target_path, &source_path, &options) {
-                    println!(
-                        "Failed to copy directory {} to {}: {}",
-                        target_path.display(),
-                        source_path.display(),
-                        e
-                    );
-                    log(&format!(
-                        "Failed to copy directory {} to {}: {}",
-                        target_path.display(),
-                        source_path.display(),
-                        e
-                    ));
-                    continue;
-                }
-
-                continue;
-            } else {
-                println!(
-                    "Unknown target type for {}. Skipping.",
-                    target_path.display()
-                );
-                log(&format!(
-                    "Unknown target type for {}. Skipping.",
-                    target_path.display()
-                ));
-                continue;
-            }
-        }
-
-        if !source_path.exists() {
-            log(&format!(
-                "Warning: Source {} does not exist. Skipping...",
-                source_path.display()
-            ));
-            continue;
-        }
-
-        if target_path.is_symlink() {
-            match fs::read_link(&target_path) {
-                Ok(existing_link) => {
-                    if existing_link == source_path {
-                        log(&format!(
-                            "Symlink {} already correctly points to {}",
-                            target_path.display(),
-                            source_path.display()
-                        ));
-                        continue; // Skip to next pair
-                    } else {
-                        log(&format!(
-                            "Removing incorrect symlink {} pointing to {}",
-                            target_path.display(),
-                            existing_link.display()
-                        ));
-                        if let Err(e) = fs::remove_file(&target_path) {
-                            println!(
-                                "Failed to remove incorrect symlink {}: {}",
-                                target_path.display(),
-                                e
-                            );
-                            log(&format!(
-                                "Failed to remove incorrect symlink {}: {}",
-                                target_path.display(),
-                                e
-                            ));
-                            continue;
-                        }
-                    }
-                }
                 Err(e) => {
-                    println!("Failed to read symlink {}: {}", target_path.display(), e);
                     log(&format!(
                         "Failed to read symlink {}: {}",
-                        target_path.display(),
+                        target.display(),
                         e
                     ));
                     continue;
@@ -166,50 +124,25 @@ pub fn run() {
             }
         }
 
-        if target_path.exists() && !target_path.is_symlink() {
-            let target_file_name = target_path
-                .file_name()
-                .map(|name| name.to_string_lossy().to_string())
-                .unwrap_or_else(|| "backup".to_string());
-            let backup_path = backup_dir.join(format!(
-                "{}_{}",
-                target_file_name,
-                chrono::Local::now().format("%Y%m%d_%H%M%S")
-            ));
-            log(&format!(
-                "Backing up {} to {}",
-                target_path.display(),
-                backup_path.display()
-            ));
-            if let Err(e) = fs::rename(&target_path, &backup_path) {
-                println!("Failed to back up {}: {}", target_path.display(), e);
-                log(&format!(
-                    "Failed to back up {}: {}",
-                    target_path.display(),
-                    e
-                ));
+        if target.exists() && !target.is_symlink() {
+            if let Err(e) = backup_existing_target(&target, &backup_dir) {
+                log(&format!("Failed to back up {}: {}", target.display(), e));
                 continue;
             }
         }
 
-        if let Err(e) = std::os::unix::fs::symlink(&source_path, &target_path) {
-            println!(
-                "Failed to link {} to {}: {}",
-                source_path.display(),
-                target_path.display(),
-                e
-            );
+        if let Err(e) = std::os::unix::fs::symlink(&source, &target) {
             log(&format!(
-                "Failed to link {} to {}: {}",
-                source_path.display(),
-                target_path.display(),
+                "Failed to link {} → {}: {}",
+                source.display(),
+                target.display(),
                 e
             ));
         } else {
             log(&format!(
-                "Linked {} to {}",
-                source_path.display(),
-                target_path.display()
+                "Linked {} → {}",
+                source.display(),
+                target.display()
             ));
         }
     }

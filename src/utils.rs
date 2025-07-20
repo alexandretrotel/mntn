@@ -1,8 +1,14 @@
+use chrono::Local;
 use std::{
     fs::{self},
+    io,
     path::{Path, PathBuf},
     process::Command,
 };
+
+use fs_extra::dir::{CopyOptions, copy as copy_dir};
+
+use crate::logger::log;
 
 /// Runs a system command with the given arguments and returns its standard output as a `String`.
 ///
@@ -192,4 +198,91 @@ pub fn get_ghostty_config_path() -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+/// Copies an existing file from the `target` path to the missing `source` path.
+///
+/// This is used when the user already has a config file in the expected location, but the
+/// dotfiles repository does not yet have it tracked. Instead of deleting the file, it is
+/// safely copied to the repository.
+///
+/// # Arguments
+/// * `target` - The current file path that exists.
+/// * `source` - The desired source location in the dotfiles directory.
+///
+/// # Errors
+/// Returns an `io::Error` if any file operations (e.g., `copy`, `create_dir_all`) fail.
+pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
+    log(&format!(
+        "Copying existing file {} to missing source {}",
+        target.display(),
+        source.display()
+    ));
+    if let Some(parent) = source.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(target, source)?;
+    Ok(())
+}
+
+/// Copies an existing directory from the `target` path to the missing `source` path.
+///
+/// This ensures the content is preserved in the user's dotfiles repository
+/// if it was not already under source control.
+///
+/// # Arguments
+/// * `target` - The existing directory.
+/// * `source` - The new source location to populate with content.
+///
+/// # Behavior
+/// Uses `fs_extra` to recursively copy contents, not the root directory itself.
+///
+/// # Errors
+/// Returns an `io::Error` if directory creation or copying fails.
+pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
+    log(&format!(
+        "Copying existing directory {} to missing source {}",
+        target.display(),
+        source.display()
+    ));
+    if let Some(parent) = source.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut options = CopyOptions::new();
+    options.copy_inside = true;
+    copy_dir(target, source, &options).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    Ok(())
+}
+
+/// Backs up an existing file or directory to a timestamped location inside the backup directory.
+///
+/// This function is used when the symlink target already exists and is not a symlink.
+/// The original content is preserved to prevent data loss.
+///
+/// # Arguments
+/// * `target` - The file or directory to back up.
+/// * `backup_dir` - Directory where backups will be placed.
+///
+/// # Backup Filename
+/// Includes the original filename and a timestamp like `name_20250720_101530`.
+///
+/// # Errors
+/// Returns an `io::Error` if `rename()` or any intermediate directory creation fails.
+pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()> {
+    let filename = target
+        .file_name()
+        .and_then(|n| Some(n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "backup".to_string());
+
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let backup_path = backup_dir.join(format!("{filename}_{timestamp}"));
+
+    log(&format!(
+        "Backing up existing {} to {}",
+        target.display(),
+        backup_path.display()
+    ));
+
+    fs::rename(target, backup_path)?;
+    Ok(())
 }
