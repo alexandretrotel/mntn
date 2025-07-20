@@ -4,6 +4,43 @@ use crate::logger::log;
 use crate::utils::{bytes_to_human_readable, calculate_dir_size, run_cmd};
 use shellexpand::tilde;
 
+/// Performs a system junk cleanup by deleting cache, logs, trash, and other temporary files on macOS.
+///
+/// The cleanup targets multiple common system and user directories, including:
+/// - User and system caches (`~/Library/Caches`, `/Library/Caches`)
+/// - System and user logs (`/private/var/log`, `~/Library/Logs`, etc.)
+/// - Saved application states and diagnostic reports
+/// - Trash directories for both user and root
+/// - Volume trashes (`/Volumes/*/.Trashes`)
+///
+/// For each target directory, the function:
+/// - Expands the tilde to the user's home directory.
+/// - Uses globbing to find matching entries.
+/// - Skips symlinks to avoid unintended deletions.
+/// - Calculates total size of deleted items.
+/// - Removes the files/directories using `sudo rm -rf`.
+///
+/// Additionally:
+/// - Resets Quick Look cache by running `qlmanage -r cache`.
+/// - Runs `brew cleanup` to clean Homebrew caches.
+///
+/// Prints progress messages and logs the start and completion with total freed space.
+///
+/// # Notes
+///
+/// - The function ignores errors during globbing and deletion, continuing to next entries.
+/// - Uses `sudo rm -rf`, which requires appropriate privileges and is potentially dangerous.
+/// - Total freed space is an approximation based on size calculation before deletion.
+///
+/// # Panics
+///
+/// This function does not panic; errors are handled silently or ignored.
+///
+/// # Examples
+///
+/// ```no_run
+/// run();
+/// ```
 pub fn run() {
     log("Starting clean");
     println!("🧹 Cleaning system junk...");
@@ -27,7 +64,7 @@ pub fn run() {
         let expanded = tilde(dir).to_string();
         let entries = match glob(&expanded) {
             Ok(e) => e,
-            Err(_) => continue,
+            Err(_) => continue, // skip invalid patterns
         };
 
         for entry in entries.filter_map(Result::ok) {
@@ -37,17 +74,19 @@ pub fn run() {
 
             if let Ok(metadata) = entry.symlink_metadata() {
                 if metadata.file_type().is_symlink() {
-                    continue;
+                    continue; // skip symlinks
                 }
             }
 
             let space = calculate_dir_size(&entry).unwrap_or(0);
             total_space_saved += space;
 
+            // Remove the file/directory forcefully with sudo
             let _ = run_cmd("sudo", &["rm", "-rf", entry.to_str().unwrap()]);
         }
     }
 
+    // Reset Quick Look cache
     let _ = run_cmd("qlmanage", &["-r", "cache"]);
 
     println!("🍺 Running brew cleanup...");
