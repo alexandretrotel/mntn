@@ -45,19 +45,18 @@ pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Copies an existing directory from the `target` path to the missing `source` path.
-///
-/// This ensures the content is preserved in the user's dotfiles repository
-/// if it was not already under source control.
+/// Copies an existing directory from `target` to `source`.
 pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
-    log(&format!(
-        "Copying existing directory {} to missing source {}",
-        target.display(),
-        source.display()
-    ));
+    if let Some(parent) = source.parent() {
+        fs::create_dir_all(parent)?;
+    }
 
-    fs::create_dir_all(source)?;
-    copy_dir_recursive(target, source)
+    let tmp_dir = source.with_extension("tmp_copy_dir");
+    fs::create_dir_all(&tmp_dir)?;
+    copy_dir_recursive(target, &tmp_dir)?;
+    fs::rename(tmp_dir, source)?;
+
+    Ok(())
 }
 
 /// Recursively copies the contents of one directory to another.
