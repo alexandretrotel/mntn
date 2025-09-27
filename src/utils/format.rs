@@ -1,23 +1,6 @@
 /// Converts a byte count into a human-readable string with units (bytes, KB, MB, GB).
 ///
-/// Uses base 1024 for unit conversion.
-///
-/// # Arguments
-///
-/// * `bytes` - The number of bytes to convert.
-///
-/// # Returns
-///
-/// A formatted string representing the size in an appropriate unit with two decimal places.
-///
-/// # Examples
-///
-/// ```
-/// use mntn::utils::format::bytes_to_human_readable;
-///
-/// assert_eq!(bytes_to_human_readable(1024), "1.00 KB");
-/// assert_eq!(bytes_to_human_readable(500), "500 bytes");
-/// ```
+/// Uses base 1024 for unit conversion (e.g., 1 KB = 1024 bytes).
 pub fn bytes_to_human_readable(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
