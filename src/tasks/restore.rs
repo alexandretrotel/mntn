@@ -1,8 +1,9 @@
 use crate::logger::log;
 use crate::tasks::paths::get_backup_path;
-use crate::utils::{
-    get_ghostty_config_path, get_vscode_keybindings_path, get_vscode_settings_path, run_cmd,
+use crate::utils::app_paths::{
+    get_ghostty_config_path, get_vscode_keybindings_path, get_vscode_settings_path,
 };
+use crate::utils::system::run_cmd;
 use std::fs;
 use std::path::PathBuf;
 

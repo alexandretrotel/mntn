@@ -1,7 +1,9 @@
 use glob::glob;
 
 use crate::logger::log;
-use crate::utils::{bytes_to_human_readable, calculate_dir_size, run_cmd};
+use crate::utils::filesystem::calculate_dir_size;
+use crate::utils::format::bytes_to_human_readable;
+use crate::utils::system::run_cmd;
 use shellexpand::tilde;
 
 /// Performs a system junk cleanup by deleting cache, logs, trash, and other temporary files on macOS.

@@ -1,5 +1,5 @@
 use crate::logger::log;
-use crate::utils::run_cmd;
+use crate::utils::system::run_cmd;
 use inquire::MultiSelect;
 use shellexpand::tilde;
 use std::fs;

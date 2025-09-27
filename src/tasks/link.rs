@@ -1,6 +1,6 @@
 use crate::logger::log;
 use crate::tasks::paths::get_symlink_backup_path;
-use crate::utils::{backup_existing_target, copy_dir_to_source, copy_file_to_source};
+use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source, copy_file_to_source};
 use shellexpand::tilde;
 use std::fs;
 use std::path::PathBuf;
