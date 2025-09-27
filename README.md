@@ -11,6 +11,7 @@ A Rust-based CLI tool for macOS system maintenance.
 - **Install**: Sets up launch agents for automated backups, cleaning, and system updates (if topgrade is installed).
 - **Link**: Creates symlinks for dotfiles (e.g., .zshrc, .vimrc, .config, lporg, VSCode settings).
 - **Purge**: Deletes unused launch agents/daemons with user confirmation.
+- **Restore**: Reinstalls packages from backup files and restores editor configuration files (VSCode settings/keybindings, Ghostty config).
 
 ## Installation
 
