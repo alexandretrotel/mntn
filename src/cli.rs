@@ -1,7 +1,6 @@
 use clap::{Parser, Subcommand};
 
 /// Command line interface for `mntn`.
-/// ```
 #[derive(Parser)]
 #[command(
     name = "mntn",
