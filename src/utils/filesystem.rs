@@ -13,24 +13,23 @@ use crate::logger::log;
 ///
 /// Returns `None` if the path metadata cannot be accessed or read.
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {
-    if path.is_symlink() {
+    let metadata = fs::symlink_metadata(path).ok()?;
+
+    if metadata.file_type().is_symlink() {
         return Some(0);
-    }
-    let mut size = 0;
-    if path.is_file() {
-        size += fs::metadata(path).ok()?.len();
-    } else if path.is_dir() {
-        let entries = fs::read_dir(path).ok()?;
-        for entry in entries {
+    } else if metadata.is_file() {
+        return Some(metadata.len());
+    } else if metadata.is_dir() {
+        let mut size = 0;
+        for entry in fs::read_dir(path).ok()? {
             let entry = entry.ok()?;
             let entry_path = entry.path();
-            if entry_path.is_symlink() {
-                continue;
-            }
             size += calculate_dir_size(&entry_path).unwrap_or(0);
         }
+        return Some(size);
     }
-    Some(size)
+
+    Some(0)
 }
 
 /// Copies an existing file from the `target` path to the missing `source` path.
