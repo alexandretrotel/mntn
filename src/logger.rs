@@ -19,7 +19,7 @@ use std::io::Write;
 /// log("Application started");
 /// ```
 pub fn log(message: &str) {
-    let log_path = dirs::home_dir().unwrap().join("mntn.log"); // ~/mntn.log
+    let log_path = dirs_next::home_dir().unwrap().join("mntn.log"); // ~/mntn.log
     let timestamp = Local::now().format("[%Y-%m-%d %H:%M:%S]").to_string();
 
     let mut file = OpenOptions::new()

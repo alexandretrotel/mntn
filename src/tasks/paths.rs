@@ -1,4 +1,4 @@
-use dirs::home_dir;
+use dirs_next::home_dir;
 use std::path::PathBuf;
 
 /// Relative path to the directory used for storing general backup files.

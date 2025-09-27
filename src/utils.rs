@@ -131,7 +131,7 @@ pub fn bytes_to_human_readable(bytes: u64) -> String {
 /// }
 /// ```
 pub fn get_vscode_settings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
+    let home_dir = dirs_next::home_dir()?;
     let vscode_path = home_dir.join("Library/Application Support/Code/User/settings.json");
     if vscode_path.exists() {
         Some(vscode_path)
@@ -161,7 +161,7 @@ pub fn get_vscode_settings_path() -> Option<PathBuf> {
 /// }
 /// ```
 pub fn get_vscode_keybindings_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
+    let home_dir = dirs_next::home_dir()?;
     let vscode_path = home_dir.join("Library/Application Support/Code/User/keybindings.json");
     if vscode_path.exists() {
         Some(vscode_path)
@@ -191,7 +191,7 @@ pub fn get_vscode_keybindings_path() -> Option<PathBuf> {
 /// }
 /// ```
 pub fn get_ghostty_config_path() -> Option<PathBuf> {
-    let home_dir = dirs::home_dir()?;
+    let home_dir = dirs_next::home_dir()?;
     let ghostty_path = home_dir.join("Library/Application Support/com.mitchellh.ghostty/config");
     if ghostty_path.exists() {
         Some(ghostty_path)

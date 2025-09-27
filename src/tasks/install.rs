@@ -76,7 +76,7 @@ impl LaunchAgent {
     fn install(&self) -> Result<(), Box<dyn std::error::Error>> {
         let binary_path = which(&self.binary_name)?.to_str().unwrap().to_string();
 
-        let plist_path = dirs::home_dir()
+        let plist_path = dirs_next::home_dir()
             .ok_or("Failed to determine home directory")?
             .join("Library/LaunchAgents")
             .join(format!("{}.plist", self.label));
