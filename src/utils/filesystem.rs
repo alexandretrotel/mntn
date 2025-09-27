@@ -1,11 +1,10 @@
 use chrono::Local;
 use std::{
+    ffi::OsString,
     fs::{self},
     io,
     path::Path,
 };
-
-use crate::logger::log;
 
 /// Recursively calculates the total size in bytes of the given directory or file path.
 ///
@@ -65,25 +64,34 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Backs up an existing file or directory to a timestamped location inside the backup directory.
-///
-/// This function is used when the symlink target already exists and is not a symlink.
-/// The original content is preserved to prevent data loss.
+/// Backs up an existing file or directory to a timestamped location inside `backup_dir`.
 pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()> {
+    if !backup_dir.exists() {
+        fs::create_dir_all(backup_dir)?;
+    }
+
     let filename = target
         .file_name()
-        .and_then(|n| Some(n.to_string_lossy().to_string()))
-        .unwrap_or_else(|| "backup".to_string());
+        .unwrap_or_else(|| std::ffi::OsStr::new("backup"));
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S%3f").to_string();
 
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let backup_path = backup_dir.join(format!("{filename}_{timestamp}"));
+    let mut backup_name = OsString::from(filename);
+    backup_name.push("_");
+    backup_name.push(timestamp);
 
-    log(&format!(
-        "Backing up existing {} to {}",
-        target.display(),
-        backup_path.display()
-    ));
+    let backup_path = backup_dir.join(backup_name);
 
-    fs::rename(target, backup_path)?;
-    Ok(())
+    match fs::rename(target, &backup_path) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            if target.is_dir() {
+                copy_dir_recursive(target, &backup_path)?;
+                fs::remove_dir_all(target)?;
+            } else {
+                fs::copy(target, &backup_path)?;
+                fs::remove_file(target)?;
+            }
+            Ok(())
+        }
+    }
 }
