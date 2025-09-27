@@ -1,6 +1,5 @@
 use crate::logger::log;
 use inquire::{MultiSelect, Select};
-use once_cell::sync::Lazy;
 use plist::Value;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -9,7 +8,7 @@ use std::collections::VecDeque;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use trash;
 
 /// User config loaded from ~/.config/myappcleaner/config.json
@@ -19,7 +18,11 @@ struct Config {
 }
 
 /// Global queue to track what was sent to trash.
-static TRASHED_FILES: Lazy<Mutex<VecDeque<PathBuf>>> = Lazy::new(|| Mutex::new(VecDeque::new()));
+static TRASHED_FILES: OnceLock<Mutex<VecDeque<PathBuf>>> = OnceLock::new();
+
+fn trashed_files() -> &'static Mutex<VecDeque<PathBuf>> {
+    TRASHED_FILES.get_or_init(|| Mutex::new(VecDeque::new()))
+}
 
 /// Main entry point for the app deletion process.
 ///
@@ -194,7 +197,7 @@ fn delete(app_name: &str) -> std::io::Result<bool> {
             had_errors = true;
             prompt_error("Failed to move app bundle to Trash", Some(e));
         } else {
-            TRASHED_FILES.lock().unwrap().push_back(app_path);
+            trashed_files().lock().unwrap().push_back(app_path);
         }
     }
 
@@ -210,7 +213,7 @@ fn delete(app_name: &str) -> std::io::Result<bool> {
                 Some(e),
             );
         } else {
-            TRASHED_FILES.lock().unwrap().push_back(path);
+            trashed_files().lock().unwrap().push_back(path);
         }
     }
 

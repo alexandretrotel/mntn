@@ -509,7 +509,6 @@ dependencies = [
  "dirs-next",
  "glob",
  "inquire",
- "once_cell",
  "plist",
  "regex",
  "serde",
