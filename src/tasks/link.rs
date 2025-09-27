@@ -1,6 +1,6 @@
 use crate::logger::log;
 use crate::tasks::paths::get_symlink_backup_path;
-use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source, copy_file_to_source};
+use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
 use shellexpand::tilde;
 use std::fs;
 use std::path::PathBuf;
@@ -52,7 +52,7 @@ pub fn run() {
 
         if target.exists() && !target.is_symlink() && !source.exists() {
             if target.is_file() {
-                if let Err(e) = copy_file_to_source(&target, &source) {
+                if let Err(e) = fs::copy(&target, &source) {
                     log(&format!(
                         "Failed to copy file {} to source {}: {}",
                         target.display(),

@@ -30,21 +30,6 @@ pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     Some(0)
 }
 
-/// Copies an existing file from the `target` path to the missing `source` path.
-pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
-    if let Some(parent) = source.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    let tmp_path = source.with_extension("tmp_copy");
-    fs::copy(target, &tmp_path)?;
-    fs::rename(tmp_path, source)?;
-
-    Ok(())
-}
-
 /// Copies an existing directory from `target` to `source`.
 pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
     if let Some(parent) = source.parent() {
@@ -59,20 +44,21 @@ pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Recursively copies the contents of one directory to another.
-///
-/// This function does not copy the root directory itself, only its contents.
-/// It handles nested directories and files.
+/// Recursively copies the contents of `src` to `dst` (not the root directory itself).
+/// Creates directories as needed, handles nested files.
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
 
-        if src_path.is_dir() {
+        let metadata = fs::symlink_metadata(&src_path)?;
+        if metadata.file_type().is_symlink() {
+            continue; // ignoring symlinks here
+        } else if metadata.is_dir() {
             fs::create_dir_all(&dst_path)?;
             copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
+        } else if metadata.is_file() {
             fs::copy(&src_path, &dst_path)?;
         }
     }
