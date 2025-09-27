@@ -14,7 +14,6 @@ name = "mntn"
 path = "src/lib.rs"
 
 [dependencies]
-chrono = "0.4.41"
 clap = { version = "4.5.38", features = ["derive"] }
 dirs-next = "2.0.0"
 fs_extra = "1.3.0"

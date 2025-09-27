@@ -1,4 +1,3 @@
-use chrono::Local;
 use std::{
     fs::{self},
     io,
@@ -274,7 +273,10 @@ pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()
         .and_then(|n| Some(n.to_string_lossy().to_string()))
         .unwrap_or_else(|| "backup".to_string());
 
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     let backup_path = backup_dir.join(format!("{filename}_{timestamp}"));
 
     log(&format!(
