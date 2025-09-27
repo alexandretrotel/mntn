@@ -12,25 +12,6 @@ use crate::logger::log;
 /// Symlinks are ignored and contribute zero to the total size to avoid cycles.
 ///
 /// Returns `None` if the path metadata cannot be accessed or read.
-///
-/// # Arguments
-///
-/// * `path` - The file or directory path to measure.
-///
-/// # Returns
-///
-/// * `Some(size_in_bytes)` if successful.
-/// * `None` if the path does not exist or cannot be accessed.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-/// use mntn::utils::filesystem::calculate_dir_size;
-///
-/// let size = calculate_dir_size(Path::new("/some/path")).unwrap_or(0);
-/// println!("Size: {} bytes", size);
-/// ```
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     if path.is_symlink() {
         return Some(0);
@@ -57,13 +38,6 @@ pub fn calculate_dir_size(path: &Path) -> Option<u64> {
 /// This is used when the user already has a config file in the expected location, but the
 /// dotfiles repository does not yet have it tracked. Instead of deleting the file, it is
 /// safely copied to the repository.
-///
-/// # Arguments
-/// * `target` - The current file path that exists.
-/// * `source` - The desired source location in the dotfiles directory.
-///
-/// # Errors
-/// Returns an `io::Error` if any file operations (e.g., `copy`, `create_dir_all`) fail.
 pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
     log(&format!(
         "Copying existing file {} to missing source {}",
@@ -81,13 +55,6 @@ pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
 ///
 /// This ensures the content is preserved in the user's dotfiles repository
 /// if it was not already under source control.
-///
-/// # Arguments
-/// * `target` - The existing directory.
-/// * `source` - The new source location to populate with content.
-///
-/// # Errors
-/// Returns an `io::Error` if directory creation or copying fails.
 pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
     log(&format!(
         "Copying existing directory {} to missing source {}",
@@ -103,13 +70,6 @@ pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
 ///
 /// This function does not copy the root directory itself, only its contents.
 /// It handles nested directories and files.
-///
-/// # Arguments
-/// * `src` - The source directory to copy from.
-/// * `dst` - The destination directory to copy to.
-///
-/// # Errors
-/// Returns an `io::Error` if any file operations fail.
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -130,16 +90,6 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
 ///
 /// This function is used when the symlink target already exists and is not a symlink.
 /// The original content is preserved to prevent data loss.
-///
-/// # Arguments
-/// * `target` - The file or directory to back up.
-/// * `backup_dir` - Directory where backups will be placed.
-///
-/// # Backup Filename
-/// Includes the original filename and a timestamp like `name_20250720_101530`.
-///
-/// # Errors
-/// Returns an `io::Error` if `rename()` or any intermediate directory creation fails.
 pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()> {
     let filename = target
         .file_name()
