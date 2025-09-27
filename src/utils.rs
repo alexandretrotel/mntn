@@ -6,8 +6,6 @@ use std::{
     process::Command,
 };
 
-use fs_extra::dir::{CopyOptions, copy as copy_dir};
-
 use crate::logger::log;
 
 /// Runs a system command with the given arguments and returns its standard output as a `String`.
@@ -234,9 +232,6 @@ pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
 /// * `target` - The existing directory.
 /// * `source` - The new source location to populate with content.
 ///
-/// # Behavior
-/// Uses `fs_extra` to recursively copy contents, not the root directory itself.
-///
 /// # Errors
 /// Returns an `io::Error` if directory creation or copying fails.
 pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
@@ -245,12 +240,35 @@ pub fn copy_dir_to_source(target: &Path, source: &Path) -> io::Result<()> {
         target.display(),
         source.display()
     ));
-    if let Some(parent) = source.parent() {
-        fs::create_dir_all(parent)?;
+
+    fs::create_dir_all(source)?;
+    copy_dir_recursive(target, source)
+}
+
+/// Recursively copies the contents of one directory to another.
+///
+/// This function does not copy the root directory itself, only its contents.
+/// It handles nested directories and files.
+///
+/// # Arguments
+/// * `src` - The source directory to copy from.
+/// * `dst` - The destination directory to copy to.
+///
+/// # Errors
+/// Returns an `io::Error` if any file operations fail.
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if src_path.is_dir() {
+            fs::create_dir_all(&dst_path)?;
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
     }
-    let mut options = CopyOptions::new();
-    options.copy_inside = true;
-    copy_dir(target, source, &options).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     Ok(())
 }
 
