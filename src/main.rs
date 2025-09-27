@@ -38,7 +38,6 @@ fn main() {
         Some(Commands::BiometricSudo) => biometric_sudo::run(),
         Some(Commands::Restore) => restore::run(),
         None => {
-            // No command provided, print help to guide the user
             Cli::command().print_help().expect("Failed to print help");
         }
     }
