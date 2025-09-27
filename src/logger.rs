@@ -1,6 +1,6 @@
+use chrono::Local;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Appends a timestamped log message to a file named `mntn.log` in the user's home directory.
 ///
@@ -20,12 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// ```
 pub fn log(message: &str) {
     let log_path = dirs_next::home_dir().unwrap().join("mntn.log"); // ~/mntn.log
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    let formatted_timestamp = format!("[{}]", timestamp);
+    let timestamp = Local::now().format("[%Y-%m-%d %H:%M:%S]").to_string();
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -33,5 +28,5 @@ pub fn log(message: &str) {
         .open(log_path)
         .unwrap();
 
-    writeln!(file, "{} {}", formatted_timestamp, message).unwrap();
+    writeln!(file, "{} {}", timestamp, message).unwrap();
 }
