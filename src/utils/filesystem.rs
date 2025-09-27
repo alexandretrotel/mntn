@@ -10,8 +10,6 @@ use crate::logger::log;
 /// Recursively calculates the total size in bytes of the given directory or file path.
 ///
 /// Symlinks are ignored and contribute zero to the total size to avoid cycles.
-///
-/// Returns `None` if the path metadata cannot be accessed or read.
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     let metadata = fs::symlink_metadata(path).ok()?;
 
@@ -33,20 +31,17 @@ pub fn calculate_dir_size(path: &Path) -> Option<u64> {
 }
 
 /// Copies an existing file from the `target` path to the missing `source` path.
-///
-/// This is used when the user already has a config file in the expected location, but the
-/// dotfiles repository does not yet have it tracked. Instead of deleting the file, it is
-/// safely copied to the repository.
 pub fn copy_file_to_source(target: &Path, source: &Path) -> io::Result<()> {
-    log(&format!(
-        "Copying existing file {} to missing source {}",
-        target.display(),
-        source.display()
-    ));
     if let Some(parent) = source.parent() {
-        fs::create_dir_all(parent)?;
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
     }
-    fs::copy(target, source)?;
+
+    let tmp_path = source.with_extension("tmp_copy");
+    fs::copy(target, &tmp_path)?;
+    fs::rename(tmp_path, source)?;
+
     Ok(())
 }
 
