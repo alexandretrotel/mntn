@@ -42,11 +42,6 @@ fn trashed_files() -> &'static Mutex<VecDeque<PathBuf>> {
 /// - Falls back gracefully if selection fails or nothing is selected
 /// - Logs and prints detailed errors if any failure occurs
 ///
-/// # Example
-/// ```no_run
-/// app_delete::run();
-/// ```
-///
 /// # Errors
 /// All errors are logged and printed; no panics.
 pub fn run() {
