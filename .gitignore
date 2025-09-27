@@ -1,20 +1,7 @@
 /target/**
 
-# FeedYourAI
-feedyourai.txt
+# fyai
+fyai.txt
 
-bun.lock
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-Cargo.lock
-.DS_Store
-uv.lock
-node_modules/**
-dist/**
-build/**
-
-
-
-
-
+# todo
+todo.txt
