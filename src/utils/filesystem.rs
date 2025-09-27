@@ -7,7 +7,6 @@ use std::{
 };
 
 /// Recursively calculates the total size in bytes of the given directory or file path.
-///
 /// Symlinks are ignored and contribute zero to the total size to avoid cycles.
 pub fn calculate_dir_size(path: &Path) -> Option<u64> {
     let metadata = fs::symlink_metadata(path).ok()?;
