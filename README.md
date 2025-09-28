@@ -11,7 +11,8 @@ A Rust-based CLI tool for system maintenance.
 - **Install**: Sets up automated services for backups, cleaning, and system updates.
 - **Link**: Creates symlinks for dotfiles (e.g., .mntn, .zshrc, .vimrc, .config, VSCode settings).
 - **Purge**: Deletes unused services with user confirmation.
-- **Restore**: Restores configuration files from backups.
+- **Registry**: Centralized management of configuration files and directories to backup and link.
+- **Restore**: Restores configuration files from backups using the registry system.
 
 ## Installation
 
@@ -148,6 +149,78 @@ mntn link
 
 # Run backup to update with any new package installations
 mntn backup
+```
+
+### Registry Management
+
+The `registry` command provides a centralized way to manage what files and folders are backed up and linked. The registry stores metadata about each configuration entry including source paths, target locations, and categories.
+
+#### Viewing Registry Entries
+
+```bash
+# List all entries in the registry
+mntn registry list
+
+# List only enabled entries
+mntn registry list --enabled-only
+
+# List entries in a specific category
+mntn registry list --category editor
+```
+
+**Registry Categories:**
+- `shell` - Shell configuration files (.zshrc, .bashrc, etc.)
+- `editor` - Text editors and IDEs (vim, vscode, etc.)
+- `terminal` - Terminal emulators and related tools
+- `system` - System-wide configuration
+- `development` - Development tools and environments
+- `application` - Application-specific configs
+
+#### Adding New Entries
+
+```bash
+# Add a new configuration file to track
+mntn registry add my_app_config \
+  --name "My App Config" \
+  --source "myapp/config.json" \
+  --target "~/.config/myapp/config.json" \
+  --category application \
+  --description "Configuration for My App"
+```
+
+**Target Path Types:**
+- `~/path` - Home directory relative paths
+- `.config/path` - Config directory relative paths  
+- `/absolute/path` - Absolute paths
+- Automatic detection based on path patterns
+
+#### Managing Entries
+
+```bash
+# Enable or disable an entry
+mntn registry toggle my_app_config --enable
+mntn registry toggle my_app_config --disable
+
+# Remove an entry from the registry
+mntn registry remove my_app_config
+```
+
+#### Registry File Location
+
+The registry is stored as JSON at `~/.mntn/registry.json`. You can edit it manually if needed, but using the CLI commands is recommended for consistency.
+
+**Example registry entry:**
+```json
+{
+  "name": "Zsh Configuration",
+  "source_path": ".zshrc",
+  "target_path": {
+    "Home": ".zshrc"
+  },
+  "category": "Shell",
+  "enabled": true,
+  "description": "Main Zsh shell configuration file"
+}
 ```
 
 ### Automated Maintenance Setup
