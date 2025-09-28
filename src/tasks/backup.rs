@@ -77,11 +77,23 @@ pub fn run() {
         ),
     ];
 
+    // Execute each command and write output to corresponding file
     for (name, cmd_fn) in files {
-        // Catch panics in command execution so backup continues even if one fails
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (cmd_fn)()));
-        let content = result.unwrap_or_else(|_| String::new());
-        let _ = fs::write(backup_dir.join(name), content);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(cmd_fn));
+
+        match result {
+            Ok(content) => {
+                if let Err(e) = fs::write(backup_dir.join(&name), content) {
+                    eprintln!("Failed to write {}: {}", name, e);
+                    log(&format!("Failed to write {}: {}", name, e));
+                }
+            }
+            Err(_) => {
+                eprintln!("Command for {} panicked", name);
+                log(&format!("Command for {} panicked", name));
+                let _ = fs::write(backup_dir.join(&name), "");
+            }
+        }
     }
 
     // Backup editor/config files
