@@ -224,7 +224,10 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
         total_freed += space;
 
         let space_str = bytes_to_human_readable(space);
-        let entry_name = entry.file_name().unwrap_or_default().to_string_lossy();
+        let entry_name = entry
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("<invalid-utf8>");
 
         if args.dry_run {
             println!("   [DRY RUN] Would delete: {} ({})", entry_name, space_str);
