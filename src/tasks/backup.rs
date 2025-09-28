@@ -199,6 +199,19 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         ));
     }
 
+    // Skip backup if source is a symlink pointing to our backup directory
+    if source.is_symlink() {
+        if let Ok(target) = fs::read_link(source) {
+            if target == *destination || destination.starts_with(&target) {
+                log(&format!(
+                    "Skipping backup of {} - it's already a symlink to our backup location",
+                    source.display()
+                ));
+                return Ok(());
+            }
+        }
+    }
+
     // Create destination directory if it doesn't exist
     fs::create_dir_all(destination)?;
 
