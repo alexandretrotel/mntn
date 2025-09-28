@@ -1,10 +1,10 @@
 use crate::logger::log;
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use crate::utils::paths::{get_base_dirs, get_symlinks_path};
+use crate::utils::paths::{get_backup_path, get_base_dirs, get_symlinks_path};
 use std::fs;
 use std::path::Path;
 
-/// Creates symbolic links for dotfiles and configuration directories from `~/dotfiles`
+/// Creates symbolic links for dotfiles and configuration directories from `~/.mntn/backup`
 /// to the appropriate system/user paths (e.g., `~/.zshrc`, `~/Library/...`).
 pub fn run() {
     println!("🔗 Creating symlinks...");
@@ -19,19 +19,19 @@ pub fn run() {
 
     let base_dirs = get_base_dirs();
     let home_dir = base_dirs.home_dir();
-    let dotfiles_dir = home_dir.join("dotfiles");
+    let backup_dir = get_backup_path();
     let data_dir = base_dirs.data_dir();
     let links = vec![
-        (dotfiles_dir.join(".mntn"), home_dir.join(".mntn")),
-        (dotfiles_dir.join(".zshrc"), home_dir.join(".zshrc")),
-        (dotfiles_dir.join(".vimrc"), home_dir.join(".vimrc")),
-        (dotfiles_dir.join("config"), home_dir.join(".config")),
+        (backup_dir.join(".mntn"), home_dir.join(".mntn")),
+        (backup_dir.join(".zshrc"), home_dir.join(".zshrc")),
+        (backup_dir.join(".vimrc"), home_dir.join(".vimrc")),
+        (backup_dir.join("config"), home_dir.join(".config")),
         (
-            dotfiles_dir.join("vscode/settings.json"),
+            backup_dir.join("vscode/settings.json"),
             data_dir.join("Code/User/settings.json"),
         ),
         (
-            dotfiles_dir.join("vscode/keybindings.json"),
+            backup_dir.join("vscode/keybindings.json"),
             data_dir.join("Code/User/keybindings.json"),
         ),
     ];

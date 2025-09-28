@@ -28,7 +28,7 @@ mntn backup
 # Set up automated maintenance
 mntn install --with-clean
 
-# Link your dotfiles (requires ~/dotfiles directory)
+# Link your dotfiles to your system files (requires ~/.mntn/backup to exist)
 mntn link
 
 # Clean system junk
