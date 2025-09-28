@@ -29,3 +29,8 @@ pub fn get_symlinks_path() -> PathBuf {
 pub fn get_base_dirs() -> BaseDirs {
     BaseDirs::new().unwrap()
 }
+
+/// Returns the path to the link registry file
+pub fn get_registry_path() -> PathBuf {
+    get_mntn_dir().join("registry.json")
+}

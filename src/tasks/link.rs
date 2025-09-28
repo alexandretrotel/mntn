@@ -1,6 +1,7 @@
 use crate::logger::log;
+use crate::registry::{LinkRegistry, expand_path_variables};
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use crate::utils::paths::{get_backup_path, get_base_dirs, get_symlinks_path};
+use crate::utils::paths::{get_backup_path, get_registry_path, get_symlinks_path};
 use std::fs;
 use std::path::Path;
 
@@ -17,31 +18,56 @@ pub fn run() {
         return;
     }
 
-    let base_dirs = get_base_dirs();
-    let home_dir = base_dirs.home_dir();
-    let backup_dir = get_backup_path();
-    let data_dir = base_dirs.data_dir();
-    let links = vec![
-        (backup_dir.join(".mntn"), home_dir.join(".mntn")),
-        (backup_dir.join(".zshrc"), home_dir.join(".zshrc")),
-        (backup_dir.join(".vimrc"), home_dir.join(".vimrc")),
-        (backup_dir.join("config"), home_dir.join(".config")),
-        (
-            backup_dir.join("vscode/settings.json"),
-            data_dir.join("Code/User/settings.json"),
-        ),
-        (
-            backup_dir.join("vscode/keybindings.json"),
-            data_dir.join("Code/User/keybindings.json"),
-        ),
-    ];
+    // Load the registry
+    let registry_path = get_registry_path();
+    let registry = match LinkRegistry::load_or_create(&registry_path) {
+        Ok(registry) => registry,
+        Err(e) => {
+            println!("❌ Failed to load registry: {}", e);
+            log(&format!("Failed to load registry: {}", e));
+            return;
+        }
+    };
 
-    for (src, dst) in links {
-        process_link(&src, &dst, &symlinks_dir);
+    let backup_dir = get_backup_path();
+    let mut links_processed = 0;
+
+    // Count total enabled entries
+    let links_total = registry.get_enabled_entries().count();
+
+    if links_total == 0 {
+        println!("ℹ️ No enabled entries found in registry.");
+        return;
     }
 
-    println!("✅ Symlink creation complete.");
-    log("Symlink creation complete");
+    println!("📋 Found {} enabled entries in registry", links_total);
+
+    // Process each enabled entry from the registry
+    for (id, entry) in registry.get_enabled_entries() {
+        let src = backup_dir.join(&entry.source_path);
+
+        let dst = match expand_path_variables(&entry.target_path) {
+            Ok(path) => path,
+            Err(e) => {
+                println!("⚠️ Failed to expand path for {}: {}", entry.name, e);
+                log(&format!("Failed to expand path for {}: {}", entry.name, e));
+                continue;
+            }
+        };
+
+        println!("🔗 Processing: {} ({})", entry.name, id);
+        process_link(&src, &dst, &symlinks_dir);
+        links_processed += 1;
+    }
+
+    println!(
+        "✅ Symlink creation complete. Processed {}/{} entries.",
+        links_processed, links_total
+    );
+    log(&format!(
+        "Symlink creation complete. Processed {}/{} entries",
+        links_processed, links_total
+    ));
 }
 
 /// Copies from dst to src if src is missing, handling both files and directories

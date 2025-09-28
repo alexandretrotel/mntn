@@ -1,5 +1,6 @@
 mod cli;
 mod logger;
+mod registry;
 mod tasks;
 mod utils;
 
