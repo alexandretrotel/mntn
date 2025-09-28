@@ -1,5 +1,6 @@
 use crate::cli::DeleteArgs;
 use crate::logger::log;
+use crate::utils::paths::get_base_dirs;
 use inquire::{MultiSelect, Select};
 use plist::Value;
 use regex::Regex;
@@ -7,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use shellexpand::tilde;
 use std::collections::VecDeque;
 use std::fs::{self, File};
+use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
@@ -93,8 +95,7 @@ pub fn run(args: DeleteArgs) {
 ///
 /// Filters for files ending in `.app`, strips the extension, and sorts the list for display.
 fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
-    let binding = tilde("/Applications").to_string();
-    let apps_dir = Path::new(&binding);
+    let apps_dir = Path::new("/Applications");
     let mut app_names = vec![];
 
     for entry in fs::read_dir(apps_dir)? {
@@ -146,7 +147,7 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
     }
 
     // Proceed with manual deletion of app bundle and related files
-    let app_path = PathBuf::from(tilde(&format!("/Applications/{}.app", app_name)).to_string());
+    let app_path = PathBuf::from(format!("/Applications/{}.app", app_name));
     let bundle_id = get_bundle_identifier(&app_path);
     let files_to_process = find_related_files_categorized(app_name, bundle_id.as_deref());
 
@@ -228,7 +229,9 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
 /// The config file contains custom directories to search for related app files.
 /// This allows users to extend cleanup behavior beyond default system paths.
 fn load_config() -> Config {
-    let config_path = tilde("~/.config/mntn/config.json").to_string();
+    let base_dirs = get_base_dirs();
+    let config_dir = base_dirs.config_dir();
+    let config_path = config_dir.join("mntn/config.json");
     File::open(&config_path)
         .ok()
         .and_then(|file| serde_json::from_reader(file).ok())
@@ -252,34 +255,43 @@ fn find_related_files_categorized(app_name: &str, bundle_id: Option<&str>) -> Fi
     let re_app = Regex::new(&format!(r"(?i){}", regex::escape(&app_name_lc))).unwrap();
     let re_bundle = bundle_id.map(|id| Regex::new(&format!(r"(?i){}", regex::escape(id))).unwrap());
 
-    let user_app_dirs = vec![
-        "~/Library/Application Support",
-        "~/Library/Caches",
-        "~/Library/Logs",
-    ];
-    let user_file_dirs = vec!["~/Library/Preferences"];
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+    let data_dir = base_dirs.data_dir();
+    let cache_dir = base_dirs.cache_dir();
 
-    let system_app_dirs = vec!["/Library/Application Support", "/Library/Caches"];
-    let system_file_dirs = vec!["/Library/Preferences"];
+    let user_app_dirs = vec![
+        data_dir.to_path_buf(),
+        cache_dir.to_path_buf(),
+        home_dir.join("Library/Logs"),
+    ];
+    let user_file_dirs = vec![home_dir.join("Library/Preferences")];
+
+    let system_app_dirs = vec![
+        PathBuf::from("/Library/Application Support"),
+        PathBuf::from("/Library/Caches"),
+    ];
+    let system_file_dirs = vec![PathBuf::from("/Library/Preferences")];
 
     // Process user directories
     for (dirs, is_app_dir) in [(user_app_dirs, true), (user_file_dirs, false)] {
         for dir in dirs {
-            process_directory(dir, &re_app, &re_bundle, is_app_dir, &mut user_files);
+            process_directory(&dir, &re_app, &re_bundle, is_app_dir, &mut user_files);
         }
     }
 
     // Process system directories
     for (dirs, is_app_dir) in [(system_app_dirs, true), (system_file_dirs, false)] {
         for dir in dirs {
-            process_directory(dir, &re_app, &re_bundle, is_app_dir, &mut system_files);
+            process_directory(&dir, &re_app, &re_bundle, is_app_dir, &mut system_files);
         }
     }
 
     // Process custom directories from config (treat as user directories by default)
     let config = load_config();
     for dir in config.custom_dirs {
-        process_directory(&dir, &re_app, &re_bundle, true, &mut user_files);
+        let dir_path = PathBuf::from(tilde(&dir).to_string());
+        process_directory(&dir_path, &re_app, &re_bundle, true, &mut user_files);
     }
 
     FilesToProcess {
@@ -290,18 +302,17 @@ fn find_related_files_categorized(app_name: &str, bundle_id: Option<&str>) -> Fi
 
 /// Helper function to process a single directory and add matching files to results
 fn process_directory(
-    dir: &str,
+    dir: &PathBuf,
     re_app: &Regex,
     re_bundle: &Option<Regex>,
     is_app_dir: bool,
     results: &mut Vec<PathBuf>,
 ) {
-    let expanded = PathBuf::from(tilde(dir).to_string());
-    if !expanded.exists() {
+    if !dir.exists() {
         return;
     }
 
-    let entries = match fs::read_dir(&expanded) {
+    let entries = match fs::read_dir(dir) {
         Ok(e) => e.filter_map(Result::ok).collect::<Vec<_>>(),
         Err(_) => Vec::new(),
     };
