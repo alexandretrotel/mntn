@@ -16,7 +16,7 @@ fn main() {
         Some(Commands::Purge) => purge::run(),
         Some(Commands::Link) => link::run(),
         Some(Commands::Delete(args)) => delete::run(args),
-        Some(Commands::Install) => install::run(),
+        Some(Commands::Install(args)) => install::run(args),
         Some(Commands::BiometricSudo) => biometric_sudo::run(),
         Some(Commands::Restore) => restore::run(),
         None => {

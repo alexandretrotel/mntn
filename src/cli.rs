@@ -34,6 +34,13 @@ pub struct DeleteArgs {
     pub dry_run: bool,
 }
 
+#[derive(Args)]
+pub struct InstallArgs {
+    /// Also schedule the daily clean task
+    #[arg(long)]
+    pub with_clean: bool,
+}
+
 /// Supported subcommands for `mntn`.
 ///
 /// Some commands are only available on macOS.
@@ -45,7 +52,7 @@ pub enum Commands {
     Clean(CleanArgs),
     #[cfg(target_os = "macos")]
     Delete(DeleteArgs),
-    Install,
+    Install(InstallArgs),
     Link,
     #[cfg(target_os = "macos")]
     Purge,
