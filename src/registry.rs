@@ -192,19 +192,6 @@ impl Default for LinkRegistry {
             },
         );
 
-        // Self-reference for mntn configuration
-        entries.insert(
-            "mntn_config".to_string(),
-            RegistryEntry {
-                name: "mntn Configuration".to_string(),
-                source_path: ".mntn".to_string(),
-                target_path: TargetPath::Home(".mntn".to_string()),
-                category: Category::System,
-                enabled: true,
-                description: Some("mntn tool for system maintenance".to_string()),
-            },
-        );
-
         Self {
             version: "1.0.0".to_string(),
             entries,
