@@ -237,7 +237,7 @@ impl PackageRegistry {
     }
 
     /// Update an existing entry
-    pub fn update_entry(&mut self, id: &str, entry: PackageManagerEntry) -> Result<(), String> {
+    pub fn _update_entry(&mut self, id: &str, entry: PackageManagerEntry) -> Result<(), String> {
         match self.entries.get_mut(id) {
             Some(existing_entry) => {
                 *existing_entry = entry;
