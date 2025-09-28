@@ -169,20 +169,24 @@ Add `mntn sync` command for seamless git integration:
 ```rust
 // In src/tasks/sync.rs
 pub fn run(args: SyncArgs) {
-    let backup_dir = get_backup_path();
+    let mntn_dir = get_mntn_dir(); // ~/.mntn instead of ~/.mntn/backup
     
     // Ensure git repository exists
-    if !backup_dir.join(".git").exists() {
+    if !mntn_dir.join(".git").exists() {
         if args.init {
-            initialize_git_repo(&backup_dir, &args.remote_url)?;
+            initialize_git_repo(&mntn_dir, &args.remote_url)?;
+            create_default_gitignore(&mntn_dir)?;
         } else {
             return Err("No git repository found. Use --init to initialize.".into());
         }
+    } else {
+        // Ensure .gitignore exists even if repo already exists
+        ensure_gitignore_exists(&mntn_dir)?;
     }
     
     if args.pull || args.sync {
         println!("🔄 Pulling latest changes...");
-        run_cmd_in_dir("git", &["pull"], &backup_dir)?;
+        run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
         
         // Re-link configurations after pull
         if args.auto_link {
@@ -195,18 +199,47 @@ pub fn run(args: SyncArgs) {
         let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
         let commit_msg = args.message.unwrap_or_else(|| format!("Update dotfiles - {}", timestamp));
         
-        run_cmd_in_dir("git", &["add", "."], &backup_dir)?;
+        run_cmd_in_dir("git", &["add", "."], &mntn_dir)?;
         
         // Check if there are changes to commit
-        let status = run_cmd_in_dir("git", &["status", "--porcelain"], &backup_dir)?;
+        let status = run_cmd_in_dir("git", &["status", "--porcelain"], &mntn_dir)?;
         if !status.trim().is_empty() {
-            run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &backup_dir)?;
-            run_cmd_in_dir("git", &["push"], &backup_dir)?;
+            run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &mntn_dir)?;
+            run_cmd_in_dir("git", &["push"], &mntn_dir)?;
             println!("✅ Changes pushed to remote repository");
         } else {
             println!("ℹ️ No changes to commit");
         }
     }
+}
+
+fn create_default_gitignore(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let gitignore_path = mntn_dir.join(".gitignore");
+    if !gitignore_path.exists() {
+        let default_gitignore = "# mntn log files\nmntn.log\n*.log\n\n# Temporary files\n.DS_Store\nThumbs.db\n\n# Editor files\n.vscode/\n.idea/\n\n# OS generated files\n*~\n.swp\n.swo\n";
+        fs::write(&gitignore_path, default_gitignore)?;
+        println!("✅ Created default .gitignore with mntn.log excluded");
+    }
+    Ok(())
+}
+
+fn ensure_gitignore_exists(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let gitignore_path = mntn_dir.join(".gitignore");
+    if !gitignore_path.exists() {
+        create_default_gitignore(mntn_dir)?;
+    } else {
+        // Check if mntn.log is in .gitignore, add if missing
+        let content = fs::read_to_string(&gitignore_path)?;
+        if !content.contains("mntn.log") && !content.contains("*.log") {
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&gitignore_path)?;
+            writeln!(file, "\n# mntn log files\nmntn.log")?;
+            println!("✅ Added mntn.log to existing .gitignore");
+        }
+    }
+    Ok(())
 }
 ```
 

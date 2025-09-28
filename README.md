@@ -86,38 +86,47 @@ done < ~/.mntn/backup/cargo.txt
 
 #### Setting up Version Control for Your Configurations
 
-1. **Initialize git repository in mntn backup folder:**
+1. **Initialize git repository in the mntn directory:**
    ```bash
    # Create your first backup to set up the folder structure
    mntn backup
    
-   # Initialize git repository in the backup folder
-   cd ~/.mntn/backup
+   # Initialize git repository in the mntn directory (includes full context)
+   cd ~/.mntn
    git init
    git remote add origin https://github.com/yourusername/dotfiles.git
+   
+   # mntn will automatically create a .gitignore with mntn.log excluded
    ```
 
-2. **Your backup folder structure will look like:**
+2. **Your mntn directory structure will look like:**
    ```
-   ~/.mntn/backup/
-   ├── .zshrc              # Shell configuration
-   ├── .vimrc              # Vim configuration
-   ├── config/             # This becomes ~/.config
-   │   ├── nvim/
-   │   └── git/
-   ├── vscode/
-   │   ├── settings.json
-   │   └── keybindings.json
-   ├── brew.txt            # package managers, etc.
-   ├── npm.txt
-   └── cargo.txt
+   ~/.mntn/
+   ├── .git/               # Git repository
+   ├── .gitignore          # Automatically created (excludes mntn.log)
+   ├── registry.json       # Configuration registry
+   ├── package_registry.json # Package manager registry
+   ├── mntn.log           # Log file (ignored by git)
+   ├── symlinks/          # Backup of original files
+   └── backup/            # Your dotfiles and configs
+       ├── .zshrc         # Shell configuration
+       ├── .vimrc         # Vim configuration
+       ├── config/        # This becomes ~/.config
+       │   ├── nvim/
+       │   └── git/
+       ├── vscode/
+       │   ├── settings.json
+       │   └── keybindings.json
+       ├── brew.txt       # package managers, etc.
+       ├── npm.txt
+       └── cargo.txt
    ```
 
 3. **Commit and push your configurations:**
    ```bash
-   cd ~/.mntn/backup
+   cd ~/.mntn
    git add .
-   git commit -m "Initial mntn backup setup"
+   git commit -m "Initial mntn setup with full context"
    git push -u origin main
    ```
 
@@ -147,14 +156,16 @@ mntn link
 # Install mntn
 cargo install mntn
 
-# Clone your backup repository
-git clone https://github.com/yourusername/dotfiles.git ~/.mntn/backup
+# Clone your mntn repository (includes full context and registries)
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn
 
 # Create symlinks for your configurations
 mntn link
 
 # Run backup to update with any new package installations
 mntn backup
+
+# The repository now includes your registries and full mntn context
 ```
 
 ### Package Registry Management
