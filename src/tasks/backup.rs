@@ -85,17 +85,15 @@ pub fn run() {
     }
 
     // Backup editor/config files
-    backup_editor_file(
-        get_vscode_settings_path(),
-        "vscode-settings.json",
-        &backup_dir,
-    );
-    backup_editor_file(
-        get_vscode_keybindings_path(),
-        "vscode-keybindings.json",
-        &backup_dir,
-    );
-    backup_editor_file(get_ghostty_config_path(), "ghostty-config", &backup_dir);
+    let editor_files = vec![
+        (get_vscode_settings_path(), "vscode-settings.json"),
+        (get_vscode_keybindings_path(), "vscode-keybindings.json"),
+        (get_ghostty_config_path(), "ghostty-config"),
+    ];
+
+    for (path, backup_name) in editor_files {
+        let _ = backup_editor_file(path, backup_name, &backup_dir);
+    }
 
     println!("✅ Backup complete.");
     log("Backup complete");
