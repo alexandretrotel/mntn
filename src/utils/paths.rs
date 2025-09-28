@@ -1,0 +1,19 @@
+use dirs_next::home_dir;
+use std::path::PathBuf;
+
+/// Relative path to the directory used for storing general backup files.
+pub const BACKUP_DIR: &str = "dotfiles/backups";
+
+/// This directory is a subdirectory of `BACKUP_DIR` and is used when a file or folder
+/// would be replaced by a symlink, allowing safe restoration if needed.
+pub const SYMLINK_BACKUP_DIR: &str = "dotfiles/backups/symlinks";
+
+/// Resolves the full path to the general backup directory (`BACKUP_DIR`) inside the user's home.
+pub fn get_backup_path() -> PathBuf {
+    home_dir().unwrap().join(BACKUP_DIR)
+}
+
+/// Resolves the full path to the symlink-specific backup directory (`SYMLINK_BACKUP_DIR`) inside the user's home.
+pub fn get_symlink_backup_path() -> PathBuf {
+    home_dir().unwrap().join(SYMLINK_BACKUP_DIR)
+}
