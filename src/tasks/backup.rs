@@ -49,44 +49,43 @@ pub fn run() {
     log("Starting backup");
 
     // List of package managers and their backup files + commands
-    let files: Vec<(&str, Box<dyn Fn() -> String>)> = vec![
-        ("bun.txt", Box::new(|| run_cmd("bun", &["pm", "ls", "-g"]))),
-        ("npm.txt", Box::new(|| run_cmd("npm", &["ls", "-g"]))),
-        ("pnpm.txt", Box::new(|| run_cmd("pnpm", &["ls", "-g"]))),
-        (
-            "yarn.txt",
-            Box::new(|| run_cmd("yarn", &["global", "list"])),
-        ),
-        (
-            "pip.txt",
-            Box::new(|| run_cmd("pip", &["list", "--format=freeze"])),
-        ),
-        ("uv.txt", Box::new(|| run_cmd("uv", &["pip", "freeze"]))),
+    let files: Vec<(
+        &str,
+        Box<dyn Fn() -> Result<String, Box<dyn std::error::Error>>>,
+    )> = vec![
         ("brew.txt", Box::new(|| run_cmd("brew", &["leaves"]))),
         (
             "brew-cask.txt",
             Box::new(|| run_cmd("brew", &["list", "--cask"])),
         ),
+        ("npm.txt", Box::new(|| run_cmd("npm", &["ls", "-g"]))),
+        (
+            "yarn.txt",
+            Box::new(|| run_cmd("yarn", &["global", "list"])),
+        ),
+        ("pnpm.txt", Box::new(|| run_cmd("pnpm", &["ls", "-g"]))),
+        ("bun.txt", Box::new(|| run_cmd("bun", &["pm", "ls", "-g"]))),
         (
             "cargo.txt",
             Box::new(|| run_cmd("cargo", &["install", "--list"])),
-        ),
-        (
-            "go.txt",
-            Box::new(|| run_cmd("go", &["list", "-f", "{{.ImportPath}}", "-m", "all"])),
         ),
     ];
 
     // Execute each command and write output to corresponding file
     for (name, cmd_fn) in files {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(cmd_fn));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cmd_fn()));
 
         match result {
-            Ok(content) => {
+            Ok(Ok(content)) => {
                 if let Err(e) = fs::write(backup_dir.join(&name), content) {
                     eprintln!("Failed to write {}: {}", name, e);
                     log(&format!("Failed to write {}: {}", name, e));
                 }
+            }
+            Ok(Err(e)) => {
+                eprintln!("Command for {} failed: {}", name, e);
+                log(&format!("Command for {} failed: {}", name, e));
+                let _ = fs::write(backup_dir.join(&name), "");
             }
             Err(_) => {
                 eprintln!("Command for {} panicked", name);
