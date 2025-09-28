@@ -7,10 +7,10 @@ use crate::utils::system::run_cmd;
 use std::fs;
 use std::path::PathBuf;
 
-/// Attempts to back up a given editor or config file by reading its contents and writing to the backup directory.
+/// Attempts to back up a given config file by reading its contents and writing to the backup directory.
 ///
 /// If the file path is `None`, it logs and prints a warning message.
-fn backup_editor_file(
+fn backup_config_file(
     path: Option<PathBuf>,
     backup_name: &str,
     backup_dir: &PathBuf,
@@ -40,7 +40,7 @@ fn backup_editor_file(
 /// - Ensures the backup directory exists.
 /// - Logs and prints start and completion messages.
 /// - Collects global package lists from various package managers, saving each to individual text files.
-/// - Backs up key editor configuration files for VSCode and Ghostty.
+/// - Backs up key configuration files.
 pub fn run() {
     let backup_dir = get_backup_path();
     fs::create_dir_all(&backup_dir).unwrap();
@@ -95,15 +95,15 @@ pub fn run() {
         }
     }
 
-    // Backup editor/config files
-    let editor_files = vec![
+    // Backup config files
+    let config_files = vec![
         (get_vscode_settings_path(), "vscode-settings.json"),
         (get_vscode_keybindings_path(), "vscode-keybindings.json"),
         (get_ghostty_config_path(), "ghostty-config"),
     ];
 
-    for (path, backup_name) in editor_files {
-        let _ = backup_editor_file(path, backup_name, &backup_dir);
+    for (path, backup_name) in config_files {
+        let _ = backup_config_file(path, backup_name, &backup_dir);
     }
 
     println!("✅ Backup complete.");
