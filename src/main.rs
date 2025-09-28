@@ -1,5 +1,6 @@
 mod cli;
 mod logger;
+mod package_registry;
 mod registry;
 mod tasks;
 mod utils;
@@ -23,6 +24,7 @@ fn main() {
         Some(Commands::BiometricSudo) => biometric_sudo::run(),
         Some(Commands::Restore) => restore::run(),
         Some(Commands::Registry(args)) => registry_task::run(args),
+        Some(Commands::PackageRegistry(args)) => tasks::package_registry::run(args),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }

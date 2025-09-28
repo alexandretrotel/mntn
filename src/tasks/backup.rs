@@ -1,6 +1,9 @@
 use crate::logger::log;
+use crate::package_registry::PackageRegistry;
 use crate::registry::LinkRegistry;
-use crate::utils::paths::{get_backup_path, get_base_dirs, get_registry_path};
+use crate::utils::paths::{
+    get_backup_path, get_base_dirs, get_package_registry_path, get_registry_path,
+};
 use crate::utils::system::run_cmd;
 use std::fs;
 use std::path::PathBuf;
@@ -19,58 +22,75 @@ pub fn run() {
     println!("🔁 Backing up packages...");
     log("Starting backup");
 
-    // List of package managers and their backup files + commands
-    let files: Vec<(
-        &str,
-        Box<dyn Fn() -> Result<String, Box<dyn std::error::Error>>>,
-    )> = vec![
-        ("brew.txt", Box::new(|| run_cmd("brew", &["leaves"]))),
-        (
-            "brew-cask.txt",
-            Box::new(|| run_cmd("brew", &["list", "--cask"])),
-        ),
-        ("npm.txt", Box::new(|| run_cmd("npm", &["ls", "-g"]))),
-        (
-            "yarn.txt",
-            Box::new(|| run_cmd("yarn", &["global", "list"])),
-        ),
-        ("pnpm.txt", Box::new(|| run_cmd("pnpm", &["ls", "-g"]))),
-        ("bun.txt", Box::new(|| run_cmd("bun", &["pm", "ls", "-g"]))),
-        (
-            "cargo.txt",
-            Box::new(|| run_cmd("cargo", &["install", "--list"])),
-        ),
-    ];
-
-    // Execute each command and write output to corresponding file
-    for (name, cmd_fn) in files {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cmd_fn()));
-
-        match result {
-            Ok(Ok(content)) => {
-                if let Err(e) = fs::write(backup_dir.join(&name), content) {
-                    eprintln!("Failed to write {}: {}", name, e);
-                    log(&format!("Failed to write {}: {}", name, e));
-                }
-            }
-            Ok(Err(e)) => {
-                eprintln!("Command for {} failed: {}", name, e);
-                log(&format!("Command for {} failed: {}", name, e));
-                let _ = fs::write(backup_dir.join(&name), "");
-            }
-            Err(_) => {
-                eprintln!("Command for {} panicked", name);
-                log(&format!("Command for {} panicked", name));
-                let _ = fs::write(backup_dir.join(&name), "");
-            }
-        }
-    }
+    // Backup package managers using registry
+    backup_package_managers(&backup_dir);
 
     // Backup config files using registry
     backup_config_files_from_registry(&backup_dir);
 
     println!("✅ Backup complete.");
     log("Backup complete");
+}
+
+/// Backs up package managers based on the package registry entries
+fn backup_package_managers(backup_dir: &PathBuf) {
+    // Load the package registry
+    let package_registry_path = get_package_registry_path();
+    let package_registry = match PackageRegistry::load_or_create(&package_registry_path) {
+        Ok(registry) => registry,
+        Err(e) => {
+            println!(
+                "⚠️ Failed to load package registry, skipping package backup: {}",
+                e
+            );
+            log(&format!("Failed to load package registry: {}", e));
+            return;
+        }
+    };
+
+    let current_platform = PackageRegistry::get_current_platform();
+    let compatible_entries: Vec<_> = package_registry
+        .get_platform_compatible_entries(&current_platform)
+        .collect();
+
+    if compatible_entries.is_empty() {
+        println!("ℹ️ No package managers found to backup");
+        return;
+    }
+
+    println!(
+        "🔁 Backing up {} package managers...",
+        compatible_entries.len()
+    );
+
+    for (id, entry) in compatible_entries {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
+            run_cmd(&entry.command, &args)
+        }));
+
+        match result {
+            Ok(Ok(content)) => {
+                if let Err(e) = fs::write(backup_dir.join(&entry.output_file), content) {
+                    println!("⚠️ Failed to write {}: {}", entry.output_file, e);
+                    log(&format!("Failed to write {}: {}", entry.output_file, e));
+                } else {
+                    println!("🔁 Backed up {} ({})", entry.name, id);
+                    log(&format!("Backed up {}", entry.name));
+                }
+            }
+            Ok(Err(e)) => {
+                println!("⚠️ Command for {} failed: {}", entry.name, e);
+                log(&format!("Command for {} failed: {}", entry.name, e));
+                let _ = fs::write(backup_dir.join(&entry.output_file), "");
+            }
+            Err(_) => {
+                println!("⚠️ Command for {} panicked", entry.name);
+                log(&format!("Command for {} panicked", entry.name));
+                let _ = fs::write(backup_dir.join(&entry.output_file), "");
+            }
+        }
+    }
 }
 
 /// Backs up configuration files based on the registry entries

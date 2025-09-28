@@ -34,3 +34,8 @@ pub fn get_base_dirs() -> BaseDirs {
 pub fn get_registry_path() -> PathBuf {
     get_mntn_dir().join("registry.json")
 }
+
+/// Returns the path to the package manager registry file
+pub fn get_package_registry_path() -> PathBuf {
+    get_mntn_dir().join("package_registry.json")
+}

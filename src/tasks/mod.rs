@@ -4,6 +4,7 @@ pub mod clean;
 pub mod delete;
 pub mod install;
 pub mod link;
+pub mod package_registry;
 pub mod purge;
 pub mod registry;
 pub mod restore;

@@ -138,6 +138,82 @@ pub enum RegistryActions {
     },
 }
 
+/// Arguments for the package registry command.
+#[derive(Args)]
+pub struct PackageRegistryArgs {
+    #[command(subcommand)]
+    pub action: PackageRegistryActions,
+}
+
+/// Package registry management actions.
+#[derive(Subcommand)]
+pub enum PackageRegistryActions {
+    /// List all package manager entries
+    #[command(about = "List all package manager entries in the registry")]
+    List {
+        /// Show only enabled entries
+        #[arg(long, short = 'e', help = "Show only enabled entries")]
+        enabled_only: bool,
+        /// Show only entries compatible with current platform
+        #[arg(long, short = 'p', help = "Show only platform-compatible entries")]
+        platform_only: bool,
+    },
+    /// Add a new package manager entry to the registry
+    #[command(about = "Add a new package manager entry to the registry")]
+    Add {
+        /// Unique ID for the entry
+        #[arg(help = "Unique identifier for the package manager entry")]
+        id: String,
+        /// Human-readable name
+        #[arg(
+            long,
+            short = 'n',
+            help = "Human-readable name for the package manager"
+        )]
+        name: String,
+        /// Command to execute
+        #[arg(long, short = 'c', help = "Command to execute (e.g., 'brew')")]
+        command: String,
+        /// Arguments for the command
+        #[arg(
+            long,
+            short = 'a',
+            help = "Arguments for the command (comma-separated)"
+        )]
+        args: String,
+        /// Output filename
+        #[arg(long, short = 'o', help = "Output filename (e.g., 'brew.txt')")]
+        output_file: String,
+        /// Optional description
+        #[arg(long, short = 'd', help = "Optional description")]
+        description: Option<String>,
+        /// Platform compatibility (comma-separated)
+        #[arg(
+            long,
+            short = 'p',
+            help = "Platform compatibility (comma-separated, e.g., 'macos,linux')"
+        )]
+        platforms: Option<String>,
+    },
+    /// Remove a package manager entry from the registry
+    #[command(about = "Remove a package manager entry from the registry")]
+    Remove {
+        /// ID of the entry to remove
+        #[arg(help = "ID of the entry to remove")]
+        id: String,
+    },
+    /// Enable or disable a package manager entry
+    #[command(about = "Enable or disable a package manager entry")]
+    Toggle {
+        /// ID of the entry to toggle
+        #[arg(help = "ID of the entry to toggle")]
+        id: String,
+        /// Enable the entry
+        #[arg(long, short = 'e', help = "Enable the entry")]
+        enable: bool,
+    },
+}
+
 /// Available maintenance commands for `mntn`.
 ///
 /// Some commands are only available on macOS systems.
@@ -180,4 +256,8 @@ pub enum Commands {
     /// Manage the registry of files and folders to backup and link
     #[command(about = "Manage the registry of files and folders for backup and linking")]
     Registry(RegistryArgs),
+
+    /// Manage the package manager registry for backup
+    #[command(about = "Manage the package manager registry for backup operations")]
+    PackageRegistry(PackageRegistryArgs),
 }
