@@ -1,11 +1,12 @@
 use crate::cli::PurgeArgs;
 use crate::logger::log;
+use crate::utils::paths::get_base_dirs;
 use crate::utils::system::run_cmd;
 use inquire::MultiSelect;
 use std::fs;
 use std::path::PathBuf;
 
-/// Represents a directory target for scanning plist files
+/// Represents a directory target for scanning service files
 #[derive(Debug, Clone)]
 struct DirectoryTarget {
     name: &'static str,
@@ -13,31 +14,65 @@ struct DirectoryTarget {
     is_system: bool,
 }
 
-/// Represents a found plist file with metadata
+/// Represents a found service/autostart file with metadata
 #[derive(Debug)]
-struct PlistFile {
+struct ServiceFile {
     display_label: String,
     path: PathBuf,
     is_system: bool,
+    service_type: ServiceType,
 }
 
-/// Lists all macOS LaunchAgents and LaunchDaemons `.plist` files from standard system directories,
+/// Types of services that can be managed
+#[derive(Debug, Clone)]
+enum ServiceType {
+    #[cfg(target_os = "macos")]
+    Plist,
+    #[cfg(target_os = "linux")]
+    SystemdService,
+    #[cfg(target_os = "linux")]
+    AutostartDesktop,
+    #[cfg(target_os = "windows")]
+    WindowsService,
+    #[cfg(target_os = "windows")]
+    StartupProgram,
+}
+
+/// Lists all system services and startup programs from standard directories,
 /// prompts the user to select which ones to delete, and deletes the selected files.
 pub fn run(args: PurgeArgs) {
-    println!("🧼 Listing all launch agents and daemons...");
-    log("Starting plist listing");
+    #[cfg(target_os = "macos")]
+    {
+        println!("🧼 Listing all launch agents and daemons...");
+        log("Starting plist listing");
+    }
+    #[cfg(target_os = "linux")]
+    {
+        println!("🧼 Listing all systemd services and autostart programs...");
+        log("Starting systemd service listing");
+    }
+    #[cfg(target_os = "windows")]
+    {
+        println!("🧼 Listing all Windows services and startup programs...");
+        log("Starting Windows service listing");
+    }
 
     let targets = get_directory_targets(args.system);
-    let plist_files = scan_plist_files(&targets);
+    let service_files = scan_service_files(&targets);
 
-    if plist_files.is_empty() {
+    if service_files.is_empty() {
+        #[cfg(target_os = "macos")]
         println!("📁 No .plist files found.");
-        log("No .plist files found.");
+        #[cfg(target_os = "linux")]
+        println!("📁 No systemd services or autostart programs found.");
+        #[cfg(target_os = "windows")]
+        println!("📁 No Windows services or startup programs found.");
+        log("No service files found.");
         return;
     }
 
     // Collect display labels for user selection prompt
-    let options: Vec<String> = plist_files
+    let options: Vec<String> = service_files
         .iter()
         .map(|f| f.display_label.clone())
         .collect();
@@ -48,112 +83,322 @@ pub fn run(args: PurgeArgs) {
     } else {
         "delete"
     };
-    let prompt_message = format!("Select .plist files to {}:", action_verb);
+    let service_type_name = get_service_type_name();
+    let prompt_message = format!("Select {} to {}:", service_type_name, action_verb);
 
     let to_delete = MultiSelect::new(&prompt_message, options.clone())
         .prompt()
         .unwrap_or_default();
 
     if args.dry_run {
-        println!("🔍 Dry run - would delete the following files:");
+        println!("🔍 Dry run - would delete the following items:");
         for selected in to_delete {
-            if let Some(plist_file) = plist_files.iter().find(|f| f.display_label == selected) {
-                println!("  - {}", plist_file.path.display());
-                log(&format!("Would delete: {}", plist_file.path.display()));
+            if let Some(service_file) = service_files.iter().find(|f| f.display_label == selected) {
+                println!("  - {}", service_file.path.display());
+                log(&format!("Would delete: {}", service_file.path.display()));
             }
         }
         println!("✅ Dry run complete. No files were actually deleted.");
         log("Dry run complete");
     } else {
         for selected in to_delete {
-            if let Some(plist_file) = plist_files.iter().find(|f| f.display_label == selected) {
-                delete_plist_file(&plist_file.path, plist_file.is_system);
-                log(&format!("Deleted: {}", plist_file.path.display()));
+            if let Some(service_file) = service_files.iter().find(|f| f.display_label == selected) {
+                delete_service_file(service_file);
+                log(&format!("Deleted: {}", service_file.path.display()));
             }
         }
-        log("Plist deletion complete");
-        println!("✅ Selected files deleted.");
+        log("Service deletion complete");
+        println!("✅ Selected items deleted.");
     }
 }
 
-/// Returns the directory targets to scan based on the system flag
+/// Returns the directory targets to scan based on the system flag and platform
 fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
-    let mut targets = vec![DirectoryTarget {
-        name: "User LaunchAgents",
-        path: "~/Library/LaunchAgents",
-        is_system: false,
-    }];
+    let mut targets = Vec::new();
 
-    if include_system {
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+    #[cfg(target_os = "linux")]
+    let config_dir = base_dirs.config_dir();
+
+    #[cfg(target_os = "macos")]
+    {
         targets.push(DirectoryTarget {
-            name: "System LaunchAgents",
-            path: "/Library/LaunchAgents",
-            is_system: true,
+            name: "User LaunchAgents",
+            path: home_dir.join("Library/LaunchAgents").to_str().unwrap_or(""),
+            is_system: false,
+        });
+
+        if include_system {
+            targets.push(DirectoryTarget {
+                name: "System LaunchAgents",
+                path: "/Library/LaunchAgents",
+                is_system: true,
+            });
+            targets.push(DirectoryTarget {
+                name: "System LaunchDaemons",
+                path: "/Library/LaunchDaemons",
+                is_system: true,
+            });
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        targets.push(DirectoryTarget {
+            name: "User Systemd Services",
+            path: config_dir.join("systemd/user").to_str().unwrap_or(""),
+            is_system: false,
         });
         targets.push(DirectoryTarget {
-            name: "System LaunchDaemons",
-            path: "/Library/LaunchDaemons",
-            is_system: true,
+            name: "User Autostart",
+            path: config_dir.join("autostart").to_str().unwrap_or(""),
+            is_system: false,
         });
+
+        if include_system {
+            targets.push(DirectoryTarget {
+                name: "System Systemd Services",
+                path: "/etc/systemd/system",
+                is_system: true,
+            });
+            targets.push(DirectoryTarget {
+                name: "System Systemd Services (lib)",
+                path: "/lib/systemd/system",
+                is_system: true,
+            });
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // TODO: Windows implementation to be added
+        println!("⚠️  Windows support is not yet implemented for the purge command.");
     }
 
     targets
 }
 
-/// Scans the specified directories for .plist files and returns them with metadata
-fn scan_plist_files(targets: &[DirectoryTarget]) -> Vec<PlistFile> {
-    let mut plist_files = Vec::new();
+/// Scans the specified directories for service files and returns them with metadata
+fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
+    let mut service_files = Vec::new();
 
     for target in targets {
-        let path = shellexpand::tilde(target.path).to_string();
+        let path = PathBuf::from(target.path);
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.flatten() {
-                let plist_path = entry.path();
+                let service_path = entry.path();
 
-                // Only consider .plist files
-                if plist_path.extension().and_then(|s| s.to_str()) != Some("plist") {
+                let (service_type, should_include) = determine_service_type(&service_path, target);
+                if !should_include {
                     continue;
                 }
 
-                let display_label = get_plist_display_label(target.name, &plist_path);
+                let display_label =
+                    get_service_display_label(target.name, &service_path, &service_type);
 
-                plist_files.push(PlistFile {
+                service_files.push(ServiceFile {
                     display_label,
-                    path: plist_path,
+                    path: service_path,
                     is_system: target.is_system,
+                    service_type,
                 });
             }
         }
     }
 
-    plist_files
+    service_files
 }
 
-/// Gets a friendly display label for a plist file
-fn get_plist_display_label(group_name: &str, plist_path: &PathBuf) -> String {
-    let label_result = run_cmd(
-        "defaults",
-        &["read", plist_path.to_str().unwrap_or(""), "Label"],
-    );
+/// Gets the service type name for the current platform
+fn get_service_type_name() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return "plist files";
+    #[cfg(target_os = "linux")]
+    return "services and autostart programs";
+    #[cfg(target_os = "windows")]
+    return "services and startup programs";
+}
 
-    let label = match label_result {
-        Ok(output) => output.trim().to_string(),
-        Err(_) => String::new(),
-    };
+/// Determines the service type and whether the file should be included
+fn determine_service_type(service_path: &PathBuf, target: &DirectoryTarget) -> (ServiceType, bool) {
+    let extension = service_path.extension().and_then(|s| s.to_str());
 
-    if !label.is_empty() {
-        format!("[{}] {}", group_name, label)
-    } else {
-        let fallback = plist_path
-            .file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("unknown.plist");
-        format!("[{}] {}", group_name, fallback)
+    #[cfg(target_os = "macos")]
+    {
+        if extension == Some("plist") {
+            return (ServiceType::Plist, true);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if extension == Some("service") || extension == Some("timer") || extension == Some("socket")
+        {
+            return (ServiceType::SystemdService, true);
+        }
+        if extension == Some("desktop") && target.path.contains("autostart") {
+            return (ServiceType::AutostartDesktop, true);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // TODO: Implement Windows service detection
+        let _ = target;
+        return (ServiceType::WindowsService, false);
+    }
+
+    #[allow(unreachable_code)]
+    {
+        let _ = target;
+        (ServiceType::Plist, false)
     }
 }
 
-/// Attempts to delete a plist file, trying fs::remove_file first, then sudo if needed
-fn delete_plist_file(path: &PathBuf, is_system_file: bool) {
+/// Gets a friendly display label for a service file
+fn get_service_display_label(
+    group_name: &str,
+    service_path: &PathBuf,
+    service_type: &ServiceType,
+) -> String {
+    match service_type {
+        #[cfg(target_os = "macos")]
+        ServiceType::Plist => {
+            let label_result = run_cmd(
+                "defaults",
+                &["read", service_path.to_str().unwrap_or(""), "Label"],
+            );
+
+            let label = match label_result {
+                Ok(output) => output.trim().to_string(),
+                Err(_) => String::new(),
+            };
+
+            if !label.is_empty() {
+                format!("[{}] {}", group_name, label)
+            } else {
+                let fallback = service_path
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("unknown.plist");
+                format!("[{}] {}", group_name, fallback)
+            }
+        }
+        #[cfg(target_os = "linux")]
+        ServiceType::SystemdService => {
+            let service_name = service_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("unknown.service");
+
+            let description = get_systemd_service_description(service_path)
+                .unwrap_or_else(|| service_name.to_string());
+
+            format!("[{}] {} ({})", group_name, service_name, description)
+        }
+        #[cfg(target_os = "linux")]
+        ServiceType::AutostartDesktop => {
+            let app_name = service_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .and_then(|s| s.strip_suffix(".desktop"))
+                .unwrap_or("unknown");
+
+            let display_name =
+                get_desktop_file_name(service_path).unwrap_or_else(|| app_name.to_string());
+
+            format!("[{}] {}", group_name, display_name)
+        }
+        #[cfg(target_os = "windows")]
+        ServiceType::WindowsService | ServiceType::StartupProgram => {
+            let fallback = service_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("unknown");
+            format!("[{}] {}", group_name, fallback)
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+/// Gets the description from a systemd service file
+fn get_systemd_service_description(service_path: &PathBuf) -> Option<String> {
+    let content = fs::read_to_string(service_path).ok()?;
+
+    for line in content.lines() {
+        if line.starts_with("Description=") {
+            return Some(line.strip_prefix("Description=")?.trim().to_string());
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "linux")]
+/// Gets the name from a desktop file
+fn get_desktop_file_name(desktop_path: &PathBuf) -> Option<String> {
+    let content = fs::read_to_string(desktop_path).ok()?;
+
+    for line in content.lines() {
+        if line.starts_with("Name=") {
+            return Some(line.strip_prefix("Name=")?.trim().to_string());
+        }
+    }
+
+    None
+}
+
+/// Attempts to delete a service file, with platform-specific handling
+fn delete_service_file(service_file: &ServiceFile) {
+    match &service_file.service_type {
+        #[cfg(target_os = "macos")]
+        ServiceType::Plist => {
+            delete_file_with_sudo(&service_file.path, service_file.is_system);
+        }
+        #[cfg(target_os = "linux")]
+        ServiceType::SystemdService => {
+            // For systemd services, first try to stop and disable the service
+            if let Some(service_name) = service_file.path.file_name().and_then(|f| f.to_str()) {
+                let systemctl_cmd = if service_file.is_system {
+                    "sudo systemctl"
+                } else {
+                    "systemctl --user"
+                };
+
+                // Try to stop the service (ignore errors as it might not be running)
+                let _ = if service_file.is_system {
+                    run_cmd("sudo", &["systemctl", "stop", service_name])
+                } else {
+                    run_cmd("systemctl", &["--user", "stop", service_name])
+                };
+
+                // Try to disable the service (ignore errors as it might not be enabled)
+                let _ = if service_file.is_system {
+                    run_cmd("sudo", &["systemctl", "disable", service_name])
+                } else {
+                    run_cmd("systemctl", &["--user", "disable", service_name])
+                };
+
+                println!("🚫 Stopped and disabled service: {}", service_name);
+            }
+
+            delete_file_with_sudo(&service_file.path, service_file.is_system);
+        }
+        #[cfg(target_os = "linux")]
+        ServiceType::AutostartDesktop => {
+            delete_file_with_sudo(&service_file.path, service_file.is_system);
+        }
+        #[cfg(target_os = "windows")]
+        ServiceType::WindowsService | ServiceType::StartupProgram => {
+            // TODO: Implement Windows service deletion
+            println!("⚠️  Windows service deletion not yet implemented");
+        }
+    }
+}
+
+/// Helper function to delete a file, using sudo if needed for system files
+fn delete_file_with_sudo(path: &PathBuf, is_system_file: bool) {
     match fs::remove_file(path) {
         Ok(_) => {
             println!("🗑️  Deleted: {}", path.display());
