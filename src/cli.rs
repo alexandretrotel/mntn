@@ -31,6 +31,7 @@ pub enum Commands {
     #[cfg(target_os = "macos")]
     BiometricSudo,
     Clean(CleanArgs),
+    #[cfg(target_os = "macos")]
     Delete,
     Install,
     Link,

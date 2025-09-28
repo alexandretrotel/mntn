@@ -11,7 +11,7 @@ use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use trash;
 
-/// User config loaded from ~/.config/myappcleaner/config.json
+/// User config loaded from ~/.config/mntn/config.json
 #[derive(Serialize, Deserialize)]
 struct Config {
     custom_dirs: Vec<String>,
@@ -93,37 +93,10 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
 /// Deletes a selected app and associated files by either:
 /// - Uninstalling via Homebrew if applicable
 /// - Moving its `.app` bundle and related files to the Trash
-///
-/// # Parameters
-/// - `app_name`: the base name of the `.app` bundle (without `.app` extension)
-///
-/// # Returns
-/// - `Ok(true)` if all deletions succeeded
-/// - `Ok(false)` if partial errors occurred (e.g., some files failed to trash)
-/// - `Err(io::Error)` if the process could not complete at all
-///
-/// # Process
-/// 1. Checks if app is a Homebrew cask and tries to uninstall it via `brew uninstall --cask`
-/// 2. Otherwise:
-///     - Locates the app's `.app` bundle and moves it to the Trash
-///     - Uses the bundle ID (from Info.plist) and app name to match related files
-///     - Prompts the user to select which files to delete
-///     - Moves selected files to the Trash
-///
-/// # Behavior
-/// - Uses `trash::delete` for safe file removal
-/// - Logs all events, including successful deletions and failures
-///
-/// # Example
-/// ```
-/// let success = delete("Visual Studio Code")?;
-/// if success {
-///     println!("Deleted successfully");
-/// }
-/// ```
 fn delete(app_name: &str) -> std::io::Result<bool> {
     let mut had_errors = false;
 
+    // Check if the app is managed by Homebrew
     if is_homebrew_app(app_name) {
         println!("🗑 Uninstalling {} via Homebrew...", app_name);
         log(&format!("Uninstalling {} via Homebrew", app_name));
@@ -140,6 +113,7 @@ fn delete(app_name: &str) -> std::io::Result<bool> {
         }
     }
 
+    // Proceed with manual deletion of app bundle and related files
     let app_path = PathBuf::from(tilde(&format!("/Applications/{}.app", app_name)).to_string());
     let bundle_id = get_bundle_identifier(&app_path);
     let related_paths = find_related_files(app_name, bundle_id.as_deref());
@@ -186,30 +160,12 @@ fn delete(app_name: &str) -> std::io::Result<bool> {
     Ok(!had_errors)
 }
 
-/// Loads user configuration from `~/.config/myappcleaner/config.json`.
+/// Loads user configuration from `~/.config/mntn/config.json`.
 ///
 /// The config file contains custom directories to search for related app files.
 /// This allows users to extend cleanup behavior beyond default system paths.
-///
-/// # Returns
-/// A `Config` struct:
-/// - If the file is found and parsed successfully, returns user-specified directories.
-/// - If the file is missing or malformed, returns an empty `custom_dirs` vector.
-///
-/// # Example config file
-/// ```json
-/// {
-///   "custom_dirs": ["/Users/username/.myapp/data"]
-/// }
-/// ```
-///
-/// # Example
-/// ```
-/// let config = load_config();
-/// println!("{:?}", config.custom_dirs);
-/// ```
 fn load_config() -> Config {
-    let config_path = tilde("~/.config/myappcleaner/config.json").to_string();
+    let config_path = tilde("~/.config/mntn/config.json").to_string();
     File::open(&config_path)
         .ok()
         .and_then(|file| serde_json::from_reader(file).ok())
@@ -223,31 +179,6 @@ fn load_config() -> Config {
 /// Uses a regex match against:
 /// - Directory and file names inside known locations (Caches, Logs, Preferences, etc.)
 /// - User-configured custom paths from the config file
-///
-/// # Parameters
-/// - `app_name`: Name of the app selected by the user (e.g., "Firefox")
-/// - `bundle_id`: Optional string like `org.mozilla.firefox` extracted from the app’s Info.plist
-///
-/// # Returns
-/// A vector of `PathBuf` entries representing related files or directories to consider deleting.
-///
-/// # Matching Rules
-/// - For directories (like Application Support): matches if the folder name includes app name or bundle ID
-/// - For `.plist` files in Preferences: matches by filename
-///
-/// # Example
-/// ```
-/// let matches = find_related_files("Firefox", Some("org.mozilla.firefox"));
-/// for path in matches {
-///     println!("Found: {}", path.display());
-/// }
-/// ```
-///
-/// # Errors
-/// Ignores entries it cannot read and continues searching.
-///
-/// # Notes
-/// Will skip non-existing directories silently.
 fn find_related_files(app_name: &str, bundle_id: Option<&str>) -> Vec<PathBuf> {
     let mut results = Vec::new();
 
@@ -284,10 +215,12 @@ fn find_related_files(app_name: &str, bundle_id: Option<&str>) -> Vec<PathBuf> {
 
         for entry in entries {
             let path = entry.path();
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let name = path.file_name().unwrap_or_default();
 
-            let matches =
-                re_app.is_match(&name) || re_bundle.as_ref().map_or(false, |re| re.is_match(&name));
+            let matches = name.to_str().map_or(false, |name_str| {
+                re_app.is_match(name_str)
+                    || re_bundle.as_ref().map_or(false, |re| re.is_match(name_str))
+            });
 
             if matches {
                 if (app_dirs.contains(&dir.as_str()) && path.is_dir())
@@ -306,24 +239,6 @@ fn find_related_files(app_name: &str, bundle_id: Option<&str>) -> Vec<PathBuf> {
 /// Extracts the `CFBundleIdentifier` from an app’s `Info.plist` file.
 ///
 /// Used to locate related system files using a more reliable identifier than the name alone.
-///
-/// # Parameters
-/// - `app_path`: Path to the `.app` bundle (e.g., `/Applications/Foo.app`)
-///
-/// # Returns
-/// - `Some(String)` if the bundle identifier is found in the Info.plist
-/// - `None` if the file is missing or cannot be parsed
-///
-/// # Example
-/// ```
-/// let id = get_bundle_identifier(Path::new("/Applications/Foo.app"));
-/// if let Some(bundle_id) = id {
-///     println!("Bundle ID: {}", bundle_id);
-/// }
-/// ```
-///
-/// # Notes
-/// Looks for `Contents/Info.plist` inside the `.app` directory.
 fn get_bundle_identifier(app_path: &Path) -> Option<String> {
     let plist_path = app_path.join("Contents/Info.plist");
     File::open(&plist_path)
@@ -339,48 +254,27 @@ fn get_bundle_identifier(app_path: &Path) -> Option<String> {
 }
 
 /// Determines whether an app is installed via Homebrew Cask.
-///
-/// # Parameters
-/// - `app_name`: The app’s base name (e.g., "firefox")
-///
-/// # Returns
-/// - `true` if the app name appears in `brew list --cask`
-/// - `false` otherwise (either not installed or not a cask)
-///
-/// # Behavior
-/// - Runs `brew list --cask` and checks for a case-insensitive match
-/// - Falls back to `false` on any command failure
-///
-/// # Example
-/// ```
-/// if is_homebrew_app("firefox") {
-///     println!("Firefox is a Homebrew Cask app");
-/// }
-/// ```
 fn is_homebrew_app(app_name: &str) -> bool {
-    Command::new("brew")
-        .args(&["list", "--cask"])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        .unwrap_or_default()
-        .to_lowercase()
-        .contains(&app_name.to_lowercase())
+    let output = Command::new("brew").args(&["list", "--cask"]).output();
+
+    let stdout = match output {
+        Ok(o) => match String::from_utf8(o.stdout) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Invalid UTF-8 output from brew: {}", e);
+                return false;
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to run brew: {}", e);
+            return false;
+        }
+    };
+
+    stdout.to_lowercase().contains(&app_name.to_lowercase())
 }
 
 /// Helper function to log and display an error in a consistent format.
-///
-/// # Parameters
-/// - `context`: Describes what the error was trying to do (e.g., "Deleting app")
-/// - `error`: The error itself (or optional `None`)
-///
-/// # Example
-/// ```
-/// prompt_error("Failed to uninstall via Homebrew", Some(err));
-/// ```
-///
-/// # Side Effects
-/// - Prints a red ❌-style message to the console
-/// - Logs the error via the custom `log` function
 fn prompt_error(context: &str, error: impl std::fmt::Debug) {
     println!("❌ {}: {:?}", context, error);
     log(&format!("{}: {:?}", context, error));
