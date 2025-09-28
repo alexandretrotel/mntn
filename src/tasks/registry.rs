@@ -1,7 +1,8 @@
 use crate::cli::{RegistryActions, RegistryArgs};
 use crate::logger::log;
-use crate::registry::{LinkRegistry, RegistryEntry};
+use crate::registry::{Category, LinkRegistry, RegistryEntry, TargetPath};
 use crate::utils::paths::get_registry_path;
+use std::str::FromStr;
 
 /// Run the registry management command
 pub fn run(args: RegistryArgs) {
@@ -53,7 +54,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     for category in sorted_categories {
         // Skip categories that don't match the filter
         if let Some(ref filter) = filter_category {
-            if category != filter {
+            if category.to_string() != *filter {
                 continue;
             }
         }
@@ -68,15 +69,16 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
             }
 
             if !has_entries {
-                println!("\n🏷️  {}", category.to_uppercase());
-                println!("{}", "─".repeat(category.len() + 4));
+                let category_str = category.to_string().to_uppercase();
+                println!("\n🏷️  {}", category_str);
+                println!("{}", "─".repeat(category_str.len() + 4));
                 has_entries = true;
             }
 
             let status = if entry.enabled { "✅" } else { "❌" };
             println!("  {} {} ({})", status, entry.name, id);
             println!("     📁 Source: {}", entry.source_path);
-            println!("     🔗 Target: {}", entry.target_path);
+            println!("     🔗 Target: {}", entry.target_path.display());
 
             if let Some(ref desc) = entry.description {
                 println!("     💬 {}", desc);
@@ -123,11 +125,39 @@ fn add_entry(
         return;
     }
 
+    // Parse category
+    let parsed_category = match Category::from_str(&category) {
+        Ok(cat) => cat,
+        Err(_) => {
+            println!(
+                "❌ Invalid category '{}'. Valid categories are: shell, editor, terminal, system, development, application",
+                category
+            );
+            return;
+        }
+    };
+
+    // Parse target path
+    let target_path = if target.starts_with('~') {
+        TargetPath::Home(target.strip_prefix("~/").unwrap_or(&target).to_string())
+    } else if target.contains("/.config/") || target.starts_with(".config/") {
+        let config_part = if target.starts_with(".config/") {
+            target.strip_prefix(".config/").unwrap_or(&target)
+        } else {
+            target.split("/.config/").nth(1).unwrap_or(&target)
+        };
+        TargetPath::Config(config_part.to_string())
+    } else if target.starts_with('/') {
+        TargetPath::Absolute(target)
+    } else {
+        TargetPath::Home(target)
+    };
+
     let entry = RegistryEntry {
         name: name.clone(),
         source_path: source,
-        target_path: target,
-        category: category.clone(),
+        target_path,
+        category: parsed_category,
         enabled: true,
         description,
     };
