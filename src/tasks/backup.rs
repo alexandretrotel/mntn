@@ -221,7 +221,7 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
     if source.is_symlink() {
         if let Ok(target) = fs::read_link(source) {
             // Canonicalize paths to handle relative vs absolute path differences
-            let canonical_target = target.canonicalize().unwrap_or(target);
+            let canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
             let canonical_dest = destination
                 .canonicalize()
                 .unwrap_or_else(|_| destination.clone());
