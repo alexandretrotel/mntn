@@ -1,4 +1,5 @@
 use crate::logger::log;
+use crate::utils::paths::get_base_dirs;
 use std::fs;
 use std::process::Command;
 use which::which;
@@ -11,16 +12,6 @@ use which::which;
 /// - `com.mntn.topgrade` → runs `topgrade` every day (only if installed)
 ///
 /// After writing each agent's configuration, it loads the agent with `launchctl`.
-///
-/// # Notes
-/// - Skips agents if their binary is not found via `which`.
-/// - All `.plist` logs go to `/tmp/{label}.out/.err`.
-/// - Gracefully logs failures and proceeds with available tasks.
-///
-/// # Example
-/// ```
-/// install_launch_agents::run();
-/// ```
 pub fn run() {
     println!("📦 Installing launch agents...");
     log("Starting launch agent installation");
@@ -76,8 +67,9 @@ impl LaunchAgent {
     fn install(&self) -> Result<(), Box<dyn std::error::Error>> {
         let binary_path = which(&self.binary_name)?.to_str().unwrap().to_string();
 
-        let plist_path = dirs_next::home_dir()
-            .ok_or("Failed to determine home directory")?
+        let base_dirs = get_base_dirs();
+        let home_dir = base_dirs.home_dir();
+        let plist_path = home_dir
             .join("Library/LaunchAgents")
             .join(format!("{}.plist", self.label));
 
