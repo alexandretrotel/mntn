@@ -75,53 +75,48 @@ brew install $(cat ~/.mntn/backup/brew.txt)
 npm install -g $(cat ~/.mntn/backup/npm.txt | grep -o '^[^@]*' | tr '\n' ' ')
 ```
 
-### Dotfiles Management with GitHub
+### Configuration Management with Version Control
 
-#### Setting up a Dotfiles Repository
+#### Setting up Version Control for Your Configurations
 
-1. **Create a dotfiles repository on GitHub:**
+1. **Initialize git repository in mntn backup folder:**
    ```bash
-   mkdir ~/dotfiles
-   cd ~/dotfiles
+   # Create your first backup to set up the folder structure
+   mntn backup
+   
+   # Initialize git repository in the backup folder
+   cd ~/.mntn/backup
    git init
    git remote add origin https://github.com/yourusername/dotfiles.git
    ```
 
-2. **Organize your dotfiles structure:**
+2. **Your backup folder structure will look like:**
    ```
-   ~/dotfiles/
-   ├── .zshrc
-   ├── .vimrc
-   ├── config/          # This becomes ~/.config
+   ~/.mntn/backup/
+   ├── .zshrc              # Shell configuration
+   ├── .vimrc              # Vim configuration
+   ├── config/             # This becomes ~/.config
    │   ├── nvim/
    │   └── git/
-   └── vscode/
-       ├── settings.json
-       └── keybindings.json
+   ├── vscode/
+   │   ├── settings.json
+   │   └── keybindings.json
+   ├── brew.txt            # package managers, etc.
+   ├── npm.txt
+   └── cargo.txt
    ```
 
-3. **Add your existing config files:**
+3. **Commit and push your configurations:**
    ```bash
-   # Copy existing configs to dotfiles repo
-   cp ~/.zshrc ~/dotfiles/
-   cp ~/.vimrc ~/dotfiles/
-   cp -r ~/.config ~/dotfiles/config
-   mkdir -p ~/dotfiles/vscode
-   cp ~/Library/Application\ Support/Code/User/settings.json ~/dotfiles/vscode/
-   cp ~/Library/Application\ Support/Code/User/keybindings.json ~/dotfiles/vscode/
-   ```
-
-4. **Commit and push:**
-   ```bash
-   cd ~/dotfiles
+   cd ~/.mntn/backup
    git add .
-   git commit -m "Initial dotfiles setup"
+   git commit -m "Initial mntn backup setup"
    git push -u origin main
    ```
 
-#### Using mntn with Your Dotfiles
+#### Using mntn for Configuration Management
 
-Once your dotfiles repository is set up, use `mntn link` to create symlinks:
+Once your backup repository is set up, use `mntn link` to create symlinks:
 
 ```bash
 mntn link
@@ -139,19 +134,19 @@ mntn link
 - If source doesn't exist but target does, copies target to source first
 - Won't overwrite existing correct symlinks
 
-#### Cloning Your Dotfiles on a New Machine
+#### Setting up on a New Machine
 
 ```bash
-# Clone your dotfiles
-git clone https://github.com/yourusername/dotfiles.git ~/.mntn/backup
-
 # Install mntn
 cargo install mntn
 
-# Create symlinks
+# Clone your backup repository
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn/backup
+
+# Create symlinks for your configurations
 mntn link
 
-# Create your first backup
+# Run backup to update with any new package installations
 mntn backup
 ```
 
