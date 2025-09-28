@@ -41,6 +41,16 @@ pub struct InstallArgs {
     pub with_clean: bool,
 }
 
+#[derive(Args)]
+pub struct PurgeArgs {
+    /// Also purge system files (requires sudo)
+    #[arg(long, short = 's')]
+    pub system: bool,
+    /// Show what would be purged without actually purging
+    #[arg(long, short = 'n')]
+    pub dry_run: bool,
+}
+
 /// Supported subcommands for `mntn`.
 ///
 /// Some commands are only available on macOS.
@@ -55,6 +65,6 @@ pub enum Commands {
     Install(InstallArgs),
     Link,
     #[cfg(target_os = "macos")]
-    Purge,
+    Purge(PurgeArgs),
     Restore,
 }
