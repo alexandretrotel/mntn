@@ -26,11 +26,11 @@ pub fn run() {
         (dotfiles_dir.join(".vimrc"), home_dir.join(".vimrc")),
         (dotfiles_dir.join("config"), home_dir.join(".config")),
         (
-            dotfiles_dir.join("config/vscode/settings.json"),
+            dotfiles_dir.join("vscode/settings.json"),
             data_dir.join("Code/User/settings.json"),
         ),
         (
-            dotfiles_dir.join("config/vscode/keybindings.json"),
+            dotfiles_dir.join("vscode/keybindings.json"),
             data_dir.join("Code/User/keybindings.json"),
         ),
     ];
