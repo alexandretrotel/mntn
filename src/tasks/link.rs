@@ -21,6 +21,7 @@ pub fn run() {
     let dotfiles_dir = home_dir.join("dotfiles");
     let data_dir = base_dirs.data_dir();
     let links = vec![
+        (dotfiles_dir.join(".mntn"), home_dir.join(".mntn")),
         (dotfiles_dir.join(".zshrc"), home_dir.join(".zshrc")),
         (dotfiles_dir.join(".vimrc"), home_dir.join(".vimrc")),
         (dotfiles_dir.join("config"), home_dir.join(".config")),
