@@ -1,4 +1,4 @@
-use dirs_next::home_dir;
+use directories_next::BaseDirs;
 use std::path::PathBuf;
 
 /// Relative path to the directory used for storing general backup files.
@@ -10,10 +10,18 @@ pub const SYMLINK_BACKUP_DIR: &str = "dotfiles/backups/symlinks";
 
 /// Resolves the full path to the general backup directory (`BACKUP_DIR`) inside the user's home.
 pub fn get_backup_path() -> PathBuf {
-    home_dir().unwrap().join(BACKUP_DIR)
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+    home_dir.join(BACKUP_DIR)
 }
 
 /// Resolves the full path to the symlink-specific backup directory (`SYMLINK_BACKUP_DIR`) inside the user's home.
 pub fn get_symlink_backup_path() -> PathBuf {
-    home_dir().unwrap().join(SYMLINK_BACKUP_DIR)
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+    home_dir.join(SYMLINK_BACKUP_DIR)
+}
+
+pub fn get_base_dirs() -> BaseDirs {
+    BaseDirs::new().unwrap()
 }

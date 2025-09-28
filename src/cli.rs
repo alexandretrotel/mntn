@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 /// Command line interface for `mntn`.
 #[derive(Parser)]
@@ -13,6 +13,13 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+/// Arguments for commands that require additional options.
+#[derive(Args)]
+pub struct CleanArgs {
+    #[arg(long, short)]
+    pub system: bool,
+}
+
 /// Supported subcommands for `mntn`.
 ///
 /// Some commands are only available on macOS.
@@ -21,7 +28,7 @@ pub enum Commands {
     Backup,
     #[cfg(target_os = "macos")]
     BiometricSudo,
-    Clean,
+    Clean(CleanArgs),
     Delete,
     Install,
     Link,

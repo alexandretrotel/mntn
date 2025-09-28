@@ -12,7 +12,7 @@ fn main() {
 
     match cli.command {
         Some(Commands::Backup) => backup::run(),
-        Some(Commands::Clean) => clean::run(),
+        Some(Commands::Clean(args)) => clean::run(args),
         Some(Commands::Purge) => purge::run(),
         Some(Commands::Link) => link::run(),
         Some(Commands::Delete) => delete::run(),

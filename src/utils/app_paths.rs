@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
+use crate::utils::paths::get_base_dirs;
+
 /// Resolves an application-specific path inside the local data directory,
 fn resolve_config_path(relative: &str) -> Option<PathBuf> {
-    let base = dirs_next::config_dir()?;
+    let base_dirs = get_base_dirs();
+    let base = base_dirs.config_dir();
     let path = base.join(relative);
     path.exists().then_some(path)
 }
