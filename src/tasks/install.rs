@@ -41,13 +41,6 @@ pub fn run(args: InstallArgs) {
     log("Scheduled tasks installed");
 }
 
-/// A struct representing a scheduled task configuration.
-enum ScheduledTaskKind {
-    MacLaunchd,
-    SystemdUser,
-    WindowsTask,
-}
-
 struct ScheduledTask {
     label: String,
     binary: String,
