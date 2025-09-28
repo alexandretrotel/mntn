@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 struct DirectoryTarget {
     name: &'static str,
-    path: &'static str,
+    path: PathBuf,
     is_system: bool,
 }
 
@@ -125,19 +125,19 @@ fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
     {
         targets.push(DirectoryTarget {
             name: "User LaunchAgents",
-            path: home_dir.join("Library/LaunchAgents").to_str().unwrap_or(""),
+            path: home_dir.join("Library/LaunchAgents"),
             is_system: false,
         });
 
         if include_system {
             targets.push(DirectoryTarget {
                 name: "System LaunchAgents",
-                path: "/Library/LaunchAgents",
+                path: PathBuf::from("/Library/LaunchAgents"),
                 is_system: true,
             });
             targets.push(DirectoryTarget {
                 name: "System LaunchDaemons",
-                path: "/Library/LaunchDaemons",
+                path: PathBuf::from("/Library/LaunchDaemons"),
                 is_system: true,
             });
         }
@@ -147,24 +147,24 @@ fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
     {
         targets.push(DirectoryTarget {
             name: "User Systemd Services",
-            path: config_dir.join("systemd/user").to_str().unwrap_or(""),
+            path: config_dir.join("systemd/user"),
             is_system: false,
         });
         targets.push(DirectoryTarget {
             name: "User Autostart",
-            path: config_dir.join("autostart").to_str().unwrap_or(""),
+            path: config_dir.join("autostart"),
             is_system: false,
         });
 
         if include_system {
             targets.push(DirectoryTarget {
                 name: "System Systemd Services",
-                path: "/etc/systemd/system",
+                path: PathBuf::from("/etc/systemd/system"),
                 is_system: true,
             });
             targets.push(DirectoryTarget {
                 name: "System Systemd Services (lib)",
-                path: "/lib/systemd/system",
+                path: PathBuf::from("/lib/systemd/system"),
                 is_system: true,
             });
         }
@@ -184,7 +184,7 @@ fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
     let mut service_files = Vec::new();
 
     for target in targets {
-        let path = PathBuf::from(target.path);
+        let path = &target.path;
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.flatten() {
                 let service_path = entry.path();
@@ -237,7 +237,12 @@ fn determine_service_type(service_path: &PathBuf, target: &DirectoryTarget) -> (
         {
             return (ServiceType::SystemdService, true);
         }
-        if extension == Some("desktop") && target.path.contains("autostart") {
+        if extension == Some("desktop")
+            && target
+                .path
+                .components()
+                .any(|c| c.as_os_str() == "autostart")
+        {
             return (ServiceType::AutostartDesktop, true);
         }
     }
