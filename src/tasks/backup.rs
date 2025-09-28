@@ -184,6 +184,24 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
         ));
     }
 
+    // Skip backup if source is a symlink pointing to our backup file
+    if source.is_symlink() {
+        if let Ok(target) = fs::read_link(source) {
+            let canonical_target = target.canonicalize().unwrap_or(target);
+            let canonical_dest = destination
+                .canonicalize()
+                .unwrap_or_else(|_| destination.clone());
+
+            if canonical_target == canonical_dest {
+                log(&format!(
+                    "Skipping backup of {} - it's already a symlink to our backup location",
+                    source.display()
+                ));
+                return Ok(());
+            }
+        }
+    }
+
     fs::copy(source, destination)?;
     Ok(())
 }
@@ -199,13 +217,24 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         ));
     }
 
-    // Skip backup if source is a symlink pointing to our backup directory
+    // Skip backup if source is a symlink pointing to our backup directory or vice versa
     if source.is_symlink() {
         if let Ok(target) = fs::read_link(source) {
-            if target == *destination || destination.starts_with(&target) {
+            // Canonicalize paths to handle relative vs absolute path differences
+            let canonical_target = target.canonicalize().unwrap_or(target);
+            let canonical_dest = destination
+                .canonicalize()
+                .unwrap_or_else(|_| destination.clone());
+
+            // Check if symlink points to destination or destination is within target
+            if canonical_target == canonical_dest
+                || canonical_dest.starts_with(&canonical_target)
+                || canonical_target.starts_with(&canonical_dest)
+            {
                 log(&format!(
-                    "Skipping backup of {} - it's already a symlink to our backup location",
-                    source.display()
+                    "Skipping backup of {} - it's a symlink to/from our backup location (target: {})",
+                    source.display(),
+                    target.display()
                 ));
                 return Ok(());
             }
