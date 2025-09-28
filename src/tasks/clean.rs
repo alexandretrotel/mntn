@@ -1,5 +1,6 @@
 use glob::glob;
 use std::fs;
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -258,7 +259,21 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
 fn should_skip(path: &Path) -> bool {
     let skip_patterns = [".X11-unix", "systemd-private", "asl", ".DS_Store"];
 
-    skip_patterns
-        .iter()
-        .any(|p| path.to_string_lossy().contains(p))
+    skip_patterns.iter().any(|&pattern| {
+        let pattern_bytes = pattern.as_bytes();
+
+        path.file_name()
+            .map(|name| {
+                name.as_bytes()
+                    .windows(pattern_bytes.len())
+                    .any(|window| window == pattern_bytes)
+            })
+            .unwrap_or(false)
+            || path.components().any(|comp| {
+                comp.as_os_str()
+                    .as_bytes()
+                    .windows(pattern_bytes.len())
+                    .any(|window| window == pattern_bytes)
+            })
+    })
 }
