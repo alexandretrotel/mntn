@@ -1,25 +1,10 @@
 use crate::logger::log;
-use crate::tasks::paths::get_symlink_backup_path;
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use shellexpand::tilde;
+use crate::utils::paths::{get_base_dirs, get_symlink_backup_path};
 use std::fs;
-use std::path::PathBuf;
 
 /// Creates symbolic links for dotfiles and configuration directories from `~/dotfiles`
 /// to the appropriate system/user paths (e.g., `~/.zshrc`, `~/Library/...`).
-///
-/// ## Behavior
-/// - Ensures a backup directory exists (via `get_symlink_backup_path()`).
-/// - For each pair of source and target:
-///     - If the source does not exist but the target does, copies the target to the source.
-///     - If the target exists and is not a correct symlink, backs it up.
-///     - If the target is a symlink pointing elsewhere, removes it.
-///     - Creates a symlink from the source to the target path.
-/// - All failures are logged, and the function proceeds with remaining links.
-///
-/// ## Notes
-/// - Logs are written via the `log()` utility.
-/// - Errors do not panic the program but are gracefully logged and skipped.
 pub fn run() {
     println!("🔗 Creating symlinks...");
     log("Starting symlink creation");
@@ -31,42 +16,42 @@ pub fn run() {
         return;
     }
 
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+    let dotfiles_dir = home_dir.join("dotfiles");
+    let data_dir = base_dirs.data_dir();
     let links = vec![
-        ("~/dotfiles/.zshrc", "~/.zshrc"),
-        ("~/dotfiles/.vimrc", "~/.vimrc"),
-        ("~/dotfiles/vim_runtime", "~/.vim_runtime"),
-        ("~/dotfiles/config", "~/.config"),
+        (dotfiles_dir.join(".zshrc"), home_dir.join(".zshrc")),
+        (dotfiles_dir.join(".vimrc"), home_dir.join(".vimrc")),
+        (dotfiles_dir.join("config"), home_dir.join(".config")),
         (
-            "~/dotfiles/config/lporg",
-            "~/Library/Application Support/lporg",
+            dotfiles_dir.join("config/vscode/settings.json"),
+            data_dir.join("Code/User/settings.json"),
         ),
         (
-            "~/dotfiles/config/vscode/settings.json",
-            "~/Library/Application Support/Code/User/settings.json",
+            dotfiles_dir.join("config/vscode/keybindings.json"),
+            data_dir.join("Code/User/keybindings.json"),
         ),
     ];
 
     for (src, dst) in links {
-        let source = PathBuf::from(tilde(src).to_string());
-        let target = PathBuf::from(tilde(dst).to_string());
-
-        if target.exists() && !target.is_symlink() && !source.exists() {
-            if target.is_file() {
-                if let Err(e) = fs::copy(&target, &source) {
+        if dst.exists() && !dst.is_symlink() && !src.exists() {
+            if dst.is_file() {
+                if let Err(e) = fs::copy(&dst, &src) {
                     log(&format!(
                         "Failed to copy file {} to source {}: {}",
-                        target.display(),
-                        source.display(),
+                        dst.display(),
+                        src.display(),
                         e
                     ));
                     continue;
                 }
-            } else if target.is_dir() {
-                if let Err(e) = copy_dir_to_source(&target, &source) {
+            } else if dst.is_dir() {
+                if let Err(e) = copy_dir_to_source(&dst, &src) {
                     log(&format!(
                         "Failed to copy directory {} to source {}: {}",
-                        target.display(),
-                        source.display(),
+                        dst.display(),
+                        src.display(),
                         e
                     ));
                     continue;
@@ -74,76 +59,68 @@ pub fn run() {
             } else {
                 log(&format!(
                     "Unknown target type for {}. Skipping.",
-                    target.display()
+                    dst.display()
                 ));
                 continue;
             }
         }
 
-        if !source.exists() {
+        if !src.exists() {
             log(&format!(
                 "Warning: Source {} does not exist. Skipping...",
-                source.display()
+                src.display()
             ));
             continue;
         }
 
-        if target.is_symlink() {
-            match fs::read_link(&target) {
-                Ok(existing) if existing == source => {
+        if dst.is_symlink() {
+            match fs::read_link(&dst) {
+                Ok(existing) if existing == src => {
                     log(&format!(
                         "Symlink {} already correctly points to {}",
-                        target.display(),
-                        source.display()
+                        dst.display(),
+                        src.display()
                     ));
                     continue;
                 }
                 Ok(existing) => {
                     log(&format!(
                         "Removing incorrect symlink {} → {}",
-                        target.display(),
+                        dst.display(),
                         existing.display()
                     ));
-                    if let Err(e) = fs::remove_file(&target) {
+                    if let Err(e) = fs::remove_file(&dst) {
                         log(&format!(
                             "Failed to remove incorrect symlink {}: {}",
-                            target.display(),
+                            dst.display(),
                             e
                         ));
                         continue;
                     }
                 }
                 Err(e) => {
-                    log(&format!(
-                        "Failed to read symlink {}: {}",
-                        target.display(),
-                        e
-                    ));
+                    log(&format!("Failed to read symlink {}: {}", dst.display(), e));
                     continue;
                 }
             }
         }
 
-        if target.exists() && !target.is_symlink() {
-            if let Err(e) = backup_existing_target(&target, &backup_dir) {
-                log(&format!("Failed to back up {}: {}", target.display(), e));
+        if dst.exists() && !dst.is_symlink() {
+            if let Err(e) = backup_existing_target(&dst, &backup_dir) {
+                log(&format!("Failed to back up {}: {}", dst.display(), e));
                 continue;
             }
         }
 
-        if let Err(e) = std::os::unix::fs::symlink(&source, &target) {
+        if let Err(e) = std::os::unix::fs::symlink(&src, &dst) {
             log(&format!(
                 "Failed to link {} → {}: {}",
-                source.display(),
-                target.display(),
+                src.display(),
+                dst.display(),
                 e
             ));
         } else {
-            log(&format!(
-                "Linked {} → {}",
-                source.display(),
-                target.display()
-            ));
+            log(&format!("Linked {} → {}", src.display(), dst.display()));
         }
     }
 
