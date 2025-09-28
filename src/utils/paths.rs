@@ -2,11 +2,11 @@ use directories_next::BaseDirs;
 use std::path::PathBuf;
 
 /// Relative path to the directory used for storing general backup files.
-pub const BACKUP_DIR: &str = ".mntn/backup";
+pub const BACKUP_DIR: &str = "backup";
 
 /// This directory is a subdirectory of `BACKUP_DIR` and is used when a file or folder
 /// would be replaced by a symlink, allowing safe restoration if needed.
-pub const SYMLINKS_DIR: &str = ".mntn/symlinks";
+pub const SYMLINKS_DIR: &str = "symlinks";
 
 pub fn get_mntn_dir() -> PathBuf {
     let base_dirs = get_base_dirs();
