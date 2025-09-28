@@ -77,6 +77,67 @@ pub struct PurgeArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the registry command.
+#[derive(Args)]
+pub struct RegistryArgs {
+    #[command(subcommand)]
+    pub action: RegistryActions,
+}
+
+/// Registry management actions.
+#[derive(Subcommand)]
+pub enum RegistryActions {
+    /// List all registry entries
+    #[command(about = "List all entries in the registry")]
+    List {
+        /// Filter by category
+        #[arg(long, short = 'c', help = "Filter entries by category")]
+        category: Option<String>,
+        /// Show only enabled entries
+        #[arg(long, short = 'e', help = "Show only enabled entries")]
+        enabled_only: bool,
+    },
+    /// Add a new entry to the registry
+    #[command(about = "Add a new entry to the registry")]
+    Add {
+        /// Unique ID for the entry
+        #[arg(help = "Unique identifier for the registry entry")]
+        id: String,
+        /// Human-readable name
+        #[arg(long, short = 'n', help = "Human-readable name for the entry")]
+        name: String,
+        /// Source path within backup directory
+        #[arg(long, short = 's', help = "Source path within ~/.mntn/backup/")]
+        source: String,
+        /// Target path where file should be linked
+        #[arg(long, short = 't', help = "Target path where file should be linked")]
+        target: String,
+        /// Category for organization
+        #[arg(long, short = 'c', help = "Category for organization")]
+        category: String,
+        /// Optional description
+        #[arg(long, short = 'd', help = "Optional description")]
+        description: Option<String>,
+    },
+    /// Remove an entry from the registry
+    #[command(about = "Remove an entry from the registry")]
+    Remove {
+        /// ID of the entry to remove
+        #[arg(help = "ID of the entry to remove")]
+        id: String,
+    },
+    /// Enable or disable an entry
+    #[command(about = "Enable or disable a registry entry")]
+    Toggle {
+        /// ID of the entry to toggle
+        #[arg(help = "ID of the entry to toggle")]
+        id: String,
+        /// Enable the entry
+        #[arg(long, short = 'e', help = "Enable the entry")]
+        enable: bool,
+    },
+}
+
 /// Available maintenance commands for `mntn`.
 ///
 /// Some commands are only available on macOS systems.
@@ -115,4 +176,8 @@ pub enum Commands {
     /// Restore system configurations and data from a previous backup
     #[command(about = "Restore system state from a previously created backup")]
     Restore,
+
+    /// Manage the registry of files and folders to backup and link
+    #[command(about = "Manage the registry of files and folders for backup and linking")]
+    Registry(RegistryArgs),
 }

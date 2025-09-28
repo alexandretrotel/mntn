@@ -5,4 +5,5 @@ pub mod delete;
 pub mod install;
 pub mod link;
 pub mod purge;
+pub mod registry;
 pub mod restore;

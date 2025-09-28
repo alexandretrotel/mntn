@@ -160,7 +160,7 @@ impl LinkRegistry {
     }
 
     /// Get entries by category
-    pub fn get_entries_by_category(
+    pub fn _get_entries_by_category(
         &self,
         category: &str,
     ) -> impl Iterator<Item = (&String, &RegistryEntry)> {
@@ -196,7 +196,7 @@ impl LinkRegistry {
     }
 
     /// Update an existing entry
-    pub fn update_entry(&mut self, id: &str, entry: RegistryEntry) -> Result<(), String> {
+    pub fn _update_entry(&mut self, id: &str, entry: RegistryEntry) -> Result<(), String> {
         match self.entries.get_mut(id) {
             Some(existing_entry) => {
                 *existing_entry = entry;
@@ -221,7 +221,7 @@ impl LinkRegistry {
     }
 
     /// Get entries that can be backed up (have existing target paths)
-    pub fn get_backupable_entries(&self) -> Vec<(&String, &RegistryEntry)> {
+    pub fn _get_backupable_entries(&self) -> Vec<(&String, &RegistryEntry)> {
         self.get_enabled_entries()
             .filter(|(_, entry)| {
                 // Check if the target path exists for backup
