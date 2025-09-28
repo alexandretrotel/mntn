@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 #[command(
     name = "mntn",
     version = env!("CARGO_PKG_VERSION"),
-    about = "A Rust-based CLI tool for macOS system maintenance."
+    about = "A Rust-based CLI tool for system maintenance."
 )]
 pub struct Cli {
     /// Subcommand to run

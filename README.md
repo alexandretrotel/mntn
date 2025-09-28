@@ -1,6 +1,6 @@
 # mntn
 
-A Rust-based CLI tool for macOS system maintenance.
+A Rust-based CLI tool for system maintenance.
 
 ## Features
 
