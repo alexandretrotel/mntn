@@ -20,17 +20,22 @@ use crate::utils::system::run_cmd;
 /// cleanup operations when running on the appropriate OS.
 pub fn run(args: CleanArgs) {
     log(&format!("Starting clean (system: {})", args.system));
+
+    if args.dry_run {
+        println!("🔍 Running in dry-run mode - no files will be deleted");
+    }
+
     println!("🧹 Cleaning system junk...");
 
     let mut total_space_saved: u64 = 0;
 
     // Always clean user-level directories
-    total_space_saved += clean_user_directories();
+    total_space_saved += clean_user_directories(&args);
 
     // Clean system-level directories only if requested
     if args.system {
         println!("⚠️  Cleaning system-wide files (requires sudo)...");
-        total_space_saved += clean_system_directories();
+        total_space_saved += clean_system_directories(&args);
     }
 
     // Platform-specific cleanup
@@ -40,7 +45,7 @@ pub fn run(args: CleanArgs) {
     }
 
     // Cross-platform package manager cleanup
-    total_space_saved += clean_package_managers();
+    total_space_saved += clean_package_managers(&args);
 
     // Clean trash for current user
     // TODO: Implement cross-platform trash cleaning
@@ -51,7 +56,7 @@ pub fn run(args: CleanArgs) {
 }
 
 /// Clean user-level directories that don't require sudo
-fn clean_user_directories() -> u64 {
+fn clean_user_directories(args: &CleanArgs) -> u64 {
     println!("🔹 Cleaning user directories...");
 
     let mut total_freed = 0u64;
@@ -78,14 +83,14 @@ fn clean_user_directories() -> u64 {
     }
 
     for path in user_paths {
-        total_freed += clean_directory_contents(&path, false);
+        total_freed += clean_directory_contents(&path, false, args);
     }
 
     total_freed
 }
 
 /// Clean system-level directories that require sudo
-fn clean_system_directories() -> u64 {
+fn clean_system_directories(args: &CleanArgs) -> u64 {
     let mut total_freed = 0u64;
 
     let mut system_paths = Vec::new();
@@ -116,7 +121,7 @@ fn clean_system_directories() -> u64 {
     }
 
     for path in system_paths {
-        total_freed += clean_directory_contents(&path, true);
+        total_freed += clean_directory_contents(&path, true, args);
     }
 
     total_freed
@@ -124,14 +129,18 @@ fn clean_system_directories() -> u64 {
 
 /// macOS-specific cleanup operations
 #[cfg(target_os = "macos")]
-fn clean_macos_specific(_args: &CleanArgs) -> () {
+fn clean_macos_specific(args: &CleanArgs) -> () {
     // Reset Quick Look cache (user-level)
     println!("🔹 Resetting Quick Look cache...");
-    let _ = run_cmd("qlmanage", &["-r", "cache"]);
+    if !args.dry_run {
+        let _ = run_cmd("qlmanage", &["-r", "cache"]);
+    } else {
+        println!("   [DRY RUN] Would reset Quick Look cache");
+    }
 }
 
 /// Clean package manager caches
-fn clean_package_managers() -> u64 {
+fn clean_package_managers(args: &CleanArgs) -> u64 {
     let total_freed = 0u64;
 
     // Homebrew cleanup (macOS/Linux)
@@ -139,27 +148,39 @@ fn clean_package_managers() -> u64 {
     {
         if which::which("brew").is_ok() {
             println!("🍺 Running brew cleanup...");
-            let _ = run_cmd("brew", &["cleanup"]);
+            if !args.dry_run {
+                let _ = run_cmd("brew", &["cleanup"]);
+            } else {
+                println!("   [DRY RUN] Would run brew cleanup");
+            }
         }
     }
 
     // npm cache cleanup (cross-platform)
     if which::which("npm").is_ok() {
         println!("📦 Cleaning npm cache...");
-        let _ = run_cmd("npm", &["cache", "clean", "--force"]);
+        if !args.dry_run {
+            let _ = run_cmd("npm", &["cache", "clean", "--force"]);
+        } else {
+            println!("   [DRY RUN] Would clean npm cache");
+        }
     }
 
     // pnpm cache cleanup (cross-platform)
     if which::which("pnpm").is_ok() {
         println!("📦 Cleaning pnpm cache...");
-        let _ = run_cmd("pnpm", &["cache", "delete"]);
+        if !args.dry_run {
+            let _ = run_cmd("pnpm", &["cache", "delete"]);
+        } else {
+            println!("   [DRY RUN] Would clean pnpm cache");
+        }
     }
 
     total_freed
 }
 
 /// Clean contents of a directory
-fn clean_directory_contents(dir_path: &Path, use_sudo: bool) -> u64 {
+fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -> u64 {
     if !dir_path.exists() {
         return 0;
     }
@@ -176,6 +197,11 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool) -> u64 {
 
     for entry in entries.filter_map(Result::ok) {
         if !entry.exists() {
+            continue;
+        }
+
+        // Skip if path matches skip patterns
+        if should_skip(&entry) {
             continue;
         }
 
@@ -196,6 +222,14 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool) -> u64 {
         let space = calculate_dir_size(&entry).unwrap_or(0);
         total_freed += space;
 
+        let space_str = bytes_to_human_readable(space);
+        let entry_name = entry.file_name().unwrap_or_default().to_string_lossy();
+
+        if args.dry_run {
+            println!("   [DRY RUN] Would delete: {} ({})", entry_name, space_str);
+            continue;
+        }
+
         // Remove the file/directory
         if use_sudo {
             // Try fs operations first, fall back to sudo if permission denied
@@ -206,7 +240,11 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool) -> u64 {
             };
 
             if result.is_err() {
-                let _ = run_cmd("sudo", &["rm", "-rf", entry.to_str().unwrap()]);
+                if let Some(path_str) = entry.to_str() {
+                    let _ = run_cmd("sudo", &["rm", "-rf", path_str]);
+                } else {
+                    println!("⚠️ Skipping non-UTF8 path: {:?}", entry);
+                }
             }
         } else {
             let _ = fs::remove_dir_all(&entry).or_else(|_| fs::remove_file(&entry));
@@ -214,4 +252,13 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool) -> u64 {
     }
 
     total_freed
+}
+
+/// Check if a path should be skipped during cleanup
+fn should_skip(path: &Path) -> bool {
+    let skip_patterns = [".X11-unix", "systemd-private", "asl", ".DS_Store"];
+
+    skip_patterns
+        .iter()
+        .any(|p| path.to_string_lossy().contains(p))
 }

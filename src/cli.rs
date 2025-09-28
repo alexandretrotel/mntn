@@ -16,8 +16,10 @@ pub struct Cli {
 /// Arguments for commands that require additional options.
 #[derive(Args)]
 pub struct CleanArgs {
-    #[arg(long, short)]
+    #[arg(long, short = 's')]
     pub system: bool,
+    #[arg(long, short = 'n')]
+    pub dry_run: bool,
 }
 
 /// Supported subcommands for `mntn`.
