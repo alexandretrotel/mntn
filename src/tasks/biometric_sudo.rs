@@ -1,6 +1,7 @@
 use tempfile::NamedTempFile;
 
 use crate::logger::log;
+use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
@@ -48,11 +49,11 @@ fn configure_biometric_sudo() -> io::Result<()> {
     }
 
     // Backup if not already there
-    let backup_path = sudo_path.with_file_name(format!(
-        "{}{}",
-        sudo_path.file_name().unwrap().to_string_lossy(),
-        BACKUP_SUFFIX
-    ));
+    let backup_path = sudo_path.with_file_name({
+        let mut backup_name = OsString::from(sudo_path.file_name().unwrap());
+        backup_name.push(BACKUP_SUFFIX);
+        backup_name
+    });
     if !Path::new(&backup_path).exists() {
         fs::copy(SUDO_PAM_PATH, &backup_path)?;
         println!("📦 Created backup at {}", backup_path.display());

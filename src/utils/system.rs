@@ -11,13 +11,17 @@ pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
     let output = Command::new(cmd).args(args).output()?;
 
     if !output.status.success() {
+        let stderr_len = output.stderr.len();
+        let stderr_msg = String::from_utf8(output.stderr)
+            .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
+
         return Err(io::Error::new(
             io::ErrorKind::Other,
             format!(
                 "Command '{}' failed with status {:?}: {}",
                 cmd,
                 output.status.code(),
-                String::from_utf8_lossy(&output.stderr)
+                stderr_msg
             ),
         )
         .into());
