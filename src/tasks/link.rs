@@ -1,6 +1,6 @@
 use crate::logger::log;
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use crate::utils::paths::{get_base_dirs, get_symlink_backup_path};
+use crate::utils::paths::{get_base_dirs, get_symlinks_path};
 use std::fs;
 use std::path::Path;
 
@@ -10,10 +10,10 @@ pub fn run() {
     println!("🔗 Creating symlinks...");
     log("Starting symlink creation");
 
-    let backup_dir = get_symlink_backup_path();
-    if let Err(e) = fs::create_dir_all(&backup_dir) {
-        println!("Failed to create backup directory: {e}");
-        log(&format!("Failed to create backup directory: {e}"));
+    let symlinks_dir = get_symlinks_path();
+    if let Err(e) = fs::create_dir_all(&symlinks_dir) {
+        println!("Failed to create symlinks directory: {e}");
+        log(&format!("Failed to create symlinks directory: {e}"));
         return;
     }
 
@@ -37,7 +37,7 @@ pub fn run() {
     ];
 
     for (src, dst) in links {
-        process_link(&src, &dst, &backup_dir);
+        process_link(&src, &dst, &symlinks_dir);
     }
 
     println!("✅ Symlink creation complete.");
@@ -112,9 +112,9 @@ fn handle_existing_symlink(src: &Path, dst: &Path) -> Result<(), ()> {
 }
 
 /// Backs up the destination if it exists and is not a symlink
-fn backup_if_needed(dst: &Path, backup_dir: &Path) -> Result<(), ()> {
+fn backup_if_needed(dst: &Path, symlinks_dir: &Path) -> Result<(), ()> {
     if dst.exists() && !dst.is_symlink() {
-        backup_existing_target(dst, backup_dir).map_err(|e| {
+        backup_existing_target(dst, symlinks_dir).map_err(|e| {
             log(&format!("Failed to back up {}: {}", dst.display(), e));
         })?;
     }
@@ -135,7 +135,7 @@ fn create_symlink(src: &Path, dst: &Path) {
 }
 
 /// Processes a single (src, dst) link
-fn process_link(src: &Path, dst: &Path, backup_dir: &Path) {
+fn process_link(src: &Path, dst: &Path, symlinks_dir: &Path) {
     if let Err(_) = copy_dst_to_src_if_missing(src, dst) {
         return;
     }
@@ -152,7 +152,7 @@ fn process_link(src: &Path, dst: &Path, backup_dir: &Path) {
         return;
     }
 
-    if let Err(_) = backup_if_needed(dst, backup_dir) {
+    if let Err(_) = backup_if_needed(dst, symlinks_dir) {
         return;
     }
 

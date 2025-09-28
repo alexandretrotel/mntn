@@ -63,10 +63,10 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Backs up an existing file or directory to a timestamped location inside `backup_dir`.
-pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()> {
-    if !backup_dir.exists() {
-        fs::create_dir_all(backup_dir)?;
+/// Backs up an existing file or directory to a timestamped location inside `symlinks_dir`.
+pub fn backup_existing_target(target: &Path, symlinks_dir: &Path) -> io::Result<()> {
+    if !symlinks_dir.exists() {
+        fs::create_dir_all(symlinks_dir)?;
     }
 
     let filename = target
@@ -78,7 +78,7 @@ pub fn backup_existing_target(target: &Path, backup_dir: &Path) -> io::Result<()
     backup_name.push("_");
     backup_name.push(timestamp);
 
-    let backup_path = backup_dir.join(backup_name);
+    let backup_path = symlinks_dir.join(backup_name);
 
     match fs::rename(target, &backup_path) {
         Ok(_) => Ok(()),
