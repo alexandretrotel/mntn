@@ -4,12 +4,13 @@ A Rust-based CLI tool for system maintenance.
 
 ## Features
 
-- **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files.
+- **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files using registry-based management.
 - **Biometric Sudo [macOS]**: Configures Touch ID authentication for sudo commands.
 - **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup.
 - **Delete [macOS]**: Removes applications and their related files with interactive selection.
 - **Install**: Sets up automated services for backups, cleaning, and system updates.
 - **Link**: Creates symlinks for dotfiles (e.g., .mntn, .zshrc, .vimrc, .config, VSCode settings).
+- **Package Registry**: Centralized management of package managers for backup operations.
 - **Purge**: Deletes unused services with user confirmation.
 - **Registry**: Centralized management of configuration files and directories to backup and link.
 - **Restore**: Restores configuration files from backups using the registry system.
@@ -52,8 +53,8 @@ mntn backup
 ```
 
 **What gets backed up:**
-- **Package lists**: Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), and Cargo installed packages (`cargo.txt`)
-- **Configuration files**: VS Code settings and keybindings, Ghostty terminal config
+- **Package lists**: Managed through the package registry system - Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), uv packages (`uv.txt`), and Cargo installed packages (`cargo.txt`)
+- **Configuration files**: Managed through the configuration registry - VS Code settings and keybindings, Ghostty terminal config, shell configurations, and other dotfiles
 
 **Backup location**: `~/.mntn/backup/`
 
@@ -67,13 +68,18 @@ mntn restore
 
 This will restore VS Code settings, keybindings, and Ghostty configuration from your backup.
 
-**Note**: Package restoration must be done manually using the generated package lists. For example:
+**Note**: Package restoration must be done manually using the generated package lists. The package registry system ensures only enabled and platform-compatible package managers are backed up. For example:
 ```bash
 # Restore Homebrew packages
 brew install $(cat ~/.mntn/backup/brew.txt)
 
-# Restore npm global packages
-npm install -g $(cat ~/.mntn/backup/npm.txt | grep -o '^[^@]*' | tr '\n' ' ')
+# Restore npm global packages (parse npm ls output format)
+npm install -g $(cat ~/.mntn/backup/npm.txt | grep -E '^[├└]' | sed 's/^[├└]── //' | cut -d'@' -f1 | tr '\n' ' ')
+
+# Restore cargo packages
+while read -r line; do
+  cargo install "$(echo "$line" | cut -d' ' -f1)"
+done < ~/.mntn/backup/cargo.txt
 ```
 
 ### Configuration Management with Version Control
@@ -151,9 +157,85 @@ mntn link
 mntn backup
 ```
 
-### Registry Management
+### Package Registry Management
 
-The `registry` command provides a centralized way to manage what files and folders are backed up and linked. The registry stores metadata about each configuration entry including source paths, target locations, and categories.
+The `package-registry` command provides centralized management of package managers used during backup operations. This system allows you to configure which package managers to include, customize their commands, and control platform-specific behavior.
+
+#### Viewing Package Manager Entries
+
+```bash
+# List all package manager entries
+mntn package-registry list
+
+# List only enabled entries
+mntn package-registry list --enabled-only
+
+# List only entries compatible with current platform
+mntn package-registry list --platform-only
+```
+
+**Default Package Managers:**
+- `brew` - Homebrew packages (macOS/Linux)
+- `brew_cask` - Homebrew casks/applications (macOS only)
+- `npm` - npm global packages (all platforms)
+- `yarn` - Yarn global packages (all platforms)
+- `pnpm` - pnpm global packages (all platforms)
+- `bun` - Bun global packages (all platforms)
+- `cargo` - Cargo installed packages (all platforms)
+- `uv` - uv installed tools (all platforms)
+- `pip` - pip packages (disabled by default)
+
+#### Adding Custom Package Managers
+
+```bash
+# Add a new package manager
+mntn package-registry add pipx \
+  --name "pipx Applications" \
+  --command "pipx" \
+  --args "list" \
+  --output-file "pipx.txt" \
+  --description "pipx installed Python applications"
+
+# Add with platform restrictions
+mntn package-registry add winget \
+  --name "Windows Package Manager" \
+  --command "winget" \
+  --args "list" \
+  --output-file "winget.txt" \
+  --platforms "windows"
+```
+
+#### Managing Package Manager Entries
+
+```bash
+# Enable or disable a package manager
+mntn package-registry toggle npm --enable
+mntn package-registry toggle pip --disable
+
+# Remove a package manager from the registry
+mntn package-registry remove custom_manager
+```
+
+#### Package Registry File Location
+
+The package registry is stored as JSON at `~/.mntn/package_registry.json`. You can edit it manually if needed, but using the CLI commands is recommended for consistency.
+
+**Example package manager entry:**
+```json
+{
+  "name": "Homebrew Packages",
+  "command": "brew",
+  "args": ["leaves"],
+  "output_file": "brew.txt",
+  "enabled": true,
+  "description": "Homebrew installed packages (leaves only)",
+  "platforms": ["macos", "linux"]
+}
+```
+
+### Configuration Registry Management
+
+The `registry` command provides a centralized way to manage what configuration files and folders are backed up and linked. The registry stores metadata about each configuration entry including source paths, target locations, and categories.
 
 #### Viewing Registry Entries
 
