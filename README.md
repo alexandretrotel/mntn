@@ -44,7 +44,7 @@ mntn biometric-sudo
 
 #### Creating Backups
 
-The `backup` command saves your system's package lists and configuration files to `~/.mntn/backups/`:
+The `backup` command saves your system's package lists and configuration files to `~/.mntn/backup/`:
 
 ```bash
 mntn backup
@@ -54,7 +54,7 @@ mntn backup
 - **Package lists**: Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), and Cargo installed packages (`cargo.txt`)
 - **Configuration files**: VS Code settings and keybindings, Ghostty terminal config
 
-**Backup location**: `~/.mntn/backups/`
+**Backup location**: `~/.mntn/backup/`
 
 #### Restoring from Backups
 
@@ -69,10 +69,10 @@ This will restore VS Code settings, keybindings, and Ghostty configuration from 
 **Note**: Package restoration must be done manually using the generated package lists. For example:
 ```bash
 # Restore Homebrew packages
-brew install $(cat ~/.mntn/backups/brew.txt)
+brew install $(cat ~/.mntn/backup/brew.txt)
 
 # Restore npm global packages
-npm install -g $(cat ~/.mntn/backups/npm.txt | grep -o '^[^@]*' | tr '\n' ' ')
+npm install -g $(cat ~/.mntn/backup/npm.txt | grep -o '^[^@]*' | tr '\n' ' ')
 ```
 
 ### Dotfiles Management with GitHub
@@ -128,14 +128,14 @@ mntn link
 ```
 
 **What it does:**
-- Links `~/dotfiles/.zshrc` → `~/.zshrc`
-- Links `~/dotfiles/.vimrc` → `~/.vimrc`
-- Links `~/dotfiles/config` → `~/.config`
-- Links `~/dotfiles/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
-- Links `~/dotfiles/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+- Links `~/.mntn/backup/.zshrc` → `~/.zshrc`
+- Links `~/.mntn/backup/.vimrc` → `~/.vimrc`
+- Links `~/.mntn/backup/config` → `~/.config`
+- Links `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
+- Links `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
 
 **Safety features:**
-- Automatically backs up existing files to `~/.mntn/backups/symlinks/`
+- Automatically backs up existing files to `~/.mntn/symlinks/`
 - If source doesn't exist but target does, copies target to source first
 - Won't overwrite existing correct symlinks
 
@@ -143,7 +143,7 @@ mntn link
 
 ```bash
 # Clone your dotfiles
-git clone https://github.com/yourusername/dotfiles.git ~/dotfiles
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn/backup
 
 # Install mntn
 cargo install mntn
