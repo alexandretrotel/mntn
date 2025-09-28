@@ -40,7 +40,7 @@ mntn biometric-sudo
 
 ## Guides
 
-### 📦 Backup and Restore Guide
+### Backup and Restore Guide
 
 #### Creating Backups
 
