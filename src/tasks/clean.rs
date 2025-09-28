@@ -25,24 +25,6 @@ use shellexpand::tilde;
 /// Additionally:
 /// - Resets Quick Look cache by running `qlmanage -r cache`.
 /// - Runs `brew cleanup` to clean Homebrew caches.
-///
-/// Prints progress messages and logs the start and completion with total freed space.
-///
-/// # Notes
-///
-/// - The function ignores errors during globbing and deletion, continuing to next entries.
-/// - Uses `sudo rm -rf`, which requires appropriate privileges and is potentially dangerous.
-/// - Total freed space is an approximation based on size calculation before deletion.
-///
-/// # Panics
-///
-/// This function does not panic; errors are handled silently or ignored.
-///
-/// # Examples
-///
-/// ```no_run
-/// run();
-/// ```
 pub fn run() {
     log("Starting clean");
     println!("🧹 Cleaning system junk...");
