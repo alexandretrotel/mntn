@@ -24,8 +24,6 @@ fn trashed_files() -> &'static Mutex<VecDeque<PathBuf>> {
     TRASHED_FILES.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-/// Main entry point for the app deletion process.
-///
 /// Guides the user through selecting an installed macOS `.app` bundle from the `/Applications` directory,
 /// then deletes it along with associated files and folders (e.g., caches, preferences, logs).
 ///
@@ -34,16 +32,6 @@ fn trashed_files() -> &'static Mutex<VecDeque<PathBuf>> {
 /// - If not, locating associated files via name and bundle identifier matches
 /// - Confirming with the user which related files to delete
 /// - Moving selected files to the system Trash (non-destructive)
-///
-/// Logs all major events and prints user-facing status messages.
-///
-/// # Behavior
-/// - Automatically ignores apps that cannot be found
-/// - Falls back gracefully if selection fails or nothing is selected
-/// - Logs and prints detailed errors if any failure occurs
-///
-/// # Errors
-/// All errors are logged and printed; no panics.
 pub fn run() {
     println!("🗑 Deleting application and related files...");
     log("Starting app deletion");
@@ -76,23 +64,6 @@ pub fn run() {
 /// Prompts the user to choose an installed application from `/Applications`.
 ///
 /// Filters for files ending in `.app`, strips the extension, and sorts the list for display.
-///
-/// Uses [`inquire::Select`] to present a terminal UI prompt.
-///
-/// # Returns
-/// - `Ok(Some(String))` if the user selects an app name
-/// - `Ok(None)` if no `.app` bundles are found or the list is empty
-/// - `Err(io::Error)` if directory access fails or prompt fails
-///
-/// # Errors
-/// Converts `inquire::error::InquireError` into `std::io::Error` for easier propagation.
-///
-/// # Example
-/// ```
-/// if let Ok(Some(app_name)) = prompt_user_to_select_app() {
-///     println!("User selected: {}", app_name);
-/// }
-/// ```
 fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
     let binding = tilde("/Applications").to_string();
     let apps_dir = Path::new(&binding);
