@@ -64,7 +64,6 @@ pub enum Commands {
     Delete(DeleteArgs),
     Install(InstallArgs),
     Link,
-    #[cfg(target_os = "macos")]
     Purge(PurgeArgs),
     Restore,
 }
