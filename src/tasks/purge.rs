@@ -20,7 +20,6 @@ struct ServiceFile {
     display_label: String,
     path: PathBuf,
     is_system: bool,
-    service_type: ServiceType,
 }
 
 /// Types of services that can be managed
@@ -172,8 +171,7 @@ fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
 
     #[cfg(target_os = "windows")]
     {
-        // TODO: Windows implementation to be added
-        println!("⚠️  Windows support is not yet implemented for the purge command.");
+        // No actual directories needed; handled in scan_service_files
     }
 
     targets
@@ -181,33 +179,44 @@ fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
 
 /// Scans the specified directories for service files and returns them with metadata
 fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
-    let mut service_files = Vec::new();
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        let mut service_files = Vec::new();
 
-    for target in targets {
-        let path = &target.path;
-        if let Ok(entries) = fs::read_dir(&path) {
-            for entry in entries.flatten() {
-                let service_path = entry.path();
+        for target in targets {
+            let path = &target.path;
+            if let Ok(entries) = fs::read_dir(&path) {
+                for entry in entries.flatten() {
+                    let service_path = entry.path();
 
-                let (service_type, should_include) = determine_service_type(&service_path, target);
-                if !should_include {
-                    continue;
+                    let (service_type, should_include) =
+                        determine_service_type(&service_path, target);
+                    if !should_include {
+                        continue;
+                    }
+
+                    let display_label =
+                        get_service_display_label(target.name, &service_path, &service_type);
+
+                    service_files.push(ServiceFile {
+                        display_label,
+                        path: service_path,
+                        is_system: target.is_system,
+                    });
                 }
-
-                let display_label =
-                    get_service_display_label(target.name, &service_path, &service_type);
-
-                service_files.push(ServiceFile {
-                    display_label,
-                    path: service_path,
-                    is_system: target.is_system,
-                    service_type,
-                });
             }
         }
+
+        service_files
     }
 
-    service_files
+    #[cfg(target_os = "windows")]
+    {
+        let mut services = list_windows_services();
+        let mut startups = list_startup_programs();
+        services.append(&mut startups);
+        services
+    }
 }
 
 /// Gets the service type name for the current platform
@@ -247,17 +256,13 @@ fn determine_service_type(service_path: &PathBuf, target: &DirectoryTarget) -> (
         }
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        // TODO: Implement Windows service detection
-        let _ = target;
-        return (ServiceType::WindowsService, false);
-    }
-
     #[allow(unreachable_code)]
     {
         let _ = target;
-        (ServiceType::Plist, false)
+        #[cfg(target_os = "windows")]
+        return (ServiceType::WindowsService, false);
+        #[cfg(not(target_os = "windows"))]
+        return (ServiceType::Plist, false);
     }
 }
 
@@ -356,49 +361,60 @@ fn get_desktop_file_name(desktop_path: &PathBuf) -> Option<String> {
 
 /// Attempts to delete a service file, with platform-specific handling
 fn delete_service_file(service_file: &ServiceFile) {
+    #[cfg(target_os = "macos")]
+    {
+        delete_file_with_sudo(&service_file.path, service_file.is_system);
+    }
+
+    #[cfg(target_os = "linux")]
     match &service_file.service_type {
-        #[cfg(target_os = "macos")]
-        ServiceType::Plist => {
-            delete_file_with_sudo(&service_file.path, service_file.is_system);
-        }
-        #[cfg(target_os = "linux")]
         ServiceType::SystemdService => {
             // For systemd services, first try to stop and disable the service
             if let Some(service_name) = service_file.path.file_name().and_then(|f| f.to_str()) {
-                let systemctl_cmd = if service_file.is_system {
-                    "sudo systemctl"
-                } else {
-                    "systemctl --user"
-                };
-
-                // Try to stop the service (ignore errors as it might not be running)
                 let _ = if service_file.is_system {
                     run_cmd("sudo", &["systemctl", "stop", service_name])
                 } else {
                     run_cmd("systemctl", &["--user", "stop", service_name])
                 };
-
-                // Try to disable the service (ignore errors as it might not be enabled)
                 let _ = if service_file.is_system {
                     run_cmd("sudo", &["systemctl", "disable", service_name])
                 } else {
                     run_cmd("systemctl", &["--user", "disable", service_name])
                 };
-
                 println!("🚫 Stopped and disabled service: {}", service_name);
             }
-
             delete_file_with_sudo(&service_file.path, service_file.is_system);
         }
-        #[cfg(target_os = "linux")]
         ServiceType::AutostartDesktop => {
             delete_file_with_sudo(&service_file.path, service_file.is_system);
         }
-        #[cfg(target_os = "windows")]
-        ServiceType::WindowsService | ServiceType::StartupProgram => {
-            // TODO: Implement Windows service deletion
-            println!("⚠️  Windows service deletion not yet implemented");
+        _ => {}
+    }
+
+    #[cfg(target_os = "windows")]
+    match service_file.service_type {
+        ServiceType::StartupProgram => {
+            if let Err(e) = fs::remove_file(&service_file.path) {
+                println!(
+                    "❌ Failed to delete startup program: {} ({})",
+                    service_file.path.display(),
+                    e
+                );
+            } else {
+                println!(
+                    "🗑️  Deleted startup program: {}",
+                    service_file.path.display()
+                );
+            }
         }
+        ServiceType::WindowsService => {
+            if let Some(service_name) = service_file.path.file_name().and_then(|f| f.to_str()) {
+                let _ = Command::new("sc").args(&["stop", service_name]).status();
+                let _ = Command::new("sc").args(&["delete", service_name]).status();
+                println!("🛑 Deleted Windows service: {}", service_name);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -432,4 +448,67 @@ fn delete_file_with_sudo(path: &PathBuf, is_system_file: bool) {
             }
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn list_windows_services() -> Vec<ServiceFile> {
+    let output = Command::new("powershell")
+        .args(&["-Command", "Get-Service | Select-Object Name, Status"])
+        .output()
+        .expect("Failed to run PowerShell");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut services = Vec::new();
+
+    for line in stdout.lines().skip(3) {
+        let name = line.split_whitespace().next();
+        if let Some(name) = name {
+            services.push(ServiceFile {
+                display_label: format!("[Windows Service] {}", name),
+                path: PathBuf::from(name),
+                is_system: false,
+                service_type: ServiceType::WindowsService,
+            });
+        }
+    }
+
+    services
+}
+
+#[cfg(target_os = "windows")]
+fn list_startup_programs() -> Vec<ServiceFile> {
+    use std::env;
+
+    let mut startup_files = Vec::new();
+
+    let user_startup = env::var("APPDATA")
+        .map(|appdata| PathBuf::from(appdata).join("Microsoft/Windows/Start Menu/Programs/Startup"))
+        .ok();
+
+    let all_users_startup = env::var("PROGRAMDATA")
+        .map(|programdata| {
+            PathBuf::from(programdata).join("Microsoft/Windows/Start Menu/Programs/Startup")
+        })
+        .ok();
+
+    for dir in [user_startup, all_users_startup].iter().flatten() {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    startup_files.push(ServiceFile {
+                        display_label: format!(
+                            "[Startup Program] {}",
+                            path.file_name().unwrap().to_string_lossy()
+                        ),
+                        path: path.clone(),
+                        is_system: false,
+                        service_type: ServiceType::StartupProgram,
+                    });
+                }
+            }
+        }
+    }
+
+    startup_files
 }
