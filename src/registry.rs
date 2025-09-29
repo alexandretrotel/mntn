@@ -27,13 +27,16 @@ where
     }
 
     /// Load registry from file, creating default if it doesn't exist
-    pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>>
+    where
+        Self: Default,
+    {
         if path.exists() {
             let content = std::fs::read_to_string(path)?;
             let registry: Registry<T> = serde_json::from_str(&content)?;
             Ok(registry)
         } else {
-            let registry = Self::new();
+            let registry = Self::default();
             registry.save(path)?;
             Ok(registry)
         }
