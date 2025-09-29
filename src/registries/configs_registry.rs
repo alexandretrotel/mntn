@@ -179,7 +179,7 @@ impl ConfigsRegistry {
 
         for (id, entry) in &self.entries {
             by_category
-                .entry(entry.category.clone())
+                .entry(entry.category)
                 .or_insert_with(Vec::new)
                 .push((id, entry));
         }
