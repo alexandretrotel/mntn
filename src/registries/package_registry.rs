@@ -165,7 +165,7 @@ impl Default for PackageRegistry {
 impl PackageRegistry {
     pub fn get_platform_compatible_entries<'a>(
         &'a self,
-        current_platform: &str,
+        current_platform: &'a str,
     ) -> impl Iterator<Item = (&String, &PackageManagerEntry)> + 'a {
         self.entries.iter().filter(move |(_, entry)| {
             entry.enabled
