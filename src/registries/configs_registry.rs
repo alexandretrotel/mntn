@@ -53,14 +53,20 @@ impl std::str::FromStr for Category {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "shell" => Ok(Category::Shell),
-            "editor" => Ok(Category::Editor),
-            "terminal" => Ok(Category::Terminal),
-            "system" => Ok(Category::System),
-            "development" => Ok(Category::Development),
-            "application" => Ok(Category::Application),
-            _ => Err(format!("Unknown category: {}", s)),
+        if s.eq_ignore_ascii_case("shell") {
+            Ok(Category::Shell)
+        } else if s.eq_ignore_ascii_case("editor") {
+            Ok(Category::Editor)
+        } else if s.eq_ignore_ascii_case("terminal") {
+            Ok(Category::Terminal)
+        } else if s.eq_ignore_ascii_case("system") {
+            Ok(Category::System)
+        } else if s.eq_ignore_ascii_case("development") {
+            Ok(Category::Development)
+        } else if s.eq_ignore_ascii_case("application") {
+            Ok(Category::Application)
+        } else {
+            Err(format!("Unknown category: {}", s))
         }
     }
 }
