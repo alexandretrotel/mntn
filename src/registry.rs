@@ -18,17 +18,22 @@ impl<T> Registry<T>
 where
     T: RegistryEntryLike + Clone + Serialize + for<'a> Deserialize<'a>,
 {
+    /// Create a new empty registry
+    pub fn new() -> Self {
+        Self {
+            version: "1.0.0".to_string(),
+            entries: HashMap::new(),
+        }
+    }
+
     /// Load registry from file, creating default if it doesn't exist
-    pub fn load_or_create(
-        path: &PathBuf,
-        default: fn() -> Registry<T>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         if path.exists() {
             let content = std::fs::read_to_string(path)?;
             let registry: Registry<T> = serde_json::from_str(&content)?;
             Ok(registry)
         } else {
-            let registry = default();
+            let registry = Self::new();
             registry.save(path)?;
             Ok(registry)
         }
