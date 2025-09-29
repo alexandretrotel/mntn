@@ -26,7 +26,7 @@ impl RegistryEntryLike for RegistryEntry {
 }
 
 /// Categories for organizing registry entries
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Category {
     Shell,
     Editor,
