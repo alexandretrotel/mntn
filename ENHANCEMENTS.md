@@ -2,43 +2,6 @@
 
 ## 1. Code Mutualization and Architecture Improvements
 
-### Registry Core Logic Abstraction
-
-The current implementation has two separate registry systems (`ConfigsRegistry` and `PackageRegistry`) with similar functionality. We should create a generic registry trait to reduce code duplication:
-
-```rust
-// In src/registry/core.rs
-pub trait Registry<T> {
-    fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>>
-    where
-        Self: Sized;
-    fn save(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>>;
-    fn get_enabled_entries(&self) -> impl Iterator<Item = (&String, &T)>;
-    fn add_entry(&mut self, id: String, entry: T);
-    fn remove_entry(&mut self, id: &str) -> Option<T>;
-    fn set_entry_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String>;
-    fn get_entry(&self, id: &str) -> Option<&T>;
-}
-
-// Common registry operations
-pub struct RegistryManager<T> {
-    pub version: String,
-    pub entries: HashMap<String, T>,
-}
-
-impl<T> Registry<T> for RegistryManager<T>
-where
-    T: Serialize + DeserializeOwned + HasEnabled,
-{
-    // Implementation shared by both registries
-}
-
-trait HasEnabled {
-    fn is_enabled(&self) -> bool;
-    fn set_enabled(&mut self, enabled: bool);
-}
-```
-
 ### Command Pattern for Tasks
 
 Implement a command pattern to standardize task execution:
