@@ -154,6 +154,19 @@ impl Default for ConfigsRegistry {
             },
         );
 
+        // Git configuration
+        entries.insert(
+            "git_config".to_string(),
+            RegistryEntry {
+                name: "Git Config".to_string(),
+                source_path: ".gitconfig".to_string(),
+                target_path: TargetPath::Home(".gitconfig".to_string()),
+                category: Category::Development,
+                enabled: true,
+                description: Some("Global Git configuration".to_string()),
+            },
+        );
+
         Self {
             version: "1.0.0".to_string(),
             entries,
