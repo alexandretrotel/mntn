@@ -110,19 +110,19 @@ fn backup_config_files_from_registry(backup_dir: &PathBuf) {
     };
 
     let base_dirs = get_base_dirs();
-    let backupable_entries = registry.get_backupable_entries();
+    let enabled_entries = registry.get_enabled_entries();
 
-    if backupable_entries.is_empty() {
+    if enabled_entries.is_empty() {
         println!("ℹ️ No configuration files found to backup");
         return;
     }
 
     println!(
         "🔁 Backing up {} configuration files...",
-        backupable_entries.len()
+        enabled_entries.len()
     );
 
-    for (id, entry) in backupable_entries {
+    for (id, entry) in enabled_entries {
         let target_path = match entry.target_path.resolve(&base_dirs) {
             Ok(path) => path,
             Err(e) => {
