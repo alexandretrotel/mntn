@@ -515,7 +515,6 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "tempfile",
- "thiserror 2.0.12",
  "trash",
  "which",
 ]
