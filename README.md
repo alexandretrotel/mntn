@@ -2,6 +2,49 @@
 
 A Rust-based CLI tool for system maintenance.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Platform Support](#platform-support)
+- [Guides](#guides)
+  - [Backup and Restore Guide](#backup-and-restore-guide)
+    - [Creating Backups](#creating-backups)
+    - [Restoring from Backups](#restoring-from-backups)
+  - [Configuration Management with Version Control](#configuration-management-with-version-control)
+    - [Setting up Version Control for Your Configurations](#setting-up-version-control-for-your-configurations)
+    - [Using mntn for Configuration Management](#using-mntn-for-configuration-management)
+    - [Setting up on a New Machine](#setting-up-on-a-new-machine)
+  - [Git Integration and Sync Guide](#git-integration-and-sync-guide)
+    - [Setting up Git Integration](#setting-up-git-integration)
+    - [Sync Operations](#sync-operations)
+    - [Automated Workflow Examples](#automated-workflow-examples)
+    - [Git Repository Structure](#git-repository-structure)
+    - [Sync Command Options](#sync-command-options)
+    - [Troubleshooting Sync Issues](#troubleshooting-sync-issues)
+  - [Package Registry Management](#package-registry-management)
+    - [Viewing Package Manager Entries](#viewing-package-manager-entries)
+    - [Adding Custom Package Managers](#adding-custom-package-managers)
+    - [Managing Package Manager Entries](#managing-package-manager-entries)
+    - [Package Registry File Location](#package-registry-file-location)
+  - [Configuration Registry Management](#configuration-registry-management)
+    - [Viewing Registry Entries](#viewing-registry-entries)
+    - [Adding New Entries](#adding-new-entries)
+    - [Managing Entries](#managing-entries)
+    - [Registry File Location](#registry-file-location)
+  - [Automated Maintenance Setup](#automated-maintenance-setup)
+  - [System Cleaning Guide](#system-cleaning-guide)
+  - [Service Management with Purge](#service-management-with-purge)
+  - [Biometric Sudo Setup (macOS)](#biometric-sudo-setup-macos)
+- [Troubleshooting](#troubleshooting)
+  - [Backup Issues](#backup-issues)
+  - [Link Issues](#link-issues)
+  - [Clean Issues](#clean-issues)
+  - [Restore Issues](#restore-issues)
+  - [Sync Issues](#sync-issues)
+- [License](#license)
+
 ## Features
 
 - **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files using registry-based management.
