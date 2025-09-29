@@ -8,8 +8,11 @@ pub trait RegistryEntryLike {
 }
 
 /// Generic registry type shared by all registries
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Registry<T: RegistryEntryLike + Clone + Serialize + for<'de> Deserialize<'de>> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Registry<T>
+where
+    T: RegistryEntryLike + Serialize + for<'de> Deserialize<'de>,
+{
     pub version: String,
     pub entries: HashMap<String, T>,
 }
