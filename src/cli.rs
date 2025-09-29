@@ -77,6 +77,54 @@ pub struct PurgeArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the sync command.
+#[derive(Args)]
+pub struct SyncArgs {
+    /// Initialize a new git repository in ~/.mntn
+    #[arg(
+        long,
+        help = "Initialize a new git repository in ~/.mntn with the provided remote URL"
+    )]
+    pub init: bool,
+    /// Remote URL for git repository initialization
+    #[arg(
+        long,
+        help = "Remote repository URL (required with --init)"
+    )]
+    pub remote_url: Option<String>,
+    /// Pull changes from remote repository
+    #[arg(
+        long,
+        help = "Pull latest changes from remote repository"
+    )]
+    pub pull: bool,
+    /// Push changes to remote repository
+    #[arg(
+        long,
+        help = "Push local changes to remote repository"
+    )]
+    pub push: bool,
+    /// Sync both ways (pull then push)
+    #[arg(
+        long,
+        help = "Sync both ways: pull latest changes then push local changes"
+    )]
+    pub sync: bool,
+    /// Custom commit message for push operations
+    #[arg(
+        long,
+        short = 'm',
+        help = "Custom commit message (default: timestamp-based message)"
+    )]
+    pub message: Option<String>,
+    /// Automatically run 'mntn link' after pulling changes
+    #[arg(
+        long,
+        help = "Automatically run 'mntn link' after pulling changes"
+    )]
+    pub auto_link: bool,
+}
+
 /// Arguments for the registry command.
 #[derive(Args)]
 pub struct ConfigsRegistryArgs {
@@ -260,4 +308,8 @@ pub enum Commands {
     /// Manage the package manager registry for backup
     #[command(about = "Manage the package manager registry for backup operations")]
     PackageRegistry(PackageRegistryArgs),
+
+    /// Synchronize configurations with a git repository
+    #[command(about = "Sync configurations with a git repository (pull/push/both)")]
+    Sync(SyncArgs),
 }

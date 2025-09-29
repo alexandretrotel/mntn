@@ -8,3 +8,4 @@ pub mod link;
 pub mod package_registry;
 pub mod purge;
 pub mod restore;
+pub mod sync;

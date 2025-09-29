@@ -9,7 +9,7 @@ use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 use tasks::{
     backup, biometric_sudo, clean, configs_registry as configs_registry_task, delete, install,
-    link, package_registry as package_registry_task, purge, restore,
+    link, package_registry as package_registry_task, purge, restore, sync,
 };
 
 fn main() {
@@ -26,6 +26,7 @@ fn main() {
         Some(Commands::Restore) => restore::run(),
         Some(Commands::Registry(args)) => configs_registry_task::run(args),
         Some(Commands::PackageRegistry(args)) => package_registry_task::run(args),
+        Some(Commands::Sync(args)) => sync::run(args),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }
