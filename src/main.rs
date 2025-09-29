@@ -1,6 +1,6 @@
 mod cli;
 mod logger;
-mod package_registry;
+mod registries;
 mod registry;
 mod tasks;
 mod utils;
@@ -8,7 +8,8 @@ mod utils;
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 use tasks::{
-    backup, biometric_sudo, clean, delete, install, link, purge, registry as registry_task, restore,
+    backup, biometric_sudo, clean, configs_registry as configs_registry_task, delete, install,
+    link, package_registry as package_registry_task, purge, restore,
 };
 
 fn main() {
@@ -23,8 +24,8 @@ fn main() {
         Some(Commands::Install(args)) => install::run(args),
         Some(Commands::BiometricSudo) => biometric_sudo::run(),
         Some(Commands::Restore) => restore::run(),
-        Some(Commands::Registry(args)) => registry_task::run(args),
-        Some(Commands::PackageRegistry(args)) => tasks::package_registry::run(args),
+        Some(Commands::Registry(args)) => configs_registry_task::run(args),
+        Some(Commands::PackageRegistry(args)) => package_registry_task::run(args),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }

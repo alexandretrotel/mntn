@@ -1,10 +1,10 @@
 pub mod backup;
 pub mod biometric_sudo;
 pub mod clean;
+pub mod configs_registry;
 pub mod delete;
 pub mod install;
 pub mod link;
 pub mod package_registry;
 pub mod purge;
-pub mod registry;
 pub mod restore;

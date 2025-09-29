@@ -1,6 +1,6 @@
 use crate::logger::log;
-use crate::package_registry::PackageRegistry;
-use crate::registry::LinkRegistry;
+use crate::registries::configs_registry::ConfigsRegistry;
+use crate::registries::package_registry::PackageRegistry;
 use crate::utils::paths::{
     get_backup_path, get_base_dirs, get_package_registry_path, get_registry_path,
 };
@@ -97,7 +97,7 @@ fn backup_package_managers(backup_dir: &PathBuf) {
 fn backup_config_files_from_registry(backup_dir: &PathBuf) {
     // Load the registry
     let registry_path = get_registry_path();
-    let registry = match LinkRegistry::load_or_create(&registry_path) {
+    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!(

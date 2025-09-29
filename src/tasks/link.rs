@@ -1,5 +1,5 @@
 use crate::logger::log;
-use crate::registry::LinkRegistry;
+use crate::registries::configs_registry::ConfigsRegistry;
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
 use crate::utils::paths::{get_backup_path, get_base_dirs, get_registry_path, get_symlinks_path};
 use std::fs;
@@ -20,7 +20,7 @@ pub fn run() {
 
     // Load the registry
     let registry_path = get_registry_path();
-    let registry = match LinkRegistry::load_or_create(&registry_path) {
+    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);

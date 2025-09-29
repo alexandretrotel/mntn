@@ -1,34 +1,29 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
 
-/// Represents a package manager that can be backed up
+use crate::registry::{Registry, RegistryEntryLike};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageManagerEntry {
-    /// Human-readable name for this package manager
     pub name: String,
-    /// Command to execute (e.g., "brew")
     pub command: String,
-    /// Arguments to pass to the command (e.g., ["leaves"])
     pub args: Vec<String>,
-    /// Output filename (e.g., "brew.txt")
     pub output_file: String,
-    /// Whether this entry is enabled
     pub enabled: bool,
-    /// Optional description
     pub description: Option<String>,
-    /// Platform compatibility (optional - if None, works on all platforms)
     pub platforms: Option<Vec<String>>,
 }
 
-/// Registry containing all package managers that should be backed up
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PackageRegistry {
-    /// Version of the registry format
-    pub version: String,
-    /// Map of entry IDs to package manager entries
-    pub entries: HashMap<String, PackageManagerEntry>,
+impl RegistryEntryLike for PackageManagerEntry {
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
 }
+
+pub type PackageRegistry = Registry<PackageManagerEntry>;
 
 impl Default for PackageRegistry {
     fn default() -> Self {
@@ -72,7 +67,7 @@ impl Default for PackageRegistry {
                 output_file: "npm.txt".to_string(),
                 enabled: true,
                 description: Some("npm globally installed packages".to_string()),
-                platforms: None, // works on all platforms
+                platforms: None,
             },
         );
 
@@ -146,7 +141,7 @@ impl Default for PackageRegistry {
             },
         );
 
-        // pip global packages (system-wide)
+        // pip global packages
         entries.insert(
             "pip".to_string(),
             PackageManagerEntry {
@@ -154,7 +149,7 @@ impl Default for PackageRegistry {
                 command: "pip".to_string(),
                 args: vec!["list".to_string(), "--format=freeze".to_string()],
                 output_file: "pip.txt".to_string(),
-                enabled: false, // disabled by default as it can be noisy
+                enabled: false,
                 description: Some("pip installed packages (system-wide)".to_string()),
                 platforms: None,
             },
@@ -168,97 +163,27 @@ impl Default for PackageRegistry {
 }
 
 impl PackageRegistry {
-    /// Load registry from file, creating default if it doesn't exist
-    pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            let registry: PackageRegistry = serde_json::from_str(&content)?;
-            Ok(registry)
-        } else {
-            let registry = Self::default();
-            registry.save(path)?;
-            Ok(registry)
-        }
-    }
-
-    /// Save registry to file
-    pub fn save(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let content = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
-        Ok(())
-    }
-
-    /// Get all enabled entries
-    pub fn get_enabled_entries(&self) -> impl Iterator<Item = (&String, &PackageManagerEntry)> {
-        self.entries.iter().filter(|(_, entry)| entry.enabled)
-    }
-
-    /// Get entries compatible with the current platform
-    pub fn get_platform_compatible_entries(
-        &self,
+    pub fn get_platform_compatible_entries<'a>(
+        &'a self,
         current_platform: &str,
-    ) -> impl Iterator<Item = (&String, &PackageManagerEntry)> {
+    ) -> impl Iterator<Item = (&String, &PackageManagerEntry)> + 'a {
         self.entries.iter().filter(move |(_, entry)| {
             entry.enabled
                 && match &entry.platforms {
                     Some(platforms) => platforms.contains(&current_platform.to_string()),
-                    None => true, // None means compatible with all platforms
+                    None => true,
                 }
         })
     }
 
-    /// Add a new entry
-    pub fn add_entry(&mut self, id: String, entry: PackageManagerEntry) {
-        self.entries.insert(id, entry);
-    }
-
-    /// Remove an entry
-    pub fn remove_entry(&mut self, id: &str) -> Option<PackageManagerEntry> {
-        self.entries.remove(id)
-    }
-
-    /// Enable/disable an entry
-    pub fn set_entry_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String> {
-        match self.entries.get_mut(id) {
-            Some(entry) => {
-                entry.enabled = enabled;
-                Ok(())
-            }
-            None => Err(format!("Package manager entry '{}' not found", id)),
-        }
-    }
-
-    /// Get entry by ID
-    pub fn get_entry(&self, id: &str) -> Option<&PackageManagerEntry> {
-        self.entries.get(id)
-    }
-
-    /// Update an existing entry
-    pub fn _update_entry(&mut self, id: &str, entry: PackageManagerEntry) -> Result<(), String> {
-        match self.entries.get_mut(id) {
-            Some(existing_entry) => {
-                *existing_entry = entry;
-                Ok(())
-            }
-            None => Err(format!("Package manager entry '{}' not found", id)),
-        }
-    }
-
-    /// Get current platform string
     pub fn get_current_platform() -> String {
         #[cfg(target_os = "macos")]
-        return "macos".to_string();
-
+        return "macos".into();
         #[cfg(target_os = "linux")]
-        return "linux".to_string();
-
+        return "linux".into();
         #[cfg(target_os = "windows")]
-        return "windows".to_string();
-
+        return "windows".into();
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-        return "unknown".to_string();
+        return "unknown".into();
     }
 }

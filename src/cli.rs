@@ -79,14 +79,14 @@ pub struct PurgeArgs {
 
 /// Arguments for the registry command.
 #[derive(Args)]
-pub struct RegistryArgs {
+pub struct ConfigsRegistryArgs {
     #[command(subcommand)]
-    pub action: RegistryActions,
+    pub action: ConfigsRegistryActions,
 }
 
 /// Registry management actions.
 #[derive(Subcommand)]
-pub enum RegistryActions {
+pub enum ConfigsRegistryActions {
     /// List all registry entries
     #[command(about = "List all entries in the registry")]
     List {
@@ -255,7 +255,7 @@ pub enum Commands {
 
     /// Manage the registry of files and folders to backup and link
     #[command(about = "Manage the registry of files and folders for backup and linking")]
-    Registry(RegistryArgs),
+    Registry(ConfigsRegistryArgs),
 
     /// Manage the package manager registry for backup
     #[command(about = "Manage the package manager registry for backup operations")]

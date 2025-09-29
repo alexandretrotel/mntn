@@ -4,7 +4,7 @@
 
 ### Registry Core Logic Abstraction
 
-The current implementation has two separate registry systems (`LinkRegistry` and `PackageRegistry`) with similar functionality. We should create a generic registry trait to reduce code duplication:
+The current implementation has two separate registry systems (`ConfigsRegistry` and `PackageRegistry`) with similar functionality. We should create a generic registry trait to reduce code duplication:
 
 ```rust
 // In src/registry/core.rs
