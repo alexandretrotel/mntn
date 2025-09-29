@@ -5,14 +5,14 @@ A Rust-based CLI tool for system maintenance.
 ## Features
 
 - **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files using registry-based management.
-- **Biometric Sudo [macOS]**: Configures Touch ID authentication for sudo commands.
-- **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup.
-- **Delete [macOS]**: Removes applications and their related files with interactive selection.
-- **Install**: Sets up automated services for backups, cleaning, and system updates.
-- **Link**: Creates symlinks for dotfiles (e.g., .mntn, .zshrc, .vimrc, .config, VSCode settings).
-- **Package Registry**: Centralized management of package managers for backup operations.
-- **Purge**: Deletes unused services with user confirmation.
-- **Registry**: Centralized management of configuration files and directories to backup and link.
+- **Biometric Sudo [macOS only]**: Configures Touch ID authentication for sudo commands.
+- **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup across all platforms.
+- **Delete [macOS only]**: Removes applications and their related files with interactive selection.
+- **Install**: Sets up automated services for backups, cleaning, and system updates on macOS (LaunchAgents), Linux (systemd), and Windows (Task Scheduler).
+- **Link**: Creates symlinks for dotfiles (e.g., .zshrc, .vimrc, .config, VSCode settings) from your backup directory.
+- **Package Registry**: Centralized management of package managers for backup operations with platform-specific support.
+- **Purge**: Deletes unused services with user confirmation across all platforms.
+- **Registry**: Centralized management of configuration files and directories using absolute paths for backup and linking.
 - **Restore**: Restores configuration files from backups using the registry system.
 
 ## Installation
@@ -40,6 +40,14 @@ mntn clean
 mntn biometric-sudo
 ```
 
+## Platform Support
+
+mntn supports **macOS**, **Linux**, and **Windows** with platform-specific features:
+
+- **All platforms**: backup, clean, install, link, purge, restore, registry management
+- **macOS only**: biometric-sudo, delete command, Homebrew cask support
+- **Linux/Windows**: systemd services (Linux) and Task Scheduler (Windows) for automation
+
 ## Guides
 
 ### Backup and Restore Guide
@@ -53,8 +61,22 @@ mntn backup
 ```
 
 **What gets backed up:**
-- **Package lists**: Managed through the package registry system - Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), uv packages (`uv.txt`), and Cargo installed packages (`cargo.txt`)
-- **Configuration files**: Managed through the configuration registry - VS Code settings and keybindings, Ghostty terminal config, shell configurations, and other dotfiles
+- **Package lists**: Managed through the package registry system:
+  - Homebrew packages (`brew.txt`) - macOS/Linux only
+  - Homebrew casks (`brew-cask.txt`) - macOS only  
+  - npm global packages (`npm.txt`)
+  - Yarn global packages (`yarn.txt`)
+  - pnpm global packages (`pnpm.txt`)
+  - Bun global packages (`bun.txt`)
+  - uv packages (`uv.txt`)
+  - Cargo installed packages (`cargo.txt`)
+  - pip packages (`pip.txt`) - disabled by default
+- **Configuration files**: Managed through the configuration registry:
+  - Shell configurations (.zshrc, .vimrc, .gitconfig)
+  - VSCode settings and keybindings
+  - Ghostty terminal config (with platform-specific paths)
+  - General config directory (~/.config)
+  - Other registered dotfiles and application configs
 
 **Backup location**: `~/.mntn/backup/`
 
@@ -100,29 +122,34 @@ done < ~/.mntn/backup/cargo.txt
    ```
 
 2. **Your mntn directory structure will look like:**
-   ```
-   ~/.mntn/
-   ├── .git/               # Git repository
-   ├── .gitignore          # Automatically created (excludes mntn.log)
-   ├── registry.json       # Configuration registry
-   ├── package_registry.json # Package manager registry
-   ├── mntn.log           # Log file (ignored by git)
-   ├── symlinks/          # Backup of original files
-   └── backup/            # Your dotfiles and configs
-       ├── .zshrc         # Shell configuration
-       ├── .vimrc         # Vim configuration
-       ├── config/        # This becomes ~/.config
-       │   ├── nvim/
-       │   └── git/
-       ├── vscode/
-       │   ├── settings.json
-       │   └── keybindings.json
-       ├── brew.txt       # package managers, etc.
-       ├── npm.txt
-       └── cargo.txt
-   ```
-
-3. **Commit and push your configurations:**
+```
+~/.mntn/
+├── .git/               # Git repository
+├── .gitignore          # Automatically created (excludes mntn.log)
+├── registry.json       # Configuration registry
+├── package_registry.json # Package manager registry
+├── mntn.log           # Log file (ignored by git)
+├── symlinks/          # Backup of original files before linking
+└── backup/            # Your dotfiles and configs
+    ├── .zshrc         # Shell configuration
+    ├── .vimrc         # Vim configuration  
+    ├── .gitconfig     # Git configuration
+    ├── config/        # General config directory
+    │   └── ...        # Various application configs
+    ├── vscode/
+    │   ├── settings.json
+    │   └── keybindings.json
+    ├── ghostty/
+    │   └── config     # Terminal configuration
+    ├── brew.txt       # Homebrew packages (macOS/Linux)
+    ├── brew-cask.txt  # Homebrew casks (macOS only)
+    ├── npm.txt        # npm global packages
+    ├── yarn.txt       # Yarn global packages
+    ├── pnpm.txt       # pnpm global packages
+    ├── bun.txt        # Bun global packages
+    ├── cargo.txt      # Cargo packages
+    └── uv.txt         # uv tools
+```3. **Commit and push your configurations:**
    ```bash
    cd ~/.mntn
    git add .
@@ -139,11 +166,14 @@ mntn link
 ```
 
 **What it does:**
-- Links `~/.mntn/backup/.zshrc` → `~/.zshrc`
-- Links `~/.mntn/backup/.vimrc` → `~/.vimrc`
-- Links `~/.mntn/backup/config` → `~/.config`
-- Links `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
-- Links `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+- Links files from `~/.mntn/backup/` to their target system locations based on the registry
+- Examples for macOS:
+  - `~/.mntn/backup/.zshrc` → `~/.zshrc`
+  - `~/.mntn/backup/.vimrc` → `~/.vimrc`  
+  - `~/.mntn/backup/config` → `~/.config`
+  - `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
+  - `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+  - `~/.mntn/backup/ghostty/config` → `~/Library/Application Support/com.mitchellh.ghostty/config` (macOS) or `~/.config/ghostty/config` (Linux)
 
 **Safety features:**
 - Automatically backs up existing files to `~/.mntn/symlinks/`
@@ -186,15 +216,15 @@ mntn package-registry list --platform-only
 ```
 
 **Default Package Managers:**
-- `brew` - Homebrew packages (macOS/Linux)
-- `brew_cask` - Homebrew casks/applications (macOS only)
-- `npm` - npm global packages (all platforms)
-- `yarn` - Yarn global packages (all platforms)
-- `pnpm` - pnpm global packages (all platforms)
-- `bun` - Bun global packages (all platforms)
-- `cargo` - Cargo installed packages (all platforms)
-- `uv` - uv installed tools (all platforms)
-- `pip` - pip packages (disabled by default)
+- `brew` - Homebrew packages (macOS/Linux) - uses `brew leaves`
+- `brew_cask` - Homebrew casks/applications (macOS only) - uses `brew list --cask`  
+- `npm` - npm global packages (all platforms) - uses `npm ls -g`
+- `yarn` - Yarn global packages (all platforms) - uses `yarn global list`
+- `pnpm` - pnpm global packages (all platforms) - uses `pnpm ls -g`
+- `bun` - Bun global packages (all platforms) - uses `bun pm ls -g`
+- `cargo` - Cargo installed packages (all platforms) - uses `cargo install --list`
+- `uv` - uv installed tools (all platforms) - uses `uv tool list`
+- `pip` - pip packages (disabled by default) - uses `pip list --format=freeze`
 
 #### Adding Custom Package Managers
 
@@ -263,7 +293,7 @@ mntn registry list --category editor
 
 **Registry Categories:**
 - `shell` - Shell configuration files (.zshrc, .bashrc, etc.)
-- `editor` - Text editors and IDEs (vim, vscode, etc.)
+- `editor` - Text editors and IDEs (vim, vscode, etc.)  
 - `terminal` - Terminal emulators and related tools
 - `system` - System-wide configuration
 - `development` - Development tools and environments
@@ -276,16 +306,15 @@ mntn registry list --category editor
 mntn registry add my_app_config \
   --name "My App Config" \
   --source "myapp/config.json" \
-  --target "~/.config/myapp/config.json" \
+  --target "/Users/username/.config/myapp/config.json" \
   --category application \
   --description "Configuration for My App"
 ```
 
-**Target Path Types:**
-- `~/path` - Home directory relative paths
-- `.config/path` - Config directory relative paths  
-- `/absolute/path` - Absolute paths
-- Automatic detection based on path patterns
+**Target Path:**
+- Uses absolute paths to the actual system location where files should be linked
+- Automatically resolves platform-specific paths (e.g., `~/Library/Application Support` on macOS, `~/.config` on Linux)
+- Examples: `/Users/username/.zshrc`, `/Users/username/Library/Application Support/Code/User/settings.json`
 
 #### Managing Entries
 
@@ -307,10 +336,8 @@ The registry is stored as JSON at `~/.mntn/registry.json`. You can edit it manua
 {
   "name": "Zsh Configuration",
   "source_path": ".zshrc",
-  "target_path": {
-    "Home": ".zshrc"
-  },
-  "category": "Shell",
+  "target_path": "/Users/username/.zshrc",
+  "category": "shell",
   "enabled": true,
   "description": "Main Zsh shell configuration file"
 }
@@ -331,8 +358,8 @@ mntn install --with-clean
 **What gets installed:**
 
 - **macOS**: Creates LaunchAgents in `~/Library/LaunchAgents/`
-- **Linux**: Creates systemd user services and timers
-- **Windows**: Creates scheduled tasks
+- **Linux**: Creates systemd user services and timers in `~/.config/systemd/user/`
+- **Windows**: Creates scheduled tasks using Task Scheduler
 
 **Scheduled tasks:**
 - `mntn-backup`: Runs `mntn backup` every hour
@@ -341,7 +368,8 @@ mntn install --with-clean
 
 **Task logs:** 
 - **macOS**: `/tmp/mntn-*.out` and `/tmp/mntn-*.err`
-- **Linux**: Use `journalctl --user -u mntn-*.service`
+- **Linux**: Use `journalctl --user -u mntn-*.service` or `journalctl --user -u mntn-*.timer`
+- **Windows**: Task Scheduler history and event logs
 
 ### System Cleaning Guide
 
@@ -361,21 +389,30 @@ mntn clean --dry-run
 **What gets cleaned:**
 
 **User-level cleanup (default):**
-- Cache directories (`~/Library/Caches` on macOS, `~/.cache` on Linux)
-- Temporary files
-- Application logs and saved states (macOS)
-- Quick Look cache reset (macOS)
+- Cache directories:
+  - macOS: `~/Library/Caches`
+  - Linux: `~/.cache`
+- Temporary files and directories
+- Application logs and saved states (macOS: `~/Library/Logs`, `~/Library/Saved Application State`)
+- Quick Look cache reset (macOS only)
 
 **System-level cleanup (with `--system`):**
-- System caches (`/Library/Caches`, `/var/cache`)
-- System logs (`/private/var/log`, `/var/log`)
-- Diagnostic reports (macOS)
-- Volume trash folders (macOS)
+- System caches:
+  - macOS: `/Library/Caches`, `/System/Library/Caches`
+  - Linux: `/var/cache`, `/tmp`
+- System logs:
+  - macOS: `/private/var/log`
+  - Linux: `/var/log`
+- Platform-specific cleanup:
+  - macOS: Diagnostic reports, volume trash folders
+  - Linux: Additional temp directories
 
 **Package manager cleanup:**
-- Homebrew: `brew cleanup`
+- Homebrew: `brew cleanup` (macOS/Linux)
 - npm: `npm cache clean --force`
 - pnpm: `pnpm cache delete`
+- Yarn: cache cleanup
+- Other package managers as available
 
 **Safety features:**
 - Skips files modified in the last 24 hours
@@ -400,8 +437,8 @@ mntn purge --dry-run
 **What it manages:**
 
 - **macOS**: LaunchAgents (`.plist` files) in `~/Library/LaunchAgents/` and `/Library/LaunchAgents/`
-- **Linux**: systemd user services and autostart programs
-- **Windows**: Windows services and startup programs (planned)
+- **Linux**: systemd user services in `~/.config/systemd/user/` and autostart programs in `~/.config/autostart/`
+- **Windows**: Windows services and startup programs
 
 **Interactive selection:**
 - Lists all found services/programs
