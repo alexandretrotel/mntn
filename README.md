@@ -14,6 +14,7 @@ A Rust-based CLI tool for system maintenance.
 - **Purge**: Deletes unused services with user confirmation across all platforms.
 - **Registry**: Centralized management of configuration files and directories using absolute paths for backup and linking.
 - **Restore**: Restores configuration files from backups using the registry system.
+- **Sync**: Git integration for synchronizing configurations across machines with automatic commit/push/pull operations.
 
 ## Installation
 
@@ -38,13 +39,17 @@ mntn clean
 
 # Enable Touch ID for sudo (macOS only)
 mntn biometric-sudo
+
+# Sync your configurations with a git repository
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+mntn sync --sync --auto-link
 ```
 
 ## Platform Support
 
 mntn supports **macOS**, **Linux**, and **Windows** with platform-specific features:
 
-- **All platforms**: backup, clean, install, link, purge, restore, registry management
+- **All platforms**: backup, clean, install, link, purge, restore, registry management, sync
 - **macOS only**: biometric-sudo, delete command, Homebrew cask support
 - **Linux/Windows**: systemd services (Linux) and Task Scheduler (Windows) for automation
 
@@ -196,6 +201,168 @@ mntn link
 mntn backup
 
 # The repository now includes your registries and full mntn context
+```
+
+### Git Integration and Sync Guide
+
+The `sync` command provides seamless git integration for managing your mntn configurations across multiple machines. It automates the common git operations needed to keep your dotfiles synchronized.
+
+#### Setting up Git Integration
+
+**Initialize a new git repository:**
+```bash
+# Create your first backup to set up folder structure
+mntn backup
+
+# Initialize git repository in ~/.mntn with remote
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+
+# This automatically:
+# - Initializes git repository in ~/.mntn
+# - Adds the remote origin
+# - Creates a default .gitignore (excludes mntn.log)
+# - Sets up main branch
+```
+
+**If you already have a repository:**
+```bash
+# Clone existing repository directly to ~/.mntn
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn
+
+# The sync command will ensure .gitignore exists
+mntn sync --pull
+```
+
+#### Sync Operations
+
+**Pull latest changes:**
+```bash
+# Pull changes from remote repository
+mntn sync --pull
+
+# Pull and automatically re-link configurations
+mntn sync --pull --auto-link
+```
+
+**Push local changes:**
+```bash
+# Push changes with automatic commit message
+mntn sync --push
+
+# Push with custom commit message
+mntn sync --push --message "Update VS Code settings"
+```
+
+**Bidirectional sync:**
+```bash
+# Pull latest changes, then push any local changes
+mntn sync --sync
+
+# Same as above but also re-link after pulling
+mntn sync --sync --auto-link
+```
+
+#### Automated Workflow Examples
+
+**Daily workflow on main machine:**
+```bash
+# After making configuration changes
+mntn backup                          # Update backup files
+mntn sync --push --message "Daily backup"  # Push to remote
+```
+
+**Setting up a new machine:**
+```bash
+# Install mntn
+cargo install mntn
+
+# Clone your configurations
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn
+
+# Link configurations to system locations
+mntn link
+
+# Keep in sync
+mntn sync --pull --auto-link
+```
+
+**Working across multiple machines:**
+```bash
+# Before starting work (pull latest)
+mntn sync --pull --auto-link
+
+# After finishing work (push changes)
+mntn backup
+mntn sync --push --message "Work session updates"
+```
+
+#### Git Repository Structure
+
+The sync command works with the entire `~/.mntn` directory as a git repository:
+
+```
+~/.mntn/                    # Git repository root
+├── .git/                   # Git metadata
+├── .gitignore             # Excludes mntn.log and temporary files
+├── backup/                # Your dotfiles and configs
+│   ├── .zshrc
+│   ├── .vimrc
+│   ├── vscode/
+│   └── ...
+├── registry.json          # Configuration registry
+├── package_registry.json  # Package manager registry
+├── symlinks/              # Backup of original files
+└── mntn.log               # Ignored by git
+```
+
+**Benefits of this approach:**
+- **Full context**: Registry files and all configurations are versioned together
+- **Machine-independent**: Works the same way on any machine
+- **Safe**: Automatic .gitignore prevents log files from being committed
+- **Flexible**: Can organize backup/ directory however you prefer
+
+#### Sync Command Options
+
+```bash
+# Initialize new repository
+mntn sync --init --remote-url <URL>
+
+# Pull operations
+mntn sync --pull                    # Pull changes only
+mntn sync --pull --auto-link        # Pull and re-link configs
+
+# Push operations  
+mntn sync --push                    # Push with auto-generated message
+mntn sync --push -m "Custom msg"    # Push with custom message
+
+# Bidirectional sync
+mntn sync --sync                    # Pull then push
+mntn sync --sync --auto-link        # Pull, re-link, then push
+```
+
+#### Troubleshooting Sync Issues
+
+**Repository not found:**
+```bash
+# If you see "No git repository found"
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+```
+
+**Merge conflicts:**
+```bash
+# Handle conflicts manually in ~/.mntn
+cd ~/.mntn
+git status
+# Edit conflicted files
+git add .
+git commit -m "Resolve merge conflicts"
+mntn sync --push
+```
+
+**Authentication issues:**
+```bash
+# Set up SSH keys or use personal access tokens
+# See GitHub documentation for authentication setup
 ```
 
 ### Package Registry Management
@@ -485,6 +652,13 @@ mntn biometric-sudo
 ### Restore Issues
 - **Files not found**: Run `mntn backup` first to create initial backups
 - **Permission denied**: Ensure write access to target config directories
+
+### Sync Issues
+- **No git repository found**: Use `mntn sync --init --remote-url <URL>` to initialize
+- **Authentication failed**: Set up SSH keys or GitHub personal access tokens
+- **Merge conflicts**: Resolve manually in `~/.mntn` directory using standard git commands
+- **Permission denied on push**: Check repository permissions and authentication
+- **Remote URL required**: Use `--remote-url` flag when initializing with `--init`
 
 ## License
 
