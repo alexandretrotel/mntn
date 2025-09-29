@@ -55,7 +55,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     for category in sorted_categories {
         // Skip categories that don't match the filter
         if let Some(ref filter) = filter_category {
-            if category.to_string() != *filter {
+            if format!("{:?}", category).to_lowercase() != *filter {
                 continue;
             }
         }
@@ -70,7 +70,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
             }
 
             if !has_entries {
-                let category_str = category.to_string().to_uppercase();
+                let category_str = format!("{:?}", category).to_uppercase();
                 println!("\n🏷️  {}", category_str);
                 println!("{}", "─".repeat(category_str.len() + 4));
                 has_entries = true;
@@ -88,7 +88,10 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
         }
 
         if !has_entries && filter_category.is_some() {
-            println!("\nNo entries found in category '{}'", category);
+            println!(
+                "\nNo entries found in category '{}'",
+                format!("{:?}", category).to_lowercase()
+            );
         }
     }
 

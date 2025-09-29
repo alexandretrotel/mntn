@@ -27,6 +27,7 @@ impl RegistryEntryLike for RegistryEntry {
 
 /// Categories for organizing registry entries
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
 pub enum Category {
     Shell,
     Editor,
@@ -34,19 +35,6 @@ pub enum Category {
     System,
     Development,
     Application,
-}
-
-impl std::fmt::Display for Category {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Category::Shell => write!(f, "shell"),
-            Category::Editor => write!(f, "editor"),
-            Category::Terminal => write!(f, "terminal"),
-            Category::System => write!(f, "system"),
-            Category::Development => write!(f, "development"),
-            Category::Application => write!(f, "application"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
