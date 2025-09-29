@@ -9,17 +9,14 @@ pub trait RegistryEntryLike {
 
 /// Generic registry type shared by all registries
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Registry<T>
-where
-    T: RegistryEntryLike + Serialize + for<'de> Deserialize<'de>,
-{
+pub struct Registry<T> {
     pub version: String,
     pub entries: HashMap<String, T>,
 }
 
 impl<T> Registry<T>
 where
-    T: RegistryEntryLike + Clone + Serialize + for<'de> Deserialize<'de>,
+    T: RegistryEntryLike + Clone + Serialize + for<'a> Deserialize<'a>,
 {
     /// Load registry from file, creating default if it doesn't exist
     pub fn load_or_create(
