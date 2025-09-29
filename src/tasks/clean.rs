@@ -71,7 +71,7 @@ fn clean_user_directories(args: &CleanArgs) -> u64 {
     // Cross-platform user cache directory
     user_paths.push(cache_dir.to_path_buf());
 
-    // Cross-platform user data directory
+    // Cross-platform user temp directory
     user_paths.push(std::env::temp_dir());
 
     // Platform-specific user directories
@@ -292,14 +292,52 @@ fn clean_trash(args: &CleanArgs) -> u64 {
 
     #[cfg(target_os = "macos")]
     {
+        // Main user trash directory
         let trash_dir = home_dir.join(".Trash");
         total_freed += clean_directory_contents(&trash_dir, false, args);
+
+        // External volume trash directories
+        if let Ok(entries) = glob("/Volumes/*/.Trashes/*") {
+            for entry in entries.filter_map(Result::ok) {
+                // Only clean trash for current user (use current UID)
+                if let Some(dir_name) = entry.file_name().and_then(|n| n.to_str()) {
+                    if let Ok(current_uid) = std::process::Command::new("id")
+                        .arg("-u")
+                        .output()
+                        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+                    {
+                        if dir_name == current_uid {
+                            total_freed += clean_directory_contents(&entry, false, args);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Alternative: Use native macOS trash command if available
+        if !args.dry_run && which::which("osascript").is_ok() {
+            let script = r#"
+                tell application "Finder"
+                    empty trash
+                end tell
+            "#;
+
+            if args.dry_run {
+                println!("   [DRY RUN] Would run AppleScript to empty trash");
+            } else {
+                let _ = run_cmd("osascript", &["-e", script]);
+            }
+        }
     }
 
     #[cfg(target_os = "linux")]
     {
         let trash_dir = home_dir.join(".local/share/Trash/files");
         total_freed += clean_directory_contents(&trash_dir, false, args);
+
+        // Also clean the info directory
+        let trash_info_dir = home_dir.join(".local/share/Trash/info");
+        total_freed += clean_directory_contents(&trash_info_dir, false, args);
     }
 
     #[cfg(target_os = "windows")]
