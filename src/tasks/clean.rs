@@ -49,7 +49,7 @@ pub fn run(args: CleanArgs) {
     total_space_saved += clean_package_managers(&args);
 
     // Clean trash for current user
-    // TODO: Implement cross-platform trash cleaning
+    total_space_saved += clean_trash(&args);
 
     let space_saved_str = bytes_to_human_readable(total_space_saved);
     println!("✅ System cleaned. Freed {}.", space_saved_str);
@@ -279,4 +279,41 @@ fn should_skip(path: &Path) -> bool {
                     .any(|window| window == pattern_bytes)
             })
     })
+}
+
+/// Clean the trash/recycle bin for the current user
+fn clean_trash(args: &CleanArgs) -> u64 {
+    let mut total_freed = 0u64;
+
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+
+    println!("🔹 Emptying trash...");
+
+    #[cfg(target_os = "macos")]
+    {
+        let trash_dir = home_dir.join(".Trash");
+        total_freed += clean_directory_contents(&trash_dir, false, args);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let trash_dir = home_dir.join(".local/share/Trash/files");
+        total_freed += clean_directory_contents(&trash_dir, false, args);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        if !args.dry_run {
+            let _ = Command::new("powershell")
+                .args(&["-Command", "Clear-RecycleBin -Force"])
+                .status();
+        } else {
+            println!("   [DRY RUN] Would empty Recycle Bin");
+        }
+    }
+
+    total_freed
 }
