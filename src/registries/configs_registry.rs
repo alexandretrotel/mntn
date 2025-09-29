@@ -49,8 +49,21 @@ impl std::fmt::Display for Category {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CategoryParseError {
+    pub invalid_category: String,
+}
+
+impl std::fmt::Display for CategoryParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown category: '{}'", self.invalid_category)
+    }
+}
+
+impl std::error::Error for CategoryParseError {}
+
 impl std::str::FromStr for Category {
-    type Err = String;
+    type Err = CategoryParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.eq_ignore_ascii_case("shell") {
@@ -66,7 +79,9 @@ impl std::str::FromStr for Category {
         } else if s.eq_ignore_ascii_case("application") {
             Ok(Category::Application)
         } else {
-            Err(format!("Unknown category: {}", s))
+            Err(CategoryParseError {
+                invalid_category: s.to_string(),
+            })
         }
     }
 }
