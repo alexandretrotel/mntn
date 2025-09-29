@@ -1,6 +1,6 @@
 use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
-use crate::utils::paths::{get_backup_path, get_base_dirs, get_registry_path};
+use crate::utils::paths::{get_backup_path, get_registry_path};
 use std::fs;
 use std::path::PathBuf;
 
@@ -28,30 +28,17 @@ pub fn run() {
         }
     };
 
-    let base_dirs = get_base_dirs();
     let mut restored_count = 0;
     let mut skipped_count = 0;
 
     // Process each enabled entry from the registry
     for (id, entry) in registry.get_enabled_entries() {
         let backup_source = backup_dir.join(&entry.source_path);
-
-        let target_path = match entry.target_path.resolve(&base_dirs) {
-            Ok(path) => path,
-            Err(e) => {
-                println!("⚠️ Failed to resolve target path for {}: {}", entry.name, e);
-                log(&format!(
-                    "Failed to resolve target path for {}: {}",
-                    entry.name, e
-                ));
-                skipped_count += 1;
-                continue;
-            }
-        };
+        let target_path = &entry.target_path;
 
         if backup_source.exists() {
             println!("🔄 Restoring: {} ({})", entry.name, id);
-            if restore_config_file(&backup_source, Some(target_path), &entry.name) {
+            if restore_config_file(&backup_source, target_path, &entry.name) {
                 restored_count += 1;
             } else {
                 skipped_count += 1;
@@ -84,23 +71,10 @@ pub fn run() {
 /// - Writes the contents to the target path.
 ///
 /// Returns true if the restore was successful, false otherwise.
-fn restore_config_file(
-    backup_path: &PathBuf,
-    target_path: Option<PathBuf>,
-    file_name: &str,
-) -> bool {
-    let target = match target_path {
-        Some(path) => path,
-        None => {
-            println!("⚠️ Target path not found for {}", file_name);
-            log(&format!("Target path not found for {}", file_name));
-            return false;
-        }
-    };
-
+fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: &str) -> bool {
     // Handle both files and directories
     if backup_path.is_dir() {
-        return restore_directory(backup_path, &target, file_name);
+        return restore_directory(backup_path, &target_path, file_name);
     }
 
     let contents = match fs::read_to_string(backup_path) {
@@ -115,7 +89,7 @@ fn restore_config_file(
         }
     };
 
-    if let Some(parent) = target.parent() {
+    if let Some(parent) = target_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
             println!("⚠️ Failed to create directory for {}: {}", file_name, e);
             log(&format!(
@@ -126,7 +100,7 @@ fn restore_config_file(
         }
     }
 
-    match fs::write(&target, contents) {
+    match fs::write(&target_path, contents) {
         Ok(_) => {
             log(&format!("Restored {}", file_name));
             true
