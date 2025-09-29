@@ -18,14 +18,6 @@ impl<T> Registry<T>
 where
     T: RegistryEntryLike + Clone + Serialize + for<'a> Deserialize<'a>,
 {
-    /// Create a new empty registry
-    pub fn new() -> Self {
-        Self {
-            version: "1.0.0".to_string(),
-            entries: HashMap::new(),
-        }
-    }
-
     /// Load registry from file, creating default if it doesn't exist
     pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>>
     where
@@ -84,7 +76,7 @@ where
     }
 
     /// Update an existing entry
-    pub fn update_entry(&mut self, id: &str, entry: T) -> Result<(), String> {
+    pub fn _update_entry(&mut self, id: &str, entry: T) -> Result<(), String> {
         match self.entries.get_mut(id) {
             Some(existing_entry) => {
                 *existing_entry = entry;
