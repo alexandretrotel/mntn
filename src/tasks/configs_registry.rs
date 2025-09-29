@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
 use crate::logger::log;
-use crate::registries::configs_registry::{ConfigsRegistry, RegistryEntry, TargetPath};
+use crate::registries::configs_registry::{Category, ConfigsRegistry, RegistryEntry};
 use crate::utils::paths::get_registry_path;
 
 /// Run the registry management command
@@ -136,21 +138,8 @@ fn add_entry(
         }
     };
 
-    // Parse target path
-    let target_path = if target.starts_with('~') {
-        TargetPath::Home(target.strip_prefix("~/").unwrap_or(&target).to_string())
-    } else if target.contains("/.config/") || target.starts_with(".config/") {
-        let config_part = if target.starts_with(".config/") {
-            target.strip_prefix(".config/").unwrap_or(&target)
-        } else {
-            target.split("/.config/").nth(1).unwrap_or(&target)
-        };
-        TargetPath::Config(config_part.to_string())
-    } else if target.starts_with('/') {
-        TargetPath::Absolute(target)
-    } else {
-        TargetPath::Home(target)
-    };
+    // Create target path
+    let target_path = std::path::PathBuf::from(target);
 
     let entry = RegistryEntry {
         name: name.clone(),
