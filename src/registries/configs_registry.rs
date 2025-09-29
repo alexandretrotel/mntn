@@ -183,14 +183,14 @@ impl Default for ConfigsRegistry {
 }
 
 impl ConfigsRegistry {
-    pub fn list_by_category(&self) -> HashMap<Category, Vec<(&String, &RegistryEntry)>> {
-        let mut by_category: HashMap<Category, Vec<(&String, &RegistryEntry)>> = HashMap::new();
+    pub fn list_by_category(&self) -> HashMap<Category, Vec<(String, RegistryEntry)>> {
+        let mut by_category: HashMap<Category, Vec<(String, RegistryEntry)>> = HashMap::new();
 
         for (id, entry) in &self.entries {
             by_category
                 .entry(entry.category)
                 .or_insert_with(Vec::new)
-                .push((id, entry));
+                .push((id.clone(), entry.clone()));
         }
 
         by_category
