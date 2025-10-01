@@ -123,7 +123,234 @@ impl PackageRegistry {
 }
 ```
 
-## 3. Advanced Dotfiles Management
+## 3. VS Code Extensions Backup and Restore
+
+### Extension Management Integration
+
+Add VS Code extensions to the package registry and implement backup/restore functionality:
+
+```rust
+// In src/registries/package_registry.rs - Add VS Code extensions entry
+impl PackageRegistry {
+    pub fn add_vscode_extensions_entry(&mut self) {
+        let entry = PackageEntry {
+            name: "VS Code Extensions".to_string(),
+            command: "code".to_string(),
+            args: vec!["--list-extensions".to_string()],
+            output_file: "vscode-extensions.txt".to_string(),
+            enabled: true,
+            platforms: vec!["macos".to_string(), "linux".to_string(), "windows".to_string()],
+        };
+        self.entries.insert("vscode-extensions".to_string(), entry);
+    }
+}
+```
+
+### Enhanced VS Code Extension Backup
+
+```rust
+// In src/tasks/backup_vscode.rs
+use std::process::Command;
+use crate::utils::filesystem::ensure_dir_exists;
+
+pub fn backup_vscode_extensions(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    // Check if VS Code is installed
+    if !is_vscode_installed() {
+        println!("ℹ️ VS Code not found, skipping extension backup");
+        return Ok(());
+    }
+
+    let extensions_file = backup_dir.join("vscode-extensions.txt");
+    let settings_backup_dir = backup_dir.join("vscode");
+    ensure_dir_exists(&settings_backup_dir)?;
+
+    // Backup extension list
+    println!("📦 Backing up VS Code extensions...");
+    let output = Command::new("code")
+        .args(&["--list-extensions"])
+        .output()?;
+
+    if output.status.success() {
+        let extensions = String::from_utf8_lossy(&output.stdout);
+        fs::write(&extensions_file, extensions.as_bytes())?;
+        
+        let extension_count = extensions.lines().count();
+        println!("✅ Backed up {} VS Code extensions to {}", 
+                extension_count, extensions_file.display());
+    } else {
+        println!("⚠️ Failed to list VS Code extensions");
+        return Err("Failed to execute 'code --list-extensions'".into());
+    }
+
+    // Also backup VS Code settings and keybindings
+    backup_vscode_settings(&settings_backup_dir)?;
+    
+    Ok(())
+}
+
+fn backup_vscode_settings(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let vscode_config_dir = get_vscode_config_dir();
+    
+    let files_to_backup = vec![
+        ("settings.json", "User settings"),
+        ("keybindings.json", "Keybindings"),
+        ("snippets", "User snippets"), // Directory
+    ];
+
+    for (file_name, description) in files_to_backup {
+        let source = vscode_config_dir.join(file_name);
+        let dest = backup_dir.join(file_name);
+        
+        if source.exists() {
+            if source.is_dir() {
+                copy_directory_recursive(&source, &dest)?;
+                println!("✅ Backed up VS Code {}", description);
+            } else {
+                fs::copy(&source, &dest)?;
+                println!("✅ Backed up VS Code {}", description);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn get_vscode_config_dir() -> PathBuf {
+    let home = std::env::var("HOME").expect("HOME environment variable not set");
+    match std::env::consts::OS {
+        "macos" => PathBuf::from(home).join("Library/Application Support/Code/User"),
+        "linux" => PathBuf::from(home).join(".config/Code/User"),
+        "windows" => PathBuf::from(std::env::var("APPDATA").unwrap_or_default())
+            .join("Code/User"),
+        _ => PathBuf::from(home).join(".config/Code/User"), // Default to Linux path
+    }
+}
+
+fn is_vscode_installed() -> bool {
+    Command::new("code")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+```
+
+### VS Code Extensions Restoration
+
+```rust
+// In src/tasks/restore_vscode.rs
+pub fn restore_vscode_extensions(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let extensions_file = backup_dir.join("vscode-extensions.txt");
+    let settings_backup_dir = backup_dir.join("vscode");
+
+    if !extensions_file.exists() {
+        println!("ℹ️ No VS Code extensions backup found");
+        return Ok(());
+    }
+
+    if !is_vscode_installed() {
+        println!("⚠️ VS Code not installed, cannot restore extensions");
+        return Err("VS Code not found".into());
+    }
+
+    // Restore extensions
+    println!("🔄 Restoring VS Code extensions...");
+    let extensions = fs::read_to_string(&extensions_file)?;
+    let mut installed_count = 0;
+    let mut failed_count = 0;
+
+    for extension in extensions.lines() {
+        let extension = extension.trim();
+        if extension.is_empty() {
+            continue;
+        }
+
+        print!("Installing {}... ", extension);
+        let result = Command::new("code")
+            .args(&["--install-extension", extension])
+            .output();
+
+        match result {
+            Ok(output) if output.status.success() => {
+                println!("✅");
+                installed_count += 1;
+            }
+            Ok(_) => {
+                println!("❌");
+                failed_count += 1;
+            }
+            Err(e) => {
+                println!("❌ Error: {}", e);
+                failed_count += 1;
+            }
+        }
+    }
+
+    println!("📦 Extension restoration complete: {} installed, {} failed", 
+            installed_count, failed_count);
+
+    // Restore settings and keybindings
+    restore_vscode_settings(&settings_backup_dir)?;
+
+    Ok(())
+}
+
+fn restore_vscode_settings(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    if !backup_dir.exists() {
+        println!("ℹ️ No VS Code settings backup found");
+        return Ok(());
+    }
+
+    let vscode_config_dir = get_vscode_config_dir();
+    ensure_dir_exists(&vscode_config_dir)?;
+
+    let files_to_restore = vec![
+        ("settings.json", "User settings"),
+        ("keybindings.json", "Keybindings"),
+        ("snippets", "User snippets"),
+    ];
+
+    for (file_name, description) in files_to_restore {
+        let source = backup_dir.join(file_name);
+        let dest = vscode_config_dir.join(file_name);
+        
+        if source.exists() {
+            if source.is_dir() {
+                copy_directory_recursive(&source, &dest)?;
+                println!("✅ Restored VS Code {}", description);
+            } else {
+                fs::copy(&source, &dest)?;
+                println!("✅ Restored VS Code {}", description);
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+### Integration with Main Backup Command
+
+```rust
+// In src/tasks/backup.rs - Add VS Code extensions to main backup
+pub fn run() {
+    let backup_dir = get_backup_path();
+    ensure_dir_exists(&backup_dir).expect("Failed to create backup directory");
+
+    // Existing package manager backups
+    backup_package_managers(&backup_dir);
+    
+    // Add VS Code extensions backup
+    if let Err(e) = backup_vscode_extensions(&backup_dir) {
+        println!("⚠️ Failed to backup VS Code extensions: {}", e);
+    }
+    
+    // Existing file backups
+    backup_files(&backup_dir);
+}
+```
+
+## 4. Advanced Dotfiles Management
 
 ### Machine-Specific and Environment-Based Configurations
 
