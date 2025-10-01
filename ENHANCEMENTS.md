@@ -2,43 +2,6 @@
 
 ## 1. Code Mutualization and Architecture Improvements
 
-### Registry Core Logic Abstraction
-
-The current implementation has two separate registry systems (`LinkRegistry` and `PackageRegistry`) with similar functionality. We should create a generic registry trait to reduce code duplication:
-
-```rust
-// In src/registry/core.rs
-pub trait Registry<T> {
-    fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>>
-    where
-        Self: Sized;
-    fn save(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>>;
-    fn get_enabled_entries(&self) -> impl Iterator<Item = (&String, &T)>;
-    fn add_entry(&mut self, id: String, entry: T);
-    fn remove_entry(&mut self, id: &str) -> Option<T>;
-    fn set_entry_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String>;
-    fn get_entry(&self, id: &str) -> Option<&T>;
-}
-
-// Common registry operations
-pub struct RegistryManager<T> {
-    pub version: String,
-    pub entries: HashMap<String, T>,
-}
-
-impl<T> Registry<T> for RegistryManager<T>
-where
-    T: Serialize + DeserializeOwned + HasEnabled,
-{
-    // Implementation shared by both registries
-}
-
-trait HasEnabled {
-    fn is_enabled(&self) -> bool;
-    fn set_enabled(&mut self, enabled: bool);
-}
-```
-
 ### Command Pattern for Tasks
 
 Implement a command pattern to standardize task execution:
@@ -160,88 +123,234 @@ impl PackageRegistry {
 }
 ```
 
-## 3. Advanced Dotfiles Management
+## 3. VS Code Extensions Backup and Restore
 
-### Git Integration and Sync Command
+### Extension Management Integration
 
-Add `mntn sync` command for seamless git integration:
+Add VS Code extensions to the package registry and implement backup/restore functionality:
 
 ```rust
-// In src/tasks/sync.rs
-pub fn run(args: SyncArgs) {
-    let mntn_dir = get_mntn_dir(); // ~/.mntn instead of ~/.mntn/backup
-    
-    // Ensure git repository exists
-    if !mntn_dir.join(".git").exists() {
-        if args.init {
-            initialize_git_repo(&mntn_dir, &args.remote_url)?;
-            create_default_gitignore(&mntn_dir)?;
-        } else {
-            return Err("No git repository found. Use --init to initialize.".into());
-        }
-    } else {
-        // Ensure .gitignore exists even if repo already exists
-        ensure_gitignore_exists(&mntn_dir)?;
-    }
-    
-    if args.pull || args.sync {
-        println!("🔄 Pulling latest changes...");
-        run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
-        
-        // Re-link configurations after pull
-        if args.auto_link {
-            crate::tasks::link::run();
-        }
-    }
-    
-    if args.push || args.sync {
-        // Auto-commit changes with timestamp
-        let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-        let commit_msg = args.message.unwrap_or_else(|| format!("Update dotfiles - {}", timestamp));
-        
-        run_cmd_in_dir("git", &["add", "."], &mntn_dir)?;
-        
-        // Check if there are changes to commit
-        let status = run_cmd_in_dir("git", &["status", "--porcelain"], &mntn_dir)?;
-        if !status.trim().is_empty() {
-            run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &mntn_dir)?;
-            run_cmd_in_dir("git", &["push"], &mntn_dir)?;
-            println!("✅ Changes pushed to remote repository");
-        } else {
-            println!("ℹ️ No changes to commit");
-        }
+// In src/registries/package_registry.rs - Add VS Code extensions entry
+impl PackageRegistry {
+    pub fn add_vscode_extensions_entry(&mut self) {
+        let entry = PackageEntry {
+            name: "VS Code Extensions".to_string(),
+            command: "code".to_string(),
+            args: vec!["--list-extensions".to_string()],
+            output_file: "vscode-extensions.txt".to_string(),
+            enabled: true,
+            platforms: vec!["macos".to_string(), "linux".to_string(), "windows".to_string()],
+        };
+        self.entries.insert("vscode-extensions".to_string(), entry);
     }
 }
+```
 
-fn create_default_gitignore(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let gitignore_path = mntn_dir.join(".gitignore");
-    if !gitignore_path.exists() {
-        let default_gitignore = "# mntn log files\nmntn.log\n*.log\n\n# Temporary files\n.DS_Store\nThumbs.db\n\n# Editor files\n.vscode/\n.idea/\n\n# OS generated files\n*~\n.swp\n.swo\n";
-        fs::write(&gitignore_path, default_gitignore)?;
-        println!("✅ Created default .gitignore with mntn.log excluded");
+### Enhanced VS Code Extension Backup
+
+```rust
+// In src/tasks/backup_vscode.rs
+use std::process::Command;
+use crate::utils::filesystem::ensure_dir_exists;
+
+pub fn backup_vscode_extensions(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    // Check if VS Code is installed
+    if !is_vscode_installed() {
+        println!("ℹ️ VS Code not found, skipping extension backup");
+        return Ok(());
     }
+
+    let extensions_file = backup_dir.join("vscode-extensions.txt");
+    let settings_backup_dir = backup_dir.join("vscode");
+    ensure_dir_exists(&settings_backup_dir)?;
+
+    // Backup extension list
+    println!("📦 Backing up VS Code extensions...");
+    let output = Command::new("code")
+        .args(&["--list-extensions"])
+        .output()?;
+
+    if output.status.success() {
+        let extensions = String::from_utf8_lossy(&output.stdout);
+        fs::write(&extensions_file, extensions.as_bytes())?;
+        
+        let extension_count = extensions.lines().count();
+        println!("✅ Backed up {} VS Code extensions to {}", 
+                extension_count, extensions_file.display());
+    } else {
+        println!("⚠️ Failed to list VS Code extensions");
+        return Err("Failed to execute 'code --list-extensions'".into());
+    }
+
+    // Also backup VS Code settings and keybindings
+    backup_vscode_settings(&settings_backup_dir)?;
+    
     Ok(())
 }
 
-fn ensure_gitignore_exists(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let gitignore_path = mntn_dir.join(".gitignore");
-    if !gitignore_path.exists() {
-        create_default_gitignore(mntn_dir)?;
-    } else {
-        // Check if mntn.log is in .gitignore, add if missing
-        let content = fs::read_to_string(&gitignore_path)?;
-        if !content.contains("mntn.log") && !content.contains("*.log") {
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(&gitignore_path)?;
-            writeln!(file, "\n# mntn log files\nmntn.log")?;
-            println!("✅ Added mntn.log to existing .gitignore");
+fn backup_vscode_settings(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let vscode_config_dir = get_vscode_config_dir();
+    
+    let files_to_backup = vec![
+        ("settings.json", "User settings"),
+        ("keybindings.json", "Keybindings"),
+        ("snippets", "User snippets"), // Directory
+    ];
+
+    for (file_name, description) in files_to_backup {
+        let source = vscode_config_dir.join(file_name);
+        let dest = backup_dir.join(file_name);
+        
+        if source.exists() {
+            if source.is_dir() {
+                copy_directory_recursive(&source, &dest)?;
+                println!("✅ Backed up VS Code {}", description);
+            } else {
+                fs::copy(&source, &dest)?;
+                println!("✅ Backed up VS Code {}", description);
+            }
         }
     }
+    
+    Ok(())
+}
+
+fn get_vscode_config_dir() -> PathBuf {
+    let home = std::env::var("HOME").expect("HOME environment variable not set");
+    match std::env::consts::OS {
+        "macos" => PathBuf::from(home).join("Library/Application Support/Code/User"),
+        "linux" => PathBuf::from(home).join(".config/Code/User"),
+        "windows" => PathBuf::from(std::env::var("APPDATA").unwrap_or_default())
+            .join("Code/User"),
+        _ => PathBuf::from(home).join(".config/Code/User"), // Default to Linux path
+    }
+}
+
+fn is_vscode_installed() -> bool {
+    Command::new("code")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+```
+
+### VS Code Extensions Restoration
+
+```rust
+// In src/tasks/restore_vscode.rs
+pub fn restore_vscode_extensions(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let extensions_file = backup_dir.join("vscode-extensions.txt");
+    let settings_backup_dir = backup_dir.join("vscode");
+
+    if !extensions_file.exists() {
+        println!("ℹ️ No VS Code extensions backup found");
+        return Ok(());
+    }
+
+    if !is_vscode_installed() {
+        println!("⚠️ VS Code not installed, cannot restore extensions");
+        return Err("VS Code not found".into());
+    }
+
+    // Restore extensions
+    println!("🔄 Restoring VS Code extensions...");
+    let extensions = fs::read_to_string(&extensions_file)?;
+    let mut installed_count = 0;
+    let mut failed_count = 0;
+
+    for extension in extensions.lines() {
+        let extension = extension.trim();
+        if extension.is_empty() {
+            continue;
+        }
+
+        print!("Installing {}... ", extension);
+        let result = Command::new("code")
+            .args(&["--install-extension", extension])
+            .output();
+
+        match result {
+            Ok(output) if output.status.success() => {
+                println!("✅");
+                installed_count += 1;
+            }
+            Ok(_) => {
+                println!("❌");
+                failed_count += 1;
+            }
+            Err(e) => {
+                println!("❌ Error: {}", e);
+                failed_count += 1;
+            }
+        }
+    }
+
+    println!("📦 Extension restoration complete: {} installed, {} failed", 
+            installed_count, failed_count);
+
+    // Restore settings and keybindings
+    restore_vscode_settings(&settings_backup_dir)?;
+
+    Ok(())
+}
+
+fn restore_vscode_settings(backup_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    if !backup_dir.exists() {
+        println!("ℹ️ No VS Code settings backup found");
+        return Ok(());
+    }
+
+    let vscode_config_dir = get_vscode_config_dir();
+    ensure_dir_exists(&vscode_config_dir)?;
+
+    let files_to_restore = vec![
+        ("settings.json", "User settings"),
+        ("keybindings.json", "Keybindings"),
+        ("snippets", "User snippets"),
+    ];
+
+    for (file_name, description) in files_to_restore {
+        let source = backup_dir.join(file_name);
+        let dest = vscode_config_dir.join(file_name);
+        
+        if source.exists() {
+            if source.is_dir() {
+                copy_directory_recursive(&source, &dest)?;
+                println!("✅ Restored VS Code {}", description);
+            } else {
+                fs::copy(&source, &dest)?;
+                println!("✅ Restored VS Code {}", description);
+            }
+        }
+    }
+    
     Ok(())
 }
 ```
+
+### Integration with Main Backup Command
+
+```rust
+// In src/tasks/backup.rs - Add VS Code extensions to main backup
+pub fn run() {
+    let backup_dir = get_backup_path();
+    ensure_dir_exists(&backup_dir).expect("Failed to create backup directory");
+
+    // Existing package manager backups
+    backup_package_managers(&backup_dir);
+    
+    // Add VS Code extensions backup
+    if let Err(e) = backup_vscode_extensions(&backup_dir) {
+        println!("⚠️ Failed to backup VS Code extensions: {}", e);
+    }
+    
+    // Existing file backups
+    backup_files(&backup_dir);
+}
+```
+
+## 4. Advanced Dotfiles Management
 
 ### Machine-Specific and Environment-Based Configurations
 

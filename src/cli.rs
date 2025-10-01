@@ -77,16 +77,64 @@ pub struct PurgeArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the sync command.
+#[derive(Args)]
+pub struct SyncArgs {
+    /// Initialize a new git repository in ~/.mntn
+    #[arg(
+        long,
+        help = "Initialize a new git repository in ~/.mntn with the provided remote URL"
+    )]
+    pub init: bool,
+    /// Remote URL for git repository initialization
+    #[arg(
+        long,
+        help = "Remote repository URL (required with --init)"
+    )]
+    pub remote_url: Option<String>,
+    /// Pull changes from remote repository
+    #[arg(
+        long,
+        help = "Pull latest changes from remote repository"
+    )]
+    pub pull: bool,
+    /// Push changes to remote repository
+    #[arg(
+        long,
+        help = "Push local changes to remote repository"
+    )]
+    pub push: bool,
+    /// Sync both ways (pull then push)
+    #[arg(
+        long,
+        help = "Sync both ways: pull latest changes then push local changes"
+    )]
+    pub sync: bool,
+    /// Custom commit message for push operations
+    #[arg(
+        long,
+        short = 'm',
+        help = "Custom commit message (default: timestamp-based message)"
+    )]
+    pub message: Option<String>,
+    /// Automatically run 'mntn link' after pulling changes
+    #[arg(
+        long,
+        help = "Automatically run 'mntn link' after pulling changes"
+    )]
+    pub auto_link: bool,
+}
+
 /// Arguments for the registry command.
 #[derive(Args)]
-pub struct RegistryArgs {
+pub struct ConfigsRegistryArgs {
     #[command(subcommand)]
-    pub action: RegistryActions,
+    pub action: ConfigsRegistryActions,
 }
 
 /// Registry management actions.
 #[derive(Subcommand)]
-pub enum RegistryActions {
+pub enum ConfigsRegistryActions {
     /// List all registry entries
     #[command(about = "List all entries in the registry")]
     List {
@@ -255,9 +303,13 @@ pub enum Commands {
 
     /// Manage the registry of files and folders to backup and link
     #[command(about = "Manage the registry of files and folders for backup and linking")]
-    Registry(RegistryArgs),
+    Registry(ConfigsRegistryArgs),
 
     /// Manage the package manager registry for backup
     #[command(about = "Manage the package manager registry for backup operations")]
     PackageRegistry(PackageRegistryArgs),
+
+    /// Synchronize configurations with a git repository
+    #[command(about = "Sync configurations with a git repository (pull/push/both)")]
+    Sync(SyncArgs),
 }

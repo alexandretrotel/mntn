@@ -2,18 +2,62 @@
 
 A Rust-based CLI tool for system maintenance.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Platform Support](#platform-support)
+- [Guides](#guides)
+  - [Backup and Restore Guide](#backup-and-restore-guide)
+    - [Creating Backups](#creating-backups)
+    - [Restoring from Backups](#restoring-from-backups)
+  - [Configuration Management with Version Control](#configuration-management-with-version-control)
+    - [Setting up Version Control for Your Configurations](#setting-up-version-control-for-your-configurations)
+    - [Using mntn for Configuration Management](#using-mntn-for-configuration-management)
+    - [Setting up on a New Machine](#setting-up-on-a-new-machine)
+  - [Git Integration and Sync Guide](#git-integration-and-sync-guide)
+    - [Setting up Git Integration](#setting-up-git-integration)
+    - [Sync Operations](#sync-operations)
+    - [Automated Workflow Examples](#automated-workflow-examples)
+    - [Git Repository Structure](#git-repository-structure)
+    - [Sync Command Options](#sync-command-options)
+    - [Troubleshooting Sync Issues](#troubleshooting-sync-issues)
+  - [Package Registry Management](#package-registry-management)
+    - [Viewing Package Manager Entries](#viewing-package-manager-entries)
+    - [Adding Custom Package Managers](#adding-custom-package-managers)
+    - [Managing Package Manager Entries](#managing-package-manager-entries)
+    - [Package Registry File Location](#package-registry-file-location)
+  - [Configuration Registry Management](#configuration-registry-management)
+    - [Viewing Registry Entries](#viewing-registry-entries)
+    - [Adding New Entries](#adding-new-entries)
+    - [Managing Entries](#managing-entries)
+    - [Registry File Location](#registry-file-location)
+  - [Automated Maintenance Setup](#automated-maintenance-setup)
+  - [System Cleaning Guide](#system-cleaning-guide)
+  - [Service Management with Purge](#service-management-with-purge)
+  - [Biometric Sudo Setup (macOS)](#biometric-sudo-setup-macos)
+- [Troubleshooting](#troubleshooting)
+  - [Backup Issues](#backup-issues)
+  - [Link Issues](#link-issues)
+  - [Clean Issues](#clean-issues)
+  - [Restore Issues](#restore-issues)
+  - [Sync Issues](#sync-issues)
+- [License](#license)
+
 ## Features
 
 - **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files using registry-based management.
-- **Biometric Sudo [macOS]**: Configures Touch ID authentication for sudo commands.
-- **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup.
-- **Delete [macOS]**: Removes applications and their related files with interactive selection.
-- **Install**: Sets up automated services for backups, cleaning, and system updates.
-- **Link**: Creates symlinks for dotfiles (e.g., .mntn, .zshrc, .vimrc, .config, VSCode settings).
-- **Package Registry**: Centralized management of package managers for backup operations.
-- **Purge**: Deletes unused services with user confirmation.
-- **Registry**: Centralized management of configuration files and directories to backup and link.
+- **Biometric Sudo [macOS only]**: Configures Touch ID authentication for sudo commands.
+- **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup across all platforms.
+- **Delete [macOS only]**: Removes applications and their related files with interactive selection.
+- **Install**: Sets up automated services for backups, cleaning, and system updates on macOS (LaunchAgents), Linux (systemd), and Windows (Task Scheduler).
+- **Link**: Creates symlinks for dotfiles (e.g., .zshrc, .vimrc, .config, VSCode settings) from your backup directory.
+- **Package Registry**: Centralized management of package managers for backup operations with platform-specific support.
+- **Purge**: Deletes unused services with user confirmation across all platforms.
+- **Registry**: Centralized management of configuration files and directories using absolute paths for backup and linking.
 - **Restore**: Restores configuration files from backups using the registry system.
+- **Sync**: Git integration for synchronizing configurations across machines with automatic commit/push/pull operations.
 
 ## Installation
 
@@ -38,7 +82,19 @@ mntn clean
 
 # Enable Touch ID for sudo (macOS only)
 mntn biometric-sudo
+
+# Sync your configurations with a git repository
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+mntn sync --sync --auto-link
 ```
+
+## Platform Support
+
+mntn supports **macOS**, **Linux**, and **Windows** with platform-specific features:
+
+- **All platforms**: backup, clean, install, link, purge, restore, registry management, sync
+- **macOS only**: biometric-sudo, delete command, Homebrew cask support
+- **Linux/Windows**: systemd services (Linux) and Task Scheduler (Windows) for automation
 
 ## Guides
 
@@ -53,8 +109,22 @@ mntn backup
 ```
 
 **What gets backed up:**
-- **Package lists**: Managed through the package registry system - Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), uv packages (`uv.txt`), and Cargo installed packages (`cargo.txt`)
-- **Configuration files**: Managed through the configuration registry - VS Code settings and keybindings, Ghostty terminal config, shell configurations, and other dotfiles
+- **Package lists**: Managed through the package registry system:
+  - Homebrew packages (`brew.txt`) - macOS/Linux only
+  - Homebrew casks (`brew-cask.txt`) - macOS only  
+  - npm global packages (`npm.txt`)
+  - Yarn global packages (`yarn.txt`)
+  - pnpm global packages (`pnpm.txt`)
+  - Bun global packages (`bun.txt`)
+  - uv packages (`uv.txt`)
+  - Cargo installed packages (`cargo.txt`)
+  - pip packages (`pip.txt`) - disabled by default
+- **Configuration files**: Managed through the configuration registry:
+  - Shell configurations (.zshrc, .vimrc, .gitconfig)
+  - VSCode settings and keybindings
+  - Ghostty terminal config (with platform-specific paths)
+  - General config directory (~/.config)
+  - Other registered dotfiles and application configs
 
 **Backup location**: `~/.mntn/backup/`
 
@@ -100,29 +170,34 @@ done < ~/.mntn/backup/cargo.txt
    ```
 
 2. **Your mntn directory structure will look like:**
-   ```
-   ~/.mntn/
-   ├── .git/               # Git repository
-   ├── .gitignore          # Automatically created (excludes mntn.log)
-   ├── registry.json       # Configuration registry
-   ├── package_registry.json # Package manager registry
-   ├── mntn.log           # Log file (ignored by git)
-   ├── symlinks/          # Backup of original files
-   └── backup/            # Your dotfiles and configs
-       ├── .zshrc         # Shell configuration
-       ├── .vimrc         # Vim configuration
-       ├── config/        # This becomes ~/.config
-       │   ├── nvim/
-       │   └── git/
-       ├── vscode/
-       │   ├── settings.json
-       │   └── keybindings.json
-       ├── brew.txt       # package managers, etc.
-       ├── npm.txt
-       └── cargo.txt
-   ```
-
-3. **Commit and push your configurations:**
+```
+~/.mntn/
+├── .git/               # Git repository
+├── .gitignore          # Automatically created (excludes mntn.log)
+├── registry.json       # Configuration registry
+├── package_registry.json # Package manager registry
+├── mntn.log           # Log file (ignored by git)
+├── symlinks/          # Backup of original files before linking
+└── backup/            # Your dotfiles and configs
+    ├── .zshrc         # Shell configuration
+    ├── .vimrc         # Vim configuration  
+    ├── .gitconfig     # Git configuration
+    ├── config/        # General config directory
+    │   └── ...        # Various application configs
+    ├── vscode/
+    │   ├── settings.json
+    │   └── keybindings.json
+    ├── ghostty/
+    │   └── config     # Terminal configuration
+    ├── brew.txt       # Homebrew packages (macOS/Linux)
+    ├── brew-cask.txt  # Homebrew casks (macOS only)
+    ├── npm.txt        # npm global packages
+    ├── yarn.txt       # Yarn global packages
+    ├── pnpm.txt       # pnpm global packages
+    ├── bun.txt        # Bun global packages
+    ├── cargo.txt      # Cargo packages
+    └── uv.txt         # uv tools
+```3. **Commit and push your configurations:**
    ```bash
    cd ~/.mntn
    git add .
@@ -139,11 +214,14 @@ mntn link
 ```
 
 **What it does:**
-- Links `~/.mntn/backup/.zshrc` → `~/.zshrc`
-- Links `~/.mntn/backup/.vimrc` → `~/.vimrc`
-- Links `~/.mntn/backup/config` → `~/.config`
-- Links `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
-- Links `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+- Links files from `~/.mntn/backup/` to their target system locations based on the registry
+- Examples for macOS:
+  - `~/.mntn/backup/.zshrc` → `~/.zshrc`
+  - `~/.mntn/backup/.vimrc` → `~/.vimrc`  
+  - `~/.mntn/backup/config` → `~/.config`
+  - `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
+  - `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+  - `~/.mntn/backup/ghostty/config` → `~/Library/Application Support/com.mitchellh.ghostty/config` (macOS) or `~/.config/ghostty/config` (Linux)
 
 **Safety features:**
 - Automatically backs up existing files to `~/.mntn/symlinks/`
@@ -168,6 +246,168 @@ mntn backup
 # The repository now includes your registries and full mntn context
 ```
 
+### Git Integration and Sync Guide
+
+The `sync` command provides seamless git integration for managing your mntn configurations across multiple machines. It automates the common git operations needed to keep your dotfiles synchronized.
+
+#### Setting up Git Integration
+
+**Initialize a new git repository:**
+```bash
+# Create your first backup to set up folder structure
+mntn backup
+
+# Initialize git repository in ~/.mntn with remote
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+
+# This automatically:
+# - Initializes git repository in ~/.mntn
+# - Adds the remote origin
+# - Creates a default .gitignore (excludes mntn.log)
+# - Sets up main branch
+```
+
+**If you already have a repository:**
+```bash
+# Clone existing repository directly to ~/.mntn
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn
+
+# The sync command will ensure .gitignore exists
+mntn sync --pull
+```
+
+#### Sync Operations
+
+**Pull latest changes:**
+```bash
+# Pull changes from remote repository
+mntn sync --pull
+
+# Pull and automatically re-link configurations
+mntn sync --pull --auto-link
+```
+
+**Push local changes:**
+```bash
+# Push changes with automatic commit message
+mntn sync --push
+
+# Push with custom commit message
+mntn sync --push --message "Update VS Code settings"
+```
+
+**Bidirectional sync:**
+```bash
+# Pull latest changes, then push any local changes
+mntn sync --sync
+
+# Same as above but also re-link after pulling
+mntn sync --sync --auto-link
+```
+
+#### Automated Workflow Examples
+
+**Daily workflow on main machine:**
+```bash
+# After making configuration changes
+mntn backup                          # Update backup files
+mntn sync --push --message "Daily backup"  # Push to remote
+```
+
+**Setting up a new machine:**
+```bash
+# Install mntn
+cargo install mntn
+
+# Clone your configurations
+git clone https://github.com/yourusername/dotfiles.git ~/.mntn
+
+# Link configurations to system locations
+mntn link
+
+# Keep in sync
+mntn sync --pull --auto-link
+```
+
+**Working across multiple machines:**
+```bash
+# Before starting work (pull latest)
+mntn sync --pull --auto-link
+
+# After finishing work (push changes)
+mntn backup
+mntn sync --push --message "Work session updates"
+```
+
+#### Git Repository Structure
+
+The sync command works with the entire `~/.mntn` directory as a git repository:
+
+```
+~/.mntn/                    # Git repository root
+├── .git/                   # Git metadata
+├── .gitignore             # Excludes mntn.log and temporary files
+├── backup/                # Your dotfiles and configs
+│   ├── .zshrc
+│   ├── .vimrc
+│   ├── vscode/
+│   └── ...
+├── registry.json          # Configuration registry
+├── package_registry.json  # Package manager registry
+├── symlinks/              # Backup of original files
+└── mntn.log               # Ignored by git
+```
+
+**Benefits of this approach:**
+- **Full context**: Registry files and all configurations are versioned together
+- **Machine-independent**: Works the same way on any machine
+- **Safe**: Automatic .gitignore prevents log files from being committed
+- **Flexible**: Can organize backup/ directory however you prefer
+
+#### Sync Command Options
+
+```bash
+# Initialize new repository
+mntn sync --init --remote-url <URL>
+
+# Pull operations
+mntn sync --pull                    # Pull changes only
+mntn sync --pull --auto-link        # Pull and re-link configs
+
+# Push operations  
+mntn sync --push                    # Push with auto-generated message
+mntn sync --push -m "Custom msg"    # Push with custom message
+
+# Bidirectional sync
+mntn sync --sync                    # Pull then push
+mntn sync --sync --auto-link        # Pull, re-link, then push
+```
+
+#### Troubleshooting Sync Issues
+
+**Repository not found:**
+```bash
+# If you see "No git repository found"
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+```
+
+**Merge conflicts:**
+```bash
+# Handle conflicts manually in ~/.mntn
+cd ~/.mntn
+git status
+# Edit conflicted files
+git add .
+git commit -m "Resolve merge conflicts"
+mntn sync --push
+```
+
+**Authentication issues:**
+```bash
+# Set up SSH keys or use personal access tokens
+# See GitHub documentation for authentication setup
+```
+
 ### Package Registry Management
 
 The `package-registry` command provides centralized management of package managers used during backup operations. This system allows you to configure which package managers to include, customize their commands, and control platform-specific behavior.
@@ -186,15 +426,15 @@ mntn package-registry list --platform-only
 ```
 
 **Default Package Managers:**
-- `brew` - Homebrew packages (macOS/Linux)
-- `brew_cask` - Homebrew casks/applications (macOS only)
-- `npm` - npm global packages (all platforms)
-- `yarn` - Yarn global packages (all platforms)
-- `pnpm` - pnpm global packages (all platforms)
-- `bun` - Bun global packages (all platforms)
-- `cargo` - Cargo installed packages (all platforms)
-- `uv` - uv installed tools (all platforms)
-- `pip` - pip packages (disabled by default)
+- `brew` - Homebrew packages (macOS/Linux) - uses `brew leaves`
+- `brew_cask` - Homebrew casks/applications (macOS only) - uses `brew list --cask`  
+- `npm` - npm global packages (all platforms) - uses `npm ls -g`
+- `yarn` - Yarn global packages (all platforms) - uses `yarn global list`
+- `pnpm` - pnpm global packages (all platforms) - uses `pnpm ls -g`
+- `bun` - Bun global packages (all platforms) - uses `bun pm ls -g`
+- `cargo` - Cargo installed packages (all platforms) - uses `cargo install --list`
+- `uv` - uv installed tools (all platforms) - uses `uv tool list`
+- `pip` - pip packages (disabled by default) - uses `pip list --format=freeze`
 
 #### Adding Custom Package Managers
 
@@ -263,7 +503,7 @@ mntn registry list --category editor
 
 **Registry Categories:**
 - `shell` - Shell configuration files (.zshrc, .bashrc, etc.)
-- `editor` - Text editors and IDEs (vim, vscode, etc.)
+- `editor` - Text editors and IDEs (vim, vscode, etc.)  
 - `terminal` - Terminal emulators and related tools
 - `system` - System-wide configuration
 - `development` - Development tools and environments
@@ -276,16 +516,15 @@ mntn registry list --category editor
 mntn registry add my_app_config \
   --name "My App Config" \
   --source "myapp/config.json" \
-  --target "~/.config/myapp/config.json" \
+  --target "/Users/username/.config/myapp/config.json" \
   --category application \
   --description "Configuration for My App"
 ```
 
-**Target Path Types:**
-- `~/path` - Home directory relative paths
-- `.config/path` - Config directory relative paths  
-- `/absolute/path` - Absolute paths
-- Automatic detection based on path patterns
+**Target Path:**
+- Uses absolute paths to the actual system location where files should be linked
+- Automatically resolves platform-specific paths (e.g., `~/Library/Application Support` on macOS, `~/.config` on Linux)
+- Examples: `/Users/username/.zshrc`, `/Users/username/Library/Application Support/Code/User/settings.json`
 
 #### Managing Entries
 
@@ -307,10 +546,8 @@ The registry is stored as JSON at `~/.mntn/registry.json`. You can edit it manua
 {
   "name": "Zsh Configuration",
   "source_path": ".zshrc",
-  "target_path": {
-    "Home": ".zshrc"
-  },
-  "category": "Shell",
+  "target_path": "/Users/username/.zshrc",
+  "category": "shell",
   "enabled": true,
   "description": "Main Zsh shell configuration file"
 }
@@ -331,8 +568,8 @@ mntn install --with-clean
 **What gets installed:**
 
 - **macOS**: Creates LaunchAgents in `~/Library/LaunchAgents/`
-- **Linux**: Creates systemd user services and timers
-- **Windows**: Creates scheduled tasks
+- **Linux**: Creates systemd user services and timers in `~/.config/systemd/user/`
+- **Windows**: Creates scheduled tasks using Task Scheduler
 
 **Scheduled tasks:**
 - `mntn-backup`: Runs `mntn backup` every hour
@@ -341,7 +578,8 @@ mntn install --with-clean
 
 **Task logs:** 
 - **macOS**: `/tmp/mntn-*.out` and `/tmp/mntn-*.err`
-- **Linux**: Use `journalctl --user -u mntn-*.service`
+- **Linux**: Use `journalctl --user -u mntn-*.service` or `journalctl --user -u mntn-*.timer`
+- **Windows**: Task Scheduler history and event logs
 
 ### System Cleaning Guide
 
@@ -361,21 +599,30 @@ mntn clean --dry-run
 **What gets cleaned:**
 
 **User-level cleanup (default):**
-- Cache directories (`~/Library/Caches` on macOS, `~/.cache` on Linux)
-- Temporary files
-- Application logs and saved states (macOS)
-- Quick Look cache reset (macOS)
+- Cache directories:
+  - macOS: `~/Library/Caches`
+  - Linux: `~/.cache`
+- Temporary files and directories
+- Application logs and saved states (macOS: `~/Library/Logs`, `~/Library/Saved Application State`)
+- Quick Look cache reset (macOS only)
 
 **System-level cleanup (with `--system`):**
-- System caches (`/Library/Caches`, `/var/cache`)
-- System logs (`/private/var/log`, `/var/log`)
-- Diagnostic reports (macOS)
-- Volume trash folders (macOS)
+- System caches:
+  - macOS: `/Library/Caches`, `/System/Library/Caches`
+  - Linux: `/var/cache`, `/tmp`
+- System logs:
+  - macOS: `/private/var/log`
+  - Linux: `/var/log`
+- Platform-specific cleanup:
+  - macOS: Diagnostic reports, volume trash folders
+  - Linux: Additional temp directories
 
 **Package manager cleanup:**
-- Homebrew: `brew cleanup`
+- Homebrew: `brew cleanup` (macOS/Linux)
 - npm: `npm cache clean --force`
 - pnpm: `pnpm cache delete`
+- Yarn: cache cleanup
+- Other package managers as available
 
 **Safety features:**
 - Skips files modified in the last 24 hours
@@ -400,8 +647,8 @@ mntn purge --dry-run
 **What it manages:**
 
 - **macOS**: LaunchAgents (`.plist` files) in `~/Library/LaunchAgents/` and `/Library/LaunchAgents/`
-- **Linux**: systemd user services and autostart programs
-- **Windows**: Windows services and startup programs (planned)
+- **Linux**: systemd user services in `~/.config/systemd/user/` and autostart programs in `~/.config/autostart/`
+- **Windows**: Windows services and startup programs
 
 **Interactive selection:**
 - Lists all found services/programs
@@ -448,6 +695,13 @@ mntn biometric-sudo
 ### Restore Issues
 - **Files not found**: Run `mntn backup` first to create initial backups
 - **Permission denied**: Ensure write access to target config directories
+
+### Sync Issues
+- **No git repository found**: Use `mntn sync --init --remote-url <URL>` to initialize
+- **Authentication failed**: Set up SSH keys or GitHub personal access tokens
+- **Merge conflicts**: Resolve manually in `~/.mntn` directory using standard git commands
+- **Permission denied on push**: Check repository permissions and authentication
+- **Remote URL required**: Use `--remote-url` flag when initializing with `--init`
 
 ## License
 

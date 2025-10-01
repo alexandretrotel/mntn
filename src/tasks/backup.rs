@@ -1,9 +1,7 @@
 use crate::logger::log;
-use crate::package_registry::PackageRegistry;
-use crate::registry::LinkRegistry;
-use crate::utils::paths::{
-    get_backup_path, get_base_dirs, get_package_registry_path, get_registry_path,
-};
+use crate::registries::configs_registry::ConfigsRegistry;
+use crate::registries::package_registry::PackageRegistry;
+use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use crate::utils::system::run_cmd;
 use std::fs;
 use std::path::PathBuf;
@@ -97,7 +95,7 @@ fn backup_package_managers(backup_dir: &PathBuf) {
 fn backup_config_files_from_registry(backup_dir: &PathBuf) {
     // Load the registry
     let registry_path = get_registry_path();
-    let registry = match LinkRegistry::load_or_create(&registry_path) {
+    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!(
@@ -109,32 +107,20 @@ fn backup_config_files_from_registry(backup_dir: &PathBuf) {
         }
     };
 
-    let base_dirs = get_base_dirs();
-    let backupable_entries = registry.get_backupable_entries();
+    let enabled_entries: Vec<_> = registry.get_enabled_entries().collect();
 
-    if backupable_entries.is_empty() {
+    if enabled_entries.is_empty() {
         println!("ℹ️ No configuration files found to backup");
         return;
     }
 
     println!(
         "🔁 Backing up {} configuration files...",
-        backupable_entries.len()
+        enabled_entries.len()
     );
 
-    for (id, entry) in backupable_entries {
-        let target_path = match entry.target_path.resolve(&base_dirs) {
-            Ok(path) => path,
-            Err(e) => {
-                println!("⚠️ Failed to resolve target path for {}: {}", entry.name, e);
-                log(&format!(
-                    "Failed to resolve target path for {}: {}",
-                    entry.name, e
-                ));
-                continue;
-            }
-        };
-
+    for (id, entry) in enabled_entries {
+        let target_path = &entry.target_path;
         let backup_destination = backup_dir.join(&entry.source_path);
 
         // Ensure parent directory exists

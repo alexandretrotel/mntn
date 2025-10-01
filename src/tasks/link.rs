@@ -1,7 +1,7 @@
 use crate::logger::log;
-use crate::registry::LinkRegistry;
+use crate::registries::configs_registry::ConfigsRegistry;
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use crate::utils::paths::{get_backup_path, get_base_dirs, get_registry_path, get_symlinks_path};
+use crate::utils::paths::{get_backup_path, get_registry_path, get_symlinks_path};
 use std::fs;
 use std::path::Path;
 
@@ -20,7 +20,7 @@ pub fn run() {
 
     // Load the registry
     let registry_path = get_registry_path();
-    let registry = match LinkRegistry::load_or_create(&registry_path) {
+    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);
@@ -30,7 +30,6 @@ pub fn run() {
     };
 
     let backup_dir = get_backup_path();
-    let base_dirs = get_base_dirs();
     let mut links_processed = 0;
 
     // Count total enabled entries
@@ -46,15 +45,7 @@ pub fn run() {
     // Process each enabled entry from the registry
     for (id, entry) in registry.get_enabled_entries() {
         let src = backup_dir.join(&entry.source_path);
-
-        let dst = match entry.target_path.resolve(&base_dirs) {
-            Ok(path) => path,
-            Err(e) => {
-                println!("⚠️ Failed to resolve path for {}: {}", entry.name, e);
-                log(&format!("Failed to resolve path for {}: {}", entry.name, e));
-                continue;
-            }
-        };
+        let dst = &entry.target_path;
 
         println!("🔗 Processing: {} ({})", entry.name, id);
         process_link(&src, &dst, &symlinks_dir);

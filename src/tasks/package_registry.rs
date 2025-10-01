@@ -1,6 +1,6 @@
 use crate::cli::{PackageRegistryActions, PackageRegistryArgs};
 use crate::logger::log;
-use crate::package_registry::{PackageManagerEntry, PackageRegistry};
+use crate::registries::package_registry::{PackageManagerEntry, PackageRegistry};
 use crate::utils::paths::get_package_registry_path;
 
 /// Run the package registry management command

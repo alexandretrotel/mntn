@@ -1,19 +1,20 @@
-use crate::cli::{RegistryActions, RegistryArgs};
-use crate::logger::log;
-use crate::registry::{Category, LinkRegistry, RegistryEntry, TargetPath};
-use crate::utils::paths::get_registry_path;
 use std::str::FromStr;
 
+use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
+use crate::logger::log;
+use crate::registries::configs_registry::{Category, ConfigsRegistry, RegistryEntry};
+use crate::utils::paths::get_registry_path;
+
 /// Run the registry management command
-pub fn run(args: RegistryArgs) {
+pub fn run(args: ConfigsRegistryArgs) {
     match args.action {
-        RegistryActions::List {
+        ConfigsRegistryActions::List {
             category,
             enabled_only,
         } => {
             list_entries(category, enabled_only);
         }
-        RegistryActions::Add {
+        ConfigsRegistryActions::Add {
             id,
             name,
             source,
@@ -23,10 +24,10 @@ pub fn run(args: RegistryArgs) {
         } => {
             add_entry(id, name, source, target, category, description);
         }
-        RegistryActions::Remove { id } => {
+        ConfigsRegistryActions::Remove { id } => {
             remove_entry(id);
         }
-        RegistryActions::Toggle { id, enable } => {
+        ConfigsRegistryActions::Toggle { id, enable } => {
             toggle_entry(id, enable);
         }
     }
@@ -35,7 +36,7 @@ pub fn run(args: RegistryArgs) {
 /// List registry entries
 fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     let registry_path = get_registry_path();
-    let registry = match LinkRegistry::load_or_create(&registry_path) {
+    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);
@@ -54,7 +55,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     for category in sorted_categories {
         // Skip categories that don't match the filter
         if let Some(ref filter) = filter_category {
-            if category.to_string() != *filter {
+            if format!("{:?}", category).to_lowercase() != *filter {
                 continue;
             }
         }
@@ -69,7 +70,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
             }
 
             if !has_entries {
-                let category_str = category.to_string().to_uppercase();
+                let category_str = format!("{:?}", category).to_uppercase();
                 println!("\n🏷️  {}", category_str);
                 println!("{}", "─".repeat(category_str.len() + 4));
                 has_entries = true;
@@ -87,7 +88,10 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
         }
 
         if !has_entries && filter_category.is_some() {
-            println!("\nNo entries found in category '{}'", category);
+            println!(
+                "\nNo entries found in category '{}'",
+                format!("{:?}", category).to_lowercase()
+            );
         }
     }
 
@@ -110,7 +114,7 @@ fn add_entry(
     description: Option<String>,
 ) {
     let registry_path = get_registry_path();
-    let mut registry = match LinkRegistry::load_or_create(&registry_path) {
+    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);
@@ -137,21 +141,8 @@ fn add_entry(
         }
     };
 
-    // Parse target path
-    let target_path = if target.starts_with('~') {
-        TargetPath::Home(target.strip_prefix("~/").unwrap_or(&target).to_string())
-    } else if target.contains("/.config/") || target.starts_with(".config/") {
-        let config_part = if target.starts_with(".config/") {
-            target.strip_prefix(".config/").unwrap_or(&target)
-        } else {
-            target.split("/.config/").nth(1).unwrap_or(&target)
-        };
-        TargetPath::Config(config_part.to_string())
-    } else if target.starts_with('/') {
-        TargetPath::Absolute(target)
-    } else {
-        TargetPath::Home(target)
-    };
+    // Create target path
+    let target_path = std::path::PathBuf::from(target);
 
     let entry = RegistryEntry {
         name: name.clone(),
@@ -179,7 +170,7 @@ fn add_entry(
 /// Remove an entry from the registry
 fn remove_entry(id: String) {
     let registry_path = get_registry_path();
-    let mut registry = match LinkRegistry::load_or_create(&registry_path) {
+    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);
@@ -208,7 +199,7 @@ fn remove_entry(id: String) {
 /// Toggle an entry's enabled status
 fn toggle_entry(id: String, enable: bool) {
     let registry_path = get_registry_path();
-    let mut registry = match LinkRegistry::load_or_create(&registry_path) {
+    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
             println!("❌ Failed to load registry: {}", e);
