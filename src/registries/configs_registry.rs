@@ -83,7 +83,6 @@ impl Default for ConfigsRegistry {
         let base_dirs = get_base_dirs();
         let home_dir = base_dirs.home_dir();
         let data_dir = base_dirs.data_dir();
-        let config
 
         // Shell configuration
         entries.insert(
