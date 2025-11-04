@@ -83,6 +83,7 @@ impl Default for ConfigsRegistry {
         let base_dirs = get_base_dirs();
         let home_dir = base_dirs.home_dir();
         let data_dir = base_dirs.data_dir();
+        let config
 
         // Shell configuration
         entries.insert(
@@ -134,6 +135,19 @@ impl Default for ConfigsRegistry {
                 category: Category::Editor,
                 enabled: true,
                 description: Some("Visual Studio Code user settings".to_string()),
+            },
+        );
+
+        // Zed configuration
+        entries.insert(
+            "zed_settings".to_string(),
+            RegistryEntry {
+                name: "Zed Settings".to_string(),
+                source_path: "zed/settings.json".to_string(),
+                target_path: get_zed_settings_path(),
+                category: Category::Editor,
+                enabled: true,
+                description: Some("Zed user settings".to_string()),
             },
         );
 
@@ -195,6 +209,19 @@ impl ConfigsRegistry {
 
         by_category
     }
+}
+
+/// Get the path to the zed settings.json file, considering XDG and platform conventions
+fn get_zed_settings_path() -> PathBuf {
+    let base_dirs = get_base_dirs();
+
+    // Check for XDG_CONFIG_HOME first (cross-platform)
+    if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
+        return PathBuf::from(xdg_config).join("zed/settings.json");
+    }
+
+    // Default: use ~/.config/zed/settings.json
+    base_dirs.home_dir().join(".config/zed/settings.json")
 }
 
 /// Get the path to the ghostty config file, considering XDG and platform conventions
