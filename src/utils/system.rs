@@ -16,8 +16,7 @@ pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, Box<dyn std::error::E
         let stderr_msg = String::from_utf8(output.stderr)
             .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
 
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
+        return Err(io::Error::other(
             format!(
                 "Command '{}' failed with status {:?}: {}",
                 cmd,

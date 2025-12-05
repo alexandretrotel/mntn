@@ -130,7 +130,7 @@ fn clean_system_directories(args: &CleanArgs) -> u64 {
 
 /// macOS-specific cleanup operations
 #[cfg(target_os = "macos")]
-fn clean_macos_specific(args: &CleanArgs) -> () {
+fn clean_macos_specific(args: &CleanArgs) {
     // Reset Quick Look cache (user-level)
     println!("🔹 Resetting Quick Look cache...");
     if !args.dry_run {
@@ -213,11 +213,10 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
             }
 
             // Skip files modified within the last 24 hours
-            if let Ok(modified) = metadata.modified() {
-                if now.duration_since(modified).unwrap_or_default() < min_age {
+            if let Ok(modified) = metadata.modified()
+                && now.duration_since(modified).unwrap_or_default() < min_age {
                     continue;
                 }
-            }
         }
 
         let space = calculate_dir_size(&entry).unwrap_or(0);
@@ -300,17 +299,14 @@ fn clean_trash(args: &CleanArgs) -> u64 {
         if let Ok(entries) = glob("/Volumes/*/.Trashes/*") {
             for entry in entries.filter_map(Result::ok) {
                 // Only clean trash for current user (use current UID)
-                if let Some(dir_name) = entry.file_name().and_then(|n| n.to_str()) {
-                    if let Ok(current_uid) = std::process::Command::new("id")
+                if let Some(dir_name) = entry.file_name().and_then(|n| n.to_str())
+                    && let Ok(current_uid) = std::process::Command::new("id")
                         .arg("-u")
                         .output()
                         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-                    {
-                        if dir_name == current_uid {
+                        && dir_name == current_uid {
                             total_freed += clean_directory_contents(&entry, false, args);
                         }
-                    }
-                }
             }
         }
 

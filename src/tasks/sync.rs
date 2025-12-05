@@ -4,7 +4,7 @@ use crate::utils::system::run_cmd_in_dir;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Run git sync command with the provided arguments
 pub fn run(args: SyncArgs) {
@@ -89,7 +89,7 @@ fn initialize_git_repo(
     Ok(())
 }
 
-fn create_default_gitignore(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn create_default_gitignore(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         let default_gitignore = "# mntn log files
@@ -118,7 +118,7 @@ Thumbs.db
     Ok(())
 }
 
-fn ensure_gitignore_exists(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         create_default_gitignore(mntn_dir)?;
@@ -126,10 +126,7 @@ fn ensure_gitignore_exists(mntn_dir: &PathBuf) -> Result<(), Box<dyn std::error:
         // Check if mntn.log is in .gitignore, add if missing
         let content = fs::read_to_string(&gitignore_path)?;
         if !content.contains("mntn.log") && !content.contains("*.log") {
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(&gitignore_path)?;
+            let mut file = fs::OpenOptions::new().append(true).open(&gitignore_path)?;
             writeln!(file, "\n# mntn log files\nmntn.log")?;
             println!("✅ Added mntn.log to existing .gitignore");
         }

@@ -54,11 +54,10 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
 
     for category in sorted_categories {
         // Skip categories that don't match the filter
-        if let Some(ref filter) = filter_category {
-            if format!("{:?}", category).to_lowercase() != *filter {
+        if let Some(ref filter) = filter_category
+            && format!("{:?}", category).to_lowercase() != *filter {
                 continue;
             }
-        }
 
         let entries = &entries_by_category[category];
         let mut has_entries = false;

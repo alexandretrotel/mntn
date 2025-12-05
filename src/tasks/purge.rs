@@ -4,7 +4,7 @@ use crate::utils::paths::get_base_dirs;
 use crate::utils::system::run_cmd;
 use inquire::MultiSelect;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Represents a directory target for scanning service files
 #[derive(Debug, Clone)]
@@ -185,7 +185,7 @@ fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
 
         for target in targets {
             let path = &target.path;
-            if let Ok(entries) = fs::read_dir(&path) {
+            if let Ok(entries) = fs::read_dir(path) {
                 for entry in entries.flatten() {
                     let service_path = entry.path();
 
@@ -230,7 +230,7 @@ fn get_service_type_name() -> &'static str {
 }
 
 /// Determines the service type and whether the file should be included
-fn determine_service_type(service_path: &PathBuf, target: &DirectoryTarget) -> (ServiceType, bool) {
+fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (ServiceType, bool) {
     let extension = service_path.extension().and_then(|s| s.to_str());
 
     #[cfg(target_os = "macos")]
@@ -269,7 +269,7 @@ fn determine_service_type(service_path: &PathBuf, target: &DirectoryTarget) -> (
 /// Gets a friendly display label for a service file
 fn get_service_display_label(
     group_name: &str,
-    service_path: &PathBuf,
+    service_path: &Path,
     service_type: &ServiceType,
 ) -> String {
     match service_type {

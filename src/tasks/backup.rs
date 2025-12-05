@@ -4,7 +4,7 @@ use crate::registries::package_registry::PackageRegistry;
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use crate::utils::system::run_cmd;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Runs the full backup process.
 ///
@@ -31,7 +31,7 @@ pub fn run() {
 }
 
 /// Backs up package managers based on the package registry entries
-fn backup_package_managers(backup_dir: &PathBuf) {
+fn backup_package_managers(backup_dir: &Path) {
     // Load the package registry
     let package_registry_path = get_package_registry_path();
     let package_registry = match PackageRegistry::load_or_create(&package_registry_path) {
@@ -92,7 +92,7 @@ fn backup_package_managers(backup_dir: &PathBuf) {
 }
 
 /// Backs up configuration files based on the registry entries
-fn backup_config_files_from_registry(backup_dir: &PathBuf) {
+fn backup_config_files_from_registry(backup_dir: &Path) {
     // Load the registry
     let registry_path = get_registry_path();
     let registry = match ConfigsRegistry::load_or_create(&registry_path) {
@@ -124,24 +124,24 @@ fn backup_config_files_from_registry(backup_dir: &PathBuf) {
         let backup_destination = backup_dir.join(&entry.source_path);
 
         // Ensure parent directory exists
-        if let Some(parent) = backup_destination.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                println!(
-                    "⚠️ Failed to create backup directory for {}: {}",
-                    entry.name, e
-                );
-                log(&format!(
-                    "Failed to create backup directory for {}: {}",
-                    entry.name, e
-                ));
-                continue;
-            }
+        if let Some(parent) = backup_destination.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            println!(
+                "⚠️ Failed to create backup directory for {}: {}",
+                entry.name, e
+            );
+            log(&format!(
+                "Failed to create backup directory for {}: {}",
+                entry.name, e
+            ));
+            continue;
         }
 
         let result = if target_path.is_dir() {
-            backup_directory(&target_path, &backup_destination)
+            backup_directory(target_path, &backup_destination)
         } else {
-            backup_file(&target_path, &backup_destination)
+            backup_file(target_path, &backup_destination)
         };
 
         match result {
@@ -171,20 +171,20 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
     }
 
     // Skip backup if source is a symlink pointing to our backup file
-    if source.is_symlink() {
-        if let Ok(target) = fs::read_link(source) {
-            let canonical_target = target.canonicalize().unwrap_or(target);
-            let canonical_dest = destination
-                .canonicalize()
-                .unwrap_or_else(|_| destination.clone());
+    if source.is_symlink()
+        && let Ok(target) = fs::read_link(source)
+    {
+        let canonical_target = target.canonicalize().unwrap_or(target);
+        let canonical_dest = destination
+            .canonicalize()
+            .unwrap_or_else(|_| destination.clone());
 
-            if canonical_target == canonical_dest {
-                log(&format!(
-                    "Skipping backup of {} - it's already a symlink to our backup location",
-                    source.display()
-                ));
-                return Ok(());
-            }
+        if canonical_target == canonical_dest {
+            log(&format!(
+                "Skipping backup of {} - it's already a symlink to our backup location",
+                source.display()
+            ));
+            return Ok(());
         }
     }
 
@@ -204,26 +204,26 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
     }
 
     // Skip backup if source is a symlink pointing to our backup directory or vice versa
-    if source.is_symlink() {
-        if let Ok(target) = fs::read_link(source) {
-            // Canonicalize paths to handle relative vs absolute path differences
-            let canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
-            let canonical_dest = destination
-                .canonicalize()
-                .unwrap_or_else(|_| destination.clone());
+    if source.is_symlink()
+        && let Ok(target) = fs::read_link(source)
+    {
+        // Canonicalize paths to handle relative vs absolute path differences
+        let canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
+        let canonical_dest = destination
+            .canonicalize()
+            .unwrap_or_else(|_| destination.clone());
 
-            // Check if symlink points to destination or destination is within target
-            if canonical_target == canonical_dest
-                || canonical_dest.starts_with(&canonical_target)
-                || canonical_target.starts_with(&canonical_dest)
-            {
-                log(&format!(
-                    "Skipping backup of {} - it's a symlink to/from our backup location (target: {})",
-                    source.display(),
-                    target.display()
-                ));
-                return Ok(());
-            }
+        // Check if symlink points to destination or destination is within target
+        if canonical_target == canonical_dest
+            || canonical_dest.starts_with(&canonical_target)
+            || canonical_target.starts_with(&canonical_dest)
+        {
+            log(&format!(
+                "Skipping backup of {} - it's a symlink to/from our backup location (target: {})",
+                source.display(),
+                target.display()
+            ));
+            return Ok(());
         }
     }
 
@@ -232,7 +232,7 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
 
     // Use rsync to copy directory contents
     let output = Command::new("rsync")
-        .args(&["-av", "--delete"])
+        .args(["-av", "--delete"])
         .arg(format!("{}/", source.display())) // trailing slash for rsync
         .arg(destination)
         .output()?;
@@ -241,10 +241,7 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         let stderr = String::from_utf8(output.stderr.clone())
             .unwrap_or_else(|_| format!("{:?}", output.stderr));
 
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("rsync failed: {}", stderr),
-        ));
+        return Err(std::io::Error::other(format!("rsync failed: {}", stderr)));
     }
 
     Ok(())

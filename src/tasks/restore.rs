@@ -2,7 +2,7 @@ use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::utils::paths::{get_backup_path, get_registry_path};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Main function to run the restore process.
 pub fn run() {
@@ -74,7 +74,7 @@ pub fn run() {
 fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: &str) -> bool {
     // Handle both files and directories
     if backup_path.is_dir() {
-        return restore_directory(backup_path, &target_path, file_name);
+        return restore_directory(backup_path, target_path, file_name);
     }
 
     let contents = match fs::read_to_string(backup_path) {
@@ -89,18 +89,18 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
         }
     };
 
-    if let Some(parent) = target_path.parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
-            println!("⚠️ Failed to create directory for {}: {}", file_name, e);
-            log(&format!(
-                "Failed to create directory for {}: {}",
-                file_name, e
-            ));
-            return false;
-        }
+    if let Some(parent) = target_path.parent()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        println!("⚠️ Failed to create directory for {}: {}", file_name, e);
+        log(&format!(
+            "Failed to create directory for {}: {}",
+            file_name, e
+        ));
+        return false;
     }
 
-    match fs::write(&target_path, contents) {
+    match fs::write(target_path, contents) {
         Ok(_) => {
             log(&format!("Restored {}", file_name));
             true
@@ -114,7 +114,7 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
 }
 
 /// Restores a directory from backup to target location
-fn restore_directory(backup_path: &PathBuf, target_path: &PathBuf, dir_name: &str) -> bool {
+fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> bool {
     use std::process::Command;
 
     // Create target directory if it doesn't exist
@@ -132,7 +132,7 @@ fn restore_directory(backup_path: &PathBuf, target_path: &PathBuf, dir_name: &st
 
     // Use rsync to copy directory contents
     let output = Command::new("rsync")
-        .args(&["-av", "--delete"])
+        .args(["-av", "--delete"])
         .arg(format!("{}/", backup_path.display())) // trailing slash for rsync
         .arg(target_path)
         .output();

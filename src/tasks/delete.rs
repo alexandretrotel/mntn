@@ -101,11 +101,10 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
     for entry in fs::read_dir(apps_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "app") {
-            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+        if path.extension().is_some_and(|ext| ext == "app")
+            && let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                 app_names.push(name.to_string());
             }
-        }
     }
 
     if app_names.is_empty() {
@@ -114,7 +113,7 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
 
     let selection = Select::new("Select an app to delete:", app_names)
         .prompt()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     Ok(Some(selection))
 }
@@ -133,7 +132,7 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
             println!("🗑️ Uninstalling {} via Homebrew...", app_name);
             log(&format!("Uninstalling {} via Homebrew", app_name));
             let status = Command::new("brew")
-                .args(&["uninstall", "--cask", app_name])
+                .args(["uninstall", "--cask", app_name])
                 .status();
 
             if !matches!(status, Ok(s) if s.success()) {
@@ -173,7 +172,7 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
     let selected = if !options.is_empty() {
         MultiSelect::new("Select items to delete:", options)
             .prompt()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
+            .map_err(|e| std::io::Error::other(e.to_string()))?
     } else {
         Vec::new()
     };
@@ -321,18 +320,17 @@ fn process_directory(
         let path = entry.path();
         let name = path.file_name().unwrap_or_default();
 
-        let matches = name.to_str().map_or(false, |name_str| {
+        let matches = name.to_str().is_some_and(|name_str| {
             re_app.is_match(name_str)
-                || re_bundle.as_ref().map_or(false, |re| re.is_match(name_str))
+                || re_bundle.as_ref().is_some_and(|re| re.is_match(name_str))
         });
 
-        if matches {
-            if (is_app_dir && path.is_dir())
-                || (!is_app_dir && path.extension().map_or(false, |ext| ext == "plist"))
+        if matches
+            && ((is_app_dir && path.is_dir())
+                || (!is_app_dir && path.extension().is_some_and(|ext| ext == "plist")))
             {
                 results.push(path);
             }
-        }
     }
 }
 
@@ -355,7 +353,7 @@ fn get_bundle_identifier(app_path: &Path) -> Option<String> {
 
 /// Determines whether an app is installed via Homebrew Cask.
 fn is_homebrew_app(app_name: &str) -> bool {
-    let output = Command::new("brew").args(&["list", "--cask"]).output();
+    let output = Command::new("brew").args(["list", "--cask"]).output();
 
     let stdout = match output {
         Ok(o) => match String::from_utf8(o.stdout) {
@@ -404,12 +402,12 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
             let status = if path.is_dir() {
                 match fs::remove_dir_all(path) {
                     Ok(()) => Ok(std::process::ExitStatus::from_raw(0)),
-                    Err(_) => Command::new("sudo").args(&["rm", "-rf"]).arg(path).status(),
+                    Err(_) => Command::new("sudo").args(["rm", "-rf"]).arg(path).status(),
                 }
             } else {
                 match fs::remove_file(path) {
                     Ok(()) => Ok(std::process::ExitStatus::from_raw(0)),
-                    Err(_) => Command::new("sudo").args(&["rm", "-f"]).arg(path).status(),
+                    Err(_) => Command::new("sudo").args(["rm", "-f"]).arg(path).status(),
                 }
             };
 

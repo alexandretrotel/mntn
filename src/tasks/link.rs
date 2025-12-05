@@ -48,7 +48,7 @@ pub fn run() {
         let dst = &entry.target_path;
 
         println!("🔗 Processing: {} ({})", entry.name, id);
-        process_link(&src, &dst, &symlinks_dir);
+        process_link(&src, dst, &symlinks_dir);
         links_processed += 1;
     }
 
@@ -154,7 +154,7 @@ fn create_symlink(src: &Path, dst: &Path) {
 
 /// Processes a single (src, dst) link
 fn process_link(src: &Path, dst: &Path, symlinks_dir: &Path) {
-    if let Err(_) = copy_dst_to_src_if_missing(src, dst) {
+    if copy_dst_to_src_if_missing(src, dst).is_err() {
         return;
     }
 
@@ -166,11 +166,11 @@ fn process_link(src: &Path, dst: &Path, symlinks_dir: &Path) {
         return;
     }
 
-    if let Err(_) = handle_existing_symlink(src, dst) {
+    if handle_existing_symlink(src, dst).is_err() {
         return;
     }
 
-    if let Err(_) = backup_if_needed(dst, symlinks_dir) {
+    if backup_if_needed(dst, symlinks_dir).is_err() {
         return;
     }
 
