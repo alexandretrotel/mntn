@@ -3,6 +3,8 @@ use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 /// Severity level for validation errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,31 @@ impl ValidationError {
     }
 }
 
+/// Helper function to validate JSON syntax in a file
+fn validate_json_file(path: &Path, description: &str) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    if !path.exists() {
+        return errors;
+    }
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            errors.push(
+                ValidationError::warning(format!("Could not read {}: {}", description, e))
+                    .with_fix(format!("Check file permissions for {}", path.display())),
+            );
+            return errors;
+        }
+    };
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(&content) {
+        errors.push(
+            ValidationError::error(format!("Invalid JSON in {}: {}", description, e))
+                .with_fix(format!("Check syntax in {}", path.display())),
+        );
+    }
+    errors
+}
+
 /// Trait for implementing validators
 pub trait Validator {
     fn validate(&self) -> Vec<ValidationError>;
@@ -68,15 +95,14 @@ pub trait Validator {
 }
 
 /// Report containing all validation results
+#[derive(Default)]
 pub struct ValidationReport {
     results: Vec<(String, Vec<ValidationError>)>,
 }
 
 impl ValidationReport {
     pub fn new() -> Self {
-        Self {
-            results: Vec::new(),
-        }
+        Self::default()
     }
 
     pub fn add_result(&mut self, validator_name: &str, errors: Vec<ValidationError>) {
@@ -102,18 +128,18 @@ impl ValidationReport {
     pub fn print(&self) {
         for (name, errors) in &self.results {
             if errors.is_empty() {
-                println!("  {} OK", name);
+                println!(" {} OK", name);
             } else {
-                println!("  {}", name);
+                println!(" {}", name);
                 for error in errors {
                     let icon = match error.severity {
-                        Severity::Error => "  x",
-                        Severity::Warning => "  !",
-                        Severity::Info => "  i",
+                        Severity::Error => " x",
+                        Severity::Warning => " !",
+                        Severity::Info => " i",
                     };
                     println!("{} {}", icon, error.message);
                     if let Some(fix) = &error.fix_suggestion {
-                        println!("      Fix: {}", fix);
+                        println!(" Fix: {}", fix);
                     }
                 }
             }
@@ -126,47 +152,19 @@ pub struct JsonConfigValidator;
 
 impl Validator for JsonConfigValidator {
     fn validate(&self) -> Vec<ValidationError> {
-        let mut errors = Vec::new();
         let backup_dir = get_backup_path();
-
         let json_files = [
             ("vscode/settings.json", "VS Code settings"),
             ("vscode/keybindings.json", "VS Code keybindings"),
             ("zed/settings.json", "Zed settings"),
         ];
-
-        for (file_path, description) in json_files {
-            let full_path = backup_dir.join(file_path);
-            if full_path.exists() {
-                match fs::read_to_string(&full_path) {
-                    Ok(content) => {
-                        if let Err(e) = serde_json::from_str::<serde_json::Value>(&content) {
-                            errors.push(
-                                ValidationError::error(format!(
-                                    "Invalid JSON in {}: {}",
-                                    description, e
-                                ))
-                                .with_fix(format!("Check syntax in {}", full_path.display())),
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        errors.push(
-                            ValidationError::warning(format!(
-                                "Could not read {}: {}",
-                                description, e
-                            ))
-                            .with_fix(format!(
-                                "Check file permissions for {}",
-                                full_path.display()
-                            )),
-                        );
-                    }
-                }
-            }
-        }
-
-        errors
+        json_files
+            .iter()
+            .flat_map(|&(file_path, description)| {
+                let full_path = backup_dir.join(file_path);
+                validate_json_file(&full_path, description)
+            })
+            .collect()
     }
 
     fn name(&self) -> &str {
@@ -180,7 +178,6 @@ pub struct SymlinkValidator;
 impl Validator for SymlinkValidator {
     fn validate(&self) -> Vec<ValidationError> {
         let mut errors = Vec::new();
-
         let registry_path = get_registry_path();
         let registry = match ConfigsRegistry::load_or_create(&registry_path) {
             Ok(r) => r,
@@ -192,14 +189,10 @@ impl Validator for SymlinkValidator {
                 return errors;
             }
         };
-
         let backup_dir = get_backup_path();
-
         for (id, entry) in registry.get_enabled_entries() {
             let source = backup_dir.join(&entry.source_path);
-            let target = &entry.target_path;
-
-            // Check if source exists in backup
+            let target: PathBuf = entry.target_path.clone().into(); // Assuming target_path is String or impl Into<PathBuf>
             if !source.exists() {
                 errors.push(
                     ValidationError::warning(format!(
@@ -213,10 +206,8 @@ impl Validator for SymlinkValidator {
                 );
                 continue;
             }
-
-            // Check if target is a symlink pointing to source
             if target.is_symlink() {
-                match fs::read_link(target) {
+                match fs::read_link(&target) {
                     Ok(link_target) => {
                         if link_target != source {
                             errors.push(
@@ -259,7 +250,6 @@ impl Validator for SymlinkValidator {
                 );
             }
         }
-
         errors
     }
 
@@ -275,97 +265,61 @@ impl Validator for RegistryValidator {
     fn validate(&self) -> Vec<ValidationError> {
         let mut errors = Vec::new();
 
-        // Validate configs registry
         let registry_path = get_registry_path();
-        if registry_path.exists() {
-            match fs::read_to_string(&registry_path) {
-                Ok(content) => {
-                    if let Err(e) = serde_json::from_str::<serde_json::Value>(&content) {
+        match ConfigsRegistry::load_or_create(&registry_path) {
+            Ok(registry) => {
+                let mut source_paths: HashMap<String, Vec<String>> = HashMap::new();
+                for (id, entry) in registry.entries.iter() {
+                    source_paths
+                        .entry(entry.source_path.clone())
+                        .or_default()
+                        .push(id.clone());
+                }
+                for (path, ids) in source_paths {
+                    if ids.len() > 1 {
                         errors.push(
-                            ValidationError::error(format!(
-                                "Configs registry has invalid JSON: {}",
-                                e
+                            ValidationError::warning(format!(
+                                "Duplicate source path '{}' used by: {}",
+                                path,
+                                ids.join(", ")
                             ))
-                            .with_fix("Check syntax or delete the file to regenerate defaults"),
+                            .with_fix("Consider consolidating or renaming entries"),
                         );
                     }
                 }
-                Err(e) => {
-                    errors.push(ValidationError::error(format!(
-                        "Could not read configs registry: {}",
-                        e
-                    )));
-                }
+            }
+            Err(e) => {
+                errors.push(ValidationError::error(format!(
+                    "Could not load configs registry: {}",
+                    e
+                )));
             }
         }
 
-        // Validate package registry
         let package_registry_path = get_package_registry_path();
-        if package_registry_path.exists() {
-            match fs::read_to_string(&package_registry_path) {
-                Ok(content) => {
-                    if let Err(e) = serde_json::from_str::<serde_json::Value>(&content) {
+        match PackageRegistry::load_or_create(&package_registry_path) {
+            Ok(registry) => {
+                let current_platform = PackageRegistry::get_current_platform();
+                for (id, entry) in registry.get_platform_compatible_entries(&current_platform) {
+                    if which::which(&entry.command).is_err() {
                         errors.push(
-                            ValidationError::error(format!(
-                                "Package registry has invalid JSON: {}",
-                                e
+                            ValidationError::info(format!(
+                                "Package manager '{}' ({}) not found in PATH",
+                                entry.name, id
                             ))
-                            .with_fix("Check syntax or delete the file to regenerate defaults"),
+                            .with_fix(format!(
+                                "Install {} or disable this entry with 'mntn package-registry toggle {} -e false'",
+                                entry.command, id
+                            )),
                         );
                     }
                 }
-                Err(e) => {
-                    errors.push(ValidationError::error(format!(
-                        "Could not read package registry: {}",
-                        e
-                    )));
-                }
             }
-        }
-
-        // Check for duplicate source paths in configs registry
-        if let Ok(registry) = ConfigsRegistry::load_or_create(&registry_path) {
-            let mut source_paths: std::collections::HashMap<String, Vec<String>> =
-                std::collections::HashMap::new();
-
-            for (id, entry) in registry.entries.iter() {
-                source_paths
-                    .entry(entry.source_path.clone())
-                    .or_default()
-                    .push(id.clone());
-            }
-
-            for (path, ids) in source_paths {
-                if ids.len() > 1 {
-                    errors.push(
-                        ValidationError::warning(format!(
-                            "Duplicate source path '{}' used by: {}",
-                            path,
-                            ids.join(", ")
-                        ))
-                        .with_fix("Consider consolidating or renaming entries"),
-                    );
-                }
-            }
-        }
-
-        // Check package managers are available
-        if let Ok(registry) = PackageRegistry::load_or_create(&package_registry_path) {
-            let current_platform = PackageRegistry::get_current_platform();
-
-            for (id, entry) in registry.get_platform_compatible_entries(&current_platform) {
-                if which::which(&entry.command).is_err() {
-                    errors.push(
-                        ValidationError::info(format!(
-                            "Package manager '{}' ({}) not found in PATH",
-                            entry.name, id
-                        ))
-                        .with_fix(format!(
-                            "Install {} or disable this entry with 'mntn package-registry toggle {} -e false'",
-                            entry.command, id
-                        )),
-                    );
-                }
+            Err(e) => {
+                errors.push(ValidationError::error(format!(
+                    "Could not load package registry: {}",
+                    e
+                )));
             }
         }
 
@@ -389,18 +343,15 @@ impl ConfigValidator {
             Box::new(JsonConfigValidator),
             Box::new(SymlinkValidator),
         ];
-
         Self { validators }
     }
 
     pub fn run_all(&self) -> ValidationReport {
         let mut report = ValidationReport::new();
-
         for validator in &self.validators {
             let errors = validator.validate();
             report.add_result(validator.name(), errors);
         }
-
         report
     }
 }
@@ -409,17 +360,13 @@ impl ConfigValidator {
 pub fn run() {
     println!("Validating configuration...");
     log("Starting validation");
-
     let validator = ConfigValidator::new();
     let report = validator.run_all();
-
     println!();
     report.print();
     println!();
-
     let error_count = report.error_count();
     let warning_count = report.warning_count();
-
     if error_count == 0 && warning_count == 0 {
         println!("All checks passed.");
         log("Validation complete: all checks passed");
