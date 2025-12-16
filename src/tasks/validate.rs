@@ -83,20 +83,20 @@ impl ValidationReport {
         self.results.push((validator_name.to_string(), errors));
     }
 
-    pub fn error_count(&self) -> usize {
+    fn count_by_severity(&self, severity: Severity) -> usize {
         self.results
             .iter()
             .flat_map(|(_, errors)| errors.iter())
-            .filter(|e| e.severity == Severity::Error)
+            .filter(|e| e.severity == severity)
             .count()
     }
 
+    pub fn error_count(&self) -> usize {
+        self.count_by_severity(Severity::Error)
+    }
+
     pub fn warning_count(&self) -> usize {
-        self.results
-            .iter()
-            .flat_map(|(_, errors)| errors.iter())
-            .filter(|e| e.severity == Severity::Warning)
-            .count()
+        self.count_by_severity(Severity::Warning)
     }
 
     pub fn print(&self) {
