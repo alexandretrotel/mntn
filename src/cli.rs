@@ -300,4 +300,8 @@ pub enum Commands {
     /// Synchronize configurations with a git repository
     #[command(about = "Sync configurations with a git repository (pull/push/both)")]
     Sync(SyncArgs),
+
+    /// Validate configuration files and symlinks
+    #[command(about = "Validate JSON configs, symlinks, and registry files")]
+    Validate,
 }
