@@ -24,10 +24,7 @@ impl Task for LinkTask {
 
     fn execute(&mut self) {
         println!("🔗 Creating symlinks...");
-        println!(
-            "   Profile: machine={}, env={}",
-            self.profile.machine_id, self.profile.environment
-        );
+        println!("   Profile: {}", self.profile);
 
         let symlinks_dir = get_symlinks_path();
         if let Err(e) = fs::create_dir_all(&symlinks_dir) {

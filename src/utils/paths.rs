@@ -30,15 +30,6 @@ pub fn get_mntn_dir() -> PathBuf {
     home_dir.join(".mntn")
 }
 
-#[deprecated(
-    note = "Use layered backup paths via get_backup_common_path, get_backup_machine_path, or get_backup_environment_path"
-)]
-#[allow(dead_code)]
-pub fn get_backup_path() -> PathBuf {
-    let mntn_dir = get_mntn_dir();
-    mntn_dir.join(BACKUP_DIR)
-}
-
 pub fn get_backup_root() -> PathBuf {
     get_mntn_dir().join(BACKUP_DIR)
 }

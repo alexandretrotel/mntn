@@ -1,5 +1,5 @@
 use crate::logger::log;
-use crate::profile::ActiveProfile;
+use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
@@ -477,10 +477,7 @@ impl Task for ValidateTask {
 
     fn execute(&mut self) {
         println!("🔍 Validating configuration...");
-        println!(
-            "   Profile: machine={}, env={}",
-            self.profile.machine_id, self.profile.environment
-        );
+        println!("   Profile: {}", self.profile);
         log("Starting validation");
 
         let validator = ConfigValidator::new(self.profile.clone());
@@ -515,8 +512,11 @@ impl Task for ValidateTask {
     }
 }
 
-/// Run with CLI args
 pub fn run_with_args(args: crate::cli::ValidateArgs) {
+    if let Ok(true) = ProfileConfig::save_default_if_missing() {
+        println!("ℹ️  Created default profile config at ~/.mntn/profile.json");
+    }
+
     let profile = ActiveProfile::from_defaults();
     TaskExecutor::run(&mut ValidateTask::new(profile), args.dry_run);
 }

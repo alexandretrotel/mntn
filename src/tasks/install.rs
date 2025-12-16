@@ -129,7 +129,7 @@ impl ScheduledTask {
     fn install(&self) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "macos")]
         {
-            return self.install_launchd();
+            self.install_launchd()
         }
         #[cfg(target_os = "linux")]
         {
@@ -139,8 +139,6 @@ impl ScheduledTask {
         {
             return self.install_windows();
         }
-        #[allow(unreachable_code)]
-        Err("Unsupported platform".into())
     }
 
     #[cfg(target_os = "macos")]

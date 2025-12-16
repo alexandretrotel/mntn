@@ -34,7 +34,6 @@ impl ProfileConfig {
         Self::load(&path).unwrap_or_default()
     }
 
-    #[allow(dead_code)]
     pub fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -46,14 +45,41 @@ impl ProfileConfig {
     pub fn get_profile(&self, name: &str) -> Option<&ProfileDefinition> {
         self.profiles.get(name)
     }
+
+    pub fn save_default_if_missing() -> io::Result<bool> {
+        let path = get_profile_config_path();
+        if path.exists() {
+            return Ok(false);
+        }
+
+        let config = ProfileConfig {
+            version: "1.0.0".to_string(),
+            default_profile: None,
+            profiles: HashMap::new(),
+        };
+        config.save(&path)?;
+        Ok(true)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ActiveProfile {
-    #[allow(dead_code)]
     pub name: Option<String>,
     pub machine_id: String,
     pub environment: String,
+}
+
+impl std::fmt::Display for ActiveProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.name {
+            Some(name) => write!(
+                f,
+                "profile={} (machine={}, env={})",
+                name, self.machine_id, self.environment
+            ),
+            None => write!(f, "machine={}, env={}", self.machine_id, self.environment),
+        }
+    }
 }
 
 impl ActiveProfile {

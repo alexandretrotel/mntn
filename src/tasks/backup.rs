@@ -42,10 +42,7 @@ impl Task for BackupTask {
         fs::create_dir_all(&backup_dir).unwrap();
 
         println!("🔁 Backing up...");
-        println!(
-            "   Target: {} (machine={}, env={})",
-            self.target, self.profile.machine_id, self.profile.environment
-        );
+        println!("   Target: {} ({})", self.target, self.profile);
 
         let package_dir = get_backup_root();
         fs::create_dir_all(&package_dir).unwrap();

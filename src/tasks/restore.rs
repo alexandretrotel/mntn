@@ -23,10 +23,7 @@ impl Task for RestoreTask {
 
     fn execute(&mut self) {
         println!("🔄 Starting restore process...");
-        println!(
-            "   Profile: machine={}, env={}",
-            self.profile.machine_id, self.profile.environment
-        );
+        println!("   Profile: {}", self.profile);
 
         let registry_path = get_registry_path();
         let registry = match ConfigsRegistry::load_or_create(&registry_path) {

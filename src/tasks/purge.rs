@@ -268,7 +268,6 @@ fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (Ser
         }
     }
 
-    #[allow(unreachable_code)]
     {
         let _ = target;
         #[cfg(target_os = "windows")]

@@ -104,10 +104,7 @@ impl Task for MigrateTask {
 
     fn execute(&mut self) {
         println!("🔄 Migrating legacy backup files...");
-        println!(
-            "   Target: {} (machine={}, env={})",
-            self.target, self.profile.machine_id, self.profile.environment
-        );
+        println!("   Target: {} ({})", self.target, self.profile);
 
         let target_dir = self.get_target_dir();
         if let Err(e) = fs::create_dir_all(&target_dir) {
