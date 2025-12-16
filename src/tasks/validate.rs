@@ -1,6 +1,7 @@
 use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use std::collections::HashMap;
 use std::fs;
@@ -356,28 +357,49 @@ impl ConfigValidator {
     }
 }
 
-/// Run the validation command
-pub fn run() {
-    println!("Validating configuration...");
-    log("Starting validation");
-    let validator = ConfigValidator::new();
-    let report = validator.run_all();
-    println!();
-    report.print();
-    println!();
-    let error_count = report.error_count();
-    let warning_count = report.warning_count();
-    if error_count == 0 && warning_count == 0 {
-        println!("All checks passed.");
-        log("Validation complete: all checks passed");
-    } else {
-        println!(
-            "Validation complete: {} error(s), {} warning(s)",
-            error_count, warning_count
-        );
-        log(&format!(
-            "Validation complete: {} error(s), {} warning(s)",
-            error_count, warning_count
-        ));
+/// Validation task
+pub struct ValidateTask;
+
+impl Task for ValidateTask {
+    fn name(&self) -> &str {
+        "Validate"
     }
+
+    fn execute(&mut self) {
+        println!("Validating configuration...");
+        log("Starting validation");
+        let validator = ConfigValidator::new();
+        let report = validator.run_all();
+        println!();
+        report.print();
+        println!();
+        let error_count = report.error_count();
+        let warning_count = report.warning_count();
+        if error_count == 0 && warning_count == 0 {
+            println!("All checks passed.");
+            log("Validation complete: all checks passed");
+        } else {
+            println!(
+                "Validation complete: {} error(s), {} warning(s)",
+                error_count, warning_count
+            );
+            log(&format!(
+                "Validation complete: {} error(s), {} warning(s)",
+                error_count, warning_count
+            ));
+        }
+    }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        vec![
+            PlannedOperation::new("Validate registry files"),
+            PlannedOperation::new("Validate JSON configuration files"),
+            PlannedOperation::new("Validate symlink configuration"),
+        ]
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: crate::cli::ValidateArgs) {
+    TaskExecutor::run(&mut ValidateTask, args.dry_run);
 }

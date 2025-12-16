@@ -3,34 +3,115 @@ use std::str::FromStr;
 use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
 use crate::logger::log;
 use crate::registries::configs_registry::{Category, ConfigsRegistry, RegistryEntry};
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_registry_path;
 
-/// Run the registry management command
-pub fn run(args: ConfigsRegistryArgs) {
-    match args.action {
-        ConfigsRegistryActions::List {
-            category,
-            enabled_only,
-        } => {
-            list_entries(category, enabled_only);
-        }
-        ConfigsRegistryActions::Add {
-            id,
-            name,
-            source,
-            target,
-            category,
-            description,
-        } => {
-            add_entry(id, name, source, target, category, description);
-        }
-        ConfigsRegistryActions::Remove { id } => {
-            remove_entry(id);
-        }
-        ConfigsRegistryActions::Toggle { id, enable } => {
-            toggle_entry(id, enable);
+/// Configs registry management task
+pub struct ConfigsRegistryTask {
+    args: ConfigsRegistryArgs,
+}
+
+impl ConfigsRegistryTask {
+    pub fn new(args: ConfigsRegistryArgs) -> Self {
+        Self { args }
+    }
+}
+
+impl Task for ConfigsRegistryTask {
+    fn name(&self) -> &str {
+        "Configs Registry"
+    }
+
+    fn execute(&mut self) {
+        match &self.args.action {
+            ConfigsRegistryActions::List {
+                category,
+                enabled_only,
+            } => {
+                list_entries(category.clone(), *enabled_only);
+            }
+            ConfigsRegistryActions::Add {
+                id,
+                name,
+                source,
+                target,
+                category,
+                description,
+            } => {
+                add_entry(
+                    id.clone(),
+                    name.clone(),
+                    source.clone(),
+                    target.clone(),
+                    category.clone(),
+                    description.clone(),
+                );
+            }
+            ConfigsRegistryActions::Remove { id } => {
+                remove_entry(id.clone());
+            }
+            ConfigsRegistryActions::Toggle { id, enable } => {
+                toggle_entry(id.clone(), *enable);
+            }
         }
     }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let registry_path = get_registry_path();
+
+        match &self.args.action {
+            ConfigsRegistryActions::List { .. } => {
+                operations.push(PlannedOperation::new("List registry entries"));
+            }
+            ConfigsRegistryActions::Add {
+                id,
+                name,
+                source,
+                target,
+                ..
+            } => {
+                operations.push(PlannedOperation::with_target(
+                    format!("Add registry entry '{}' ({})", name, id),
+                    format!("Source: {}, Target: {}", source, target),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Save registry".to_string(),
+                    registry_path.display().to_string(),
+                ));
+            }
+            ConfigsRegistryActions::Remove { id } => {
+                operations.push(PlannedOperation::with_target(
+                    format!("Remove registry entry ({})", id),
+                    registry_path.display().to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Save registry".to_string(),
+                    registry_path.display().to_string(),
+                ));
+            }
+            ConfigsRegistryActions::Toggle { id, enable } => {
+                let action = if *enable { "enable" } else { "disable" };
+                operations.push(PlannedOperation::with_target(
+                    format!("{} registry entry ({})", action, id),
+                    registry_path.display().to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Save registry".to_string(),
+                    registry_path.display().to_string(),
+                ));
+            }
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: ConfigsRegistryArgs) {
+    let dry_run = args.dry_run;
+    let mut task = ConfigsRegistryTask::new(args);
+    TaskExecutor::run(&mut task, dry_run);
 }
 
 /// List registry entries

@@ -101,6 +101,30 @@ pub struct RestoreArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the biometric sudo command.
+#[derive(Args)]
+pub struct BiometricSudoArgs {
+    /// Preview what would be configured without actually performing the configuration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be configured without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the validate command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Preview what would be validated without actually performing the validation
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be validated without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
 /// Arguments for the purge command.
 #[derive(Args)]
 pub struct PurgeArgs {
@@ -161,6 +185,13 @@ pub struct SyncArgs {
 pub struct ConfigsRegistryArgs {
     #[command(subcommand)]
     pub action: ConfigsRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Registry management actions.
@@ -222,6 +253,13 @@ pub enum ConfigsRegistryActions {
 pub struct PackageRegistryArgs {
     #[command(subcommand)]
     pub action: PackageRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Package registry management actions.
@@ -305,7 +343,7 @@ pub enum Commands {
     /// Configure biometric authentication for sudo operations (macOS only)
     #[cfg(target_os = "macos")]
     #[command(about = "Enable Touch ID or Face ID authentication for sudo commands")]
-    BiometricSudo,
+    BiometricSudo(BiometricSudoArgs),
 
     /// Clean temporary files, caches, and unnecessary data from the system
     #[command(about = "Remove temporary files, caches, logs, and other unnecessary data")]
@@ -346,5 +384,5 @@ pub enum Commands {
 
     /// Validate configuration files and symlinks
     #[command(about = "Validate JSON configs, symlinks, and registry files")]
-    Validate,
+    Validate(ValidateArgs),
 }
