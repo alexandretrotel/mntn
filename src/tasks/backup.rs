@@ -3,6 +3,7 @@ use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use crate::utils::system::run_cmd;
+use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -61,12 +62,27 @@ fn backup_package_managers(backup_dir: &Path) {
         compatible_entries.len()
     );
 
-    for (id, entry) in compatible_entries {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
-            run_cmd(&entry.command, &args)
-        }));
+    // Run package manager commands in parallel
+    let results: Vec<_> = compatible_entries
+        .par_iter()
+        .map(|(id, entry)| {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
+                run_cmd(&entry.command, &args)
+            }));
+            // Convert Result<Result<String, Box<dyn Error>>, _> to use String for error
+            // so it can be sent across threads
+            let result = match result {
+                Ok(Ok(content)) => Ok(Ok(content)),
+                Ok(Err(e)) => Ok(Err(e.to_string())),
+                Err(_) => Err(()),
+            };
+            ((*id).clone(), (*entry).clone(), result)
+        })
+        .collect();
 
+    // Write results sequentially to avoid output interleaving
+    for (id, entry, result) in results {
         match result {
             Ok(Ok(content)) => {
                 if let Err(e) = fs::write(backup_dir.join(&entry.output_file), content) {
