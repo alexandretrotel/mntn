@@ -209,7 +209,10 @@ fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
     if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
         return PathBuf::from(xdg_config).join(relative_path);
     }
-    get_base_dirs().home_dir().join(".config").join(relative_path)
+    get_base_dirs()
+        .home_dir()
+        .join(".config")
+        .join(relative_path)
 }
 
 /// Get the path to the ghostty config file, considering XDG and platform conventions

@@ -148,7 +148,10 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn initialize_git_repo(mntn_dir: &Path, remote_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn initialize_git_repo(
+    mntn_dir: &Path,
+    remote_url: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Initializing git repository in {}", mntn_dir.display());
 
     run_cmd_in_dir("git", &["init"], mntn_dir)?;

@@ -74,15 +74,4 @@ where
     pub fn get_entry(&self, id: &str) -> Option<&T> {
         self.entries.get(id)
     }
-
-    /// Update an existing entry
-    pub fn _update_entry(&mut self, id: &str, entry: T) -> Result<(), String> {
-        match self.entries.get_mut(id) {
-            Some(existing_entry) => {
-                *existing_entry = entry;
-                Ok(())
-            }
-            None => Err(format!("Entry '{}' not found", id)),
-        }
-    }
 }

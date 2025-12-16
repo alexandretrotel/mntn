@@ -85,7 +85,10 @@ fn backup_package_managers(backup_dir: &Path) {
     let package_registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            log_error("Failed to load package registry, skipping package backup", e);
+            log_error(
+                "Failed to load package registry, skipping package backup",
+                e,
+            );
             return;
         }
     };
