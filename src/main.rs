@@ -16,14 +16,14 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Backup) => backup::run(),
+        Some(Commands::Backup(args)) => backup::run_with_args(args),
         Some(Commands::Clean(args)) => clean::run(args),
         Some(Commands::Purge(args)) => purge::run(args),
-        Some(Commands::Link) => link::run(),
+        Some(Commands::Link(args)) => link::run_with_args(args),
         Some(Commands::Delete(args)) => delete::run(args),
         Some(Commands::Install(args)) => install::run(args),
         Some(Commands::BiometricSudo) => biometric_sudo::run(),
-        Some(Commands::Restore) => restore::run(),
+        Some(Commands::Restore(args)) => restore::run_with_args(args),
         Some(Commands::Registry(args)) => configs_registry_task::run(args),
         Some(Commands::PackageRegistry(args)) => package_registry_task::run(args),
         Some(Commands::Sync(args)) => sync::run(args),

@@ -13,6 +13,18 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+/// Arguments for the backup command.
+#[derive(Args)]
+pub struct BackupArgs {
+    /// Preview what would be backed up without actually performing the backup
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be backed up without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
 /// Arguments for the clean command.
 #[derive(Args)]
 pub struct CleanArgs {
@@ -56,6 +68,37 @@ pub struct InstallArgs {
         help = "Set up automatic daily cleaning in addition to installing"
     )]
     pub with_clean: bool,
+    /// Preview what tasks would be installed without actually installing them
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be installed without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the link command.
+#[derive(Args)]
+pub struct LinkArgs {
+    /// Preview what symlinks would be created without actually creating them
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what symlinks would be created without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the restore command.
+#[derive(Args)]
+pub struct RestoreArgs {
+    /// Preview what would be restored without actually restoring
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be restored without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Arguments for the purge command.
@@ -257,7 +300,7 @@ pub enum PackageRegistryActions {
 pub enum Commands {
     /// Create a backup of important system configurations and user data
     #[command(about = "Backup system configurations and user data to a safe location")]
-    Backup,
+    Backup(BackupArgs),
 
     /// Configure biometric authentication for sudo operations (macOS only)
     #[cfg(target_os = "macos")]
@@ -279,7 +322,7 @@ pub enum Commands {
 
     /// Create symbolic links for configurations and dotfiles
     #[command(about = "Create and manage symbolic links for dotfiles and configurations")]
-    Link,
+    Link(LinkArgs),
 
     /// Thoroughly remove files and reset configurations to defaults
     #[command(about = "Completely remove files and reset system configurations")]
@@ -287,7 +330,7 @@ pub enum Commands {
 
     /// Restore system configurations and data from a previous backup
     #[command(about = "Restore system state from a previously created backup")]
-    Restore,
+    Restore(RestoreArgs),
 
     /// Manage the registry of files and folders to backup and link
     #[command(about = "Manage the registry of files and folders for backup and linking")]
