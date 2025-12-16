@@ -1,7 +1,8 @@
-use crate::logger::log;
+use crate::logger::{log, log_error, log_success};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
+use crate::utils::filesystem::copy_dir_recursive;
 use crate::utils::paths::{
     get_backup_common_path, get_backup_environment_path, get_backup_machine_path, get_backup_root,
     get_registry_path,
@@ -26,6 +27,16 @@ impl std::fmt::Display for MigrateTarget {
     }
 }
 
+impl MigrateTarget {
+    pub fn resolve_path(&self, profile: &ActiveProfile) -> PathBuf {
+        match self {
+            MigrateTarget::Common => get_backup_common_path(),
+            MigrateTarget::Machine => get_backup_machine_path(&profile.machine_id),
+            MigrateTarget::Environment => get_backup_environment_path(&profile.environment),
+        }
+    }
+}
+
 pub struct MigrateTask {
     profile: ActiveProfile,
     target: MigrateTarget,
@@ -34,14 +45,6 @@ pub struct MigrateTask {
 impl MigrateTask {
     pub fn new(profile: ActiveProfile, target: MigrateTarget) -> Self {
         Self { profile, target }
-    }
-
-    fn get_target_dir(&self) -> PathBuf {
-        match self.target {
-            MigrateTarget::Common => get_backup_common_path(),
-            MigrateTarget::Machine => get_backup_machine_path(&self.profile.machine_id),
-            MigrateTarget::Environment => get_backup_environment_path(&self.profile.environment),
-        }
     }
 
     fn find_legacy_files(&self) -> Vec<(String, PathBuf)> {
@@ -106,17 +109,16 @@ impl Task for MigrateTask {
         println!("🔄 Migrating legacy backup files...");
         println!("   Target: {} ({})", self.target, self.profile);
 
-        let target_dir = self.get_target_dir();
+        let target_dir = self.target.resolve_path(&self.profile);
         if let Err(e) = fs::create_dir_all(&target_dir) {
-            println!("❌ Failed to create target directory: {}", e);
-            log(&format!("Failed to create target directory: {}", e));
+            log_error("Failed to create target directory", e);
             return;
         }
 
         let legacy_files = self.find_legacy_files();
 
         if legacy_files.is_empty() {
-            println!("✅ No legacy files found to migrate.");
+            log_success("No legacy files found to migrate.");
             return;
         }
 
@@ -141,7 +143,7 @@ impl Task for MigrateTask {
             }
 
             match move_path(&legacy_path, &new_path) {
-                Ok(_) => {
+                Ok(()) => {
                     println!(
                         "✅ Migrated: {} -> {}/{}",
                         source_path, self.target, source_path
@@ -168,7 +170,7 @@ impl Task for MigrateTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let target_dir = self.get_target_dir();
+        let target_dir = self.target.resolve_path(&self.profile);
         let legacy_files = self.find_legacy_files();
 
         for (source_path, legacy_path) in legacy_files {
@@ -192,6 +194,7 @@ impl Task for MigrateTask {
 
 fn move_path(from: &PathBuf, to: &PathBuf) -> std::io::Result<()> {
     if from.is_dir() {
+        fs::create_dir_all(to)?;
         copy_dir_recursive(from, to)?;
         fs::remove_dir_all(from)?;
     } else {
@@ -201,40 +204,11 @@ fn move_path(from: &PathBuf, to: &PathBuf) -> std::io::Result<()> {
     Ok(())
 }
 
-fn copy_dir_recursive(from: &PathBuf, to: &PathBuf) -> std::io::Result<()> {
-    fs::create_dir_all(to)?;
-
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
-        let path = entry.path();
-        let dest = to.join(entry.file_name());
-
-        if path.is_dir() {
-            copy_dir_recursive(&path, &dest)?;
-        } else {
-            fs::copy(&path, &dest)?;
-        }
-    }
-
-    Ok(())
-}
-
 pub fn run_with_args(args: crate::cli::MigrateArgs) {
     use crate::tasks::core::TaskExecutor;
 
-    let profile = ActiveProfile::resolve(
-        args.profile.as_deref(),
-        args.machine_id.as_deref(),
-        args.env.as_deref(),
-    );
-
-    let target = if args.to_machine {
-        MigrateTarget::Machine
-    } else if args.to_environment {
-        MigrateTarget::Environment
-    } else {
-        MigrateTarget::Common
-    };
+    let profile = args.profile_args.resolve();
+    let target = args.layer.to_migrate_target();
 
     TaskExecutor::run(&mut MigrateTask::new(profile, target), args.dry_run);
 }

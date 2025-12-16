@@ -117,11 +117,7 @@ impl Task for LinkTask {
 pub fn run_with_args(args: crate::cli::LinkArgs) {
     use crate::tasks::core::TaskExecutor;
 
-    let profile = ActiveProfile::resolve(
-        args.profile.as_deref(),
-        args.machine_id.as_deref(),
-        args.env.as_deref(),
-    );
+    let profile = args.profile_args.resolve();
 
     TaskExecutor::run(&mut LinkTask::new(profile), args.dry_run);
 }
@@ -206,7 +202,7 @@ fn backup_if_needed(dst: &Path, symlinks_dir: &Path) -> Result<(), ()> {
 /// Creates a symlink from src to dst
 fn create_symlink(src: &Path, dst: &Path) {
     match std::os::unix::fs::symlink(src, dst) {
-        Ok(_) => log(&format!("Linked {} → {}", src.display(), dst.display())),
+        Ok(()) => log(&format!("Linked {} → {}", src.display(), dst.display())),
         Err(e) => log(&format!(
             "Failed to link {} → {}: {}",
             src.display(),

@@ -5,7 +5,7 @@ use crate::utils::system::run_cmd_in_dir;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Sync task that synchronizes configurations with a git repository
 pub struct SyncTask {
@@ -97,7 +97,6 @@ pub fn run_with_args(args: SyncArgs) {
 fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mntn_dir = get_mntn_dir();
 
-    // Ensure git repository exists
     if !mntn_dir.join(".git").exists() {
         if args.init {
             if args.remote_url.is_none() {
@@ -111,7 +110,6 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     } else {
-        // Ensure .gitignore exists even if repo already exists
         ensure_gitignore_exists(&mntn_dir)?;
     }
 
@@ -124,15 +122,12 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
             println!("🔗 Auto-linking configurations...");
             crate::tasks::link::run_with_args(crate::cli::LinkArgs {
                 dry_run: false,
-                profile: None,
-                env: None,
-                machine_id: None,
+                profile_args: crate::cli::ProfileArgs::default(),
             });
         }
     }
 
     if args.push || args.sync {
-        // Auto-commit changes with timestamp
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
         let commit_msg = args
             .message
@@ -140,7 +135,6 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
 
         run_cmd_in_dir("git", &["add", "."], &mntn_dir)?;
 
-        // Check if there are changes to commit
         let status = run_cmd_in_dir("git", &["status", "--porcelain"], &mntn_dir)?;
         if !status.trim().is_empty() {
             run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &mntn_dir)?;
@@ -154,19 +148,11 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn initialize_git_repo(
-    mntn_dir: &PathBuf,
-    remote_url: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn initialize_git_repo(mntn_dir: &Path, remote_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Initializing git repository in {}", mntn_dir.display());
 
-    // Initialize git repository
     run_cmd_in_dir("git", &["init"], mntn_dir)?;
-
-    // Add remote origin
     run_cmd_in_dir("git", &["remote", "add", "origin", remote_url], mntn_dir)?;
-
-    // Set default branch to main
     run_cmd_in_dir("git", &["branch", "-M", "main"], mntn_dir)?;
 
     println!("✅ Git repository initialized with remote: {}", remote_url);
@@ -207,7 +193,6 @@ fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Er
     if !gitignore_path.exists() {
         create_default_gitignore(mntn_dir)?;
     } else {
-        // Check if mntn.log is in .gitignore, add if missing
         let content = fs::read_to_string(&gitignore_path)?;
         if !content.contains("mntn.log") && !content.contains("*.log") {
             let mut file = fs::OpenOptions::new().append(true).open(&gitignore_path)?;

@@ -1,14 +1,11 @@
-use crate::logger::log;
+use crate::logger::{log, log_error, log_info};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::tasks::migrate::MigrateTarget;
-use crate::utils::paths::{
-    get_backup_common_path, get_backup_environment_path, get_backup_machine_path, get_backup_root,
-    get_package_registry_path, get_registry_path,
-};
-use crate::utils::system::run_cmd;
+use crate::utils::paths::{get_backup_root, get_package_registry_path, get_registry_path};
+use crate::utils::system::{rsync_directory, run_cmd};
 use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,14 +19,6 @@ impl BackupTask {
     pub fn new(profile: ActiveProfile, target: MigrateTarget) -> Self {
         Self { profile, target }
     }
-
-    fn get_backup_dir(&self) -> PathBuf {
-        match self.target {
-            MigrateTarget::Common => get_backup_common_path(),
-            MigrateTarget::Machine => get_backup_machine_path(&self.profile.machine_id),
-            MigrateTarget::Environment => get_backup_environment_path(&self.profile.environment),
-        }
-    }
 }
 
 impl Task for BackupTask {
@@ -38,7 +27,7 @@ impl Task for BackupTask {
     }
 
     fn execute(&mut self) {
-        let backup_dir = self.get_backup_dir();
+        let backup_dir = self.target.resolve_path(&self.profile);
         fs::create_dir_all(&backup_dir).unwrap();
 
         println!("🔁 Backing up...");
@@ -55,7 +44,7 @@ impl Task for BackupTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let backup_dir = self.get_backup_dir();
+        let backup_dir = self.target.resolve_path(&self.profile);
         let package_dir = get_backup_root();
 
         if let Ok(registry) = PackageRegistry::load_or_create(&get_package_registry_path()) {
@@ -84,35 +73,19 @@ impl Task for BackupTask {
 pub fn run_with_args(args: crate::cli::BackupArgs) {
     use crate::tasks::core::TaskExecutor;
 
-    let profile = ActiveProfile::resolve(
-        args.profile.as_deref(),
-        args.machine_id.as_deref(),
-        args.env.as_deref(),
-    );
-
-    let target = if args.to_machine {
-        MigrateTarget::Machine
-    } else if args.to_environment {
-        MigrateTarget::Environment
-    } else {
-        MigrateTarget::Common
-    };
+    let profile = args.profile_args.resolve();
+    let target = args.layer.to_migrate_target();
 
     TaskExecutor::run(&mut BackupTask::new(profile, target), args.dry_run);
 }
 
 /// Backs up package managers based on the package registry entries
 fn backup_package_managers(backup_dir: &Path) {
-    // Load the package registry
     let package_registry_path = get_package_registry_path();
     let package_registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!(
-                "⚠️ Failed to load package registry, skipping package backup: {}",
-                e
-            );
-            log(&format!("Failed to load package registry: {}", e));
+            log_error("Failed to load package registry, skipping package backup", e);
             return;
         }
     };
@@ -123,7 +96,7 @@ fn backup_package_managers(backup_dir: &Path) {
         .collect();
 
     if compatible_entries.is_empty() {
-        println!("ℹ️ No package managers found to backup");
+        log_info("No package managers found to backup");
         return;
     }
 
@@ -132,7 +105,6 @@ fn backup_package_managers(backup_dir: &Path) {
         compatible_entries.len()
     );
 
-    // Run package manager commands in parallel
     let results: Vec<_> = compatible_entries
         .par_iter()
         .map(|(id, entry)| {
@@ -140,8 +112,6 @@ fn backup_package_managers(backup_dir: &Path) {
                 let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
                 run_cmd(&entry.command, &args)
             }));
-            // Convert Result<Result<String, Box<dyn Error>>, _> to use String for error
-            // so it can be sent across threads
             let result = match result {
                 Ok(Ok(content)) => Ok(Ok(content)),
                 Ok(Err(e)) => Ok(Err(e.to_string())),
@@ -151,7 +121,6 @@ fn backup_package_managers(backup_dir: &Path) {
         })
         .collect();
 
-    // Write results sequentially to avoid output interleaving
     for (id, entry, result) in results {
         match result {
             Ok(Ok(content)) => {
@@ -168,7 +137,7 @@ fn backup_package_managers(backup_dir: &Path) {
                 log(&format!("Command for {} failed: {}", entry.name, e));
                 let _ = fs::write(backup_dir.join(&entry.output_file), "");
             }
-            Err(_) => {
+            Err(()) => {
                 println!("⚠️ Command for {} panicked", entry.name);
                 log(&format!("Command for {} panicked", entry.name));
                 let _ = fs::write(backup_dir.join(&entry.output_file), "");
@@ -179,16 +148,11 @@ fn backup_package_managers(backup_dir: &Path) {
 
 /// Backs up configuration files based on the registry entries
 fn backup_config_files_from_registry(backup_dir: &Path) {
-    // Load the registry
     let registry_path = get_registry_path();
     let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!(
-                "⚠️ Failed to load registry, skipping config file backup: {}",
-                e
-            );
-            log(&format!("Failed to load registry: {}", e));
+            log_error("Failed to load registry, skipping config file backup", e);
             return;
         }
     };
@@ -196,7 +160,7 @@ fn backup_config_files_from_registry(backup_dir: &Path) {
     let enabled_entries: Vec<_> = registry.get_enabled_entries().collect();
 
     if enabled_entries.is_empty() {
-        println!("ℹ️ No configuration files found to backup");
+        log_info("No configuration files found to backup");
         return;
     }
 
@@ -209,7 +173,6 @@ fn backup_config_files_from_registry(backup_dir: &Path) {
         let target_path = &entry.target_path;
         let backup_destination = backup_dir.join(&entry.source_path);
 
-        // Ensure parent directory exists
         if let Some(parent) = backup_destination.parent()
             && let Err(e) = fs::create_dir_all(parent)
         {
@@ -231,7 +194,7 @@ fn backup_config_files_from_registry(backup_dir: &Path) {
         };
 
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 println!("🔁 Backed up {} ({})", entry.name, id);
                 log(&format!(
                     "Backed up {} from {}",
@@ -256,7 +219,6 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
         ));
     }
 
-    // Skip backup if source is a symlink pointing to our backup file
     if source.is_symlink()
         && let Ok(target) = fs::read_link(source)
     {
@@ -280,8 +242,6 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
 
 /// Backs up a directory using rsync for efficiency
 fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
-    use std::process::Command;
-
     if !source.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -289,17 +249,14 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         ));
     }
 
-    // Skip backup if source is a symlink pointing to our backup directory or vice versa
     if source.is_symlink()
         && let Ok(target) = fs::read_link(source)
     {
-        // Canonicalize paths to handle relative vs absolute path differences
         let canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
         let canonical_dest = destination
             .canonicalize()
             .unwrap_or_else(|_| destination.clone());
 
-        // Check if symlink points to destination or destination is within target
         if canonical_target == canonical_dest
             || canonical_dest.starts_with(&canonical_target)
             || canonical_target.starts_with(&canonical_dest)
@@ -313,22 +270,6 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         }
     }
 
-    // Create destination directory if it doesn't exist
     fs::create_dir_all(destination)?;
-
-    // Use rsync to copy directory contents
-    let output = Command::new("rsync")
-        .args(["-av", "--delete"])
-        .arg(format!("{}/", source.display())) // trailing slash for rsync
-        .arg(destination)
-        .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr.clone())
-            .unwrap_or_else(|_| format!("{:?}", output.stderr));
-
-        return Err(std::io::Error::other(format!("rsync failed: {}", stderr)));
-    }
-
-    Ok(())
+    rsync_directory(source, destination)
 }

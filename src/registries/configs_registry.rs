@@ -84,7 +84,6 @@ impl Default for ConfigsRegistry {
         let home_dir = base_dirs.home_dir();
         let data_dir = base_dirs.data_dir();
 
-        // Shell configuration
         entries.insert(
             "zshrc".to_string(),
             RegistryEntry {
@@ -109,7 +108,6 @@ impl Default for ConfigsRegistry {
             },
         );
 
-        // Configuration directory
         entries.insert(
             "config".to_string(),
             RegistryEntry {
@@ -124,7 +122,6 @@ impl Default for ConfigsRegistry {
             },
         );
 
-        // VSCode configuration
         entries.insert(
             "vscode_settings".to_string(),
             RegistryEntry {
@@ -137,13 +134,12 @@ impl Default for ConfigsRegistry {
             },
         );
 
-        // Zed configuration
         entries.insert(
             "zed_settings".to_string(),
             RegistryEntry {
                 name: "Zed Settings".to_string(),
                 source_path: "zed/settings.json".to_string(),
-                target_path: get_zed_settings_path(),
+                target_path: get_xdg_or_default_config_path("zed/settings.json"),
                 category: Category::Editor,
                 enabled: true,
                 description: Some("Zed user settings".to_string()),
@@ -162,7 +158,6 @@ impl Default for ConfigsRegistry {
             },
         );
 
-        // Terminal configuration
         entries.insert(
             "ghostty_config".to_string(),
             RegistryEntry {
@@ -175,7 +170,6 @@ impl Default for ConfigsRegistry {
             },
         );
 
-        // Git configuration
         entries.insert(
             "git_config".to_string(),
             RegistryEntry {
@@ -210,40 +204,29 @@ impl ConfigsRegistry {
     }
 }
 
-/// Get the path to the zed settings.json file, considering XDG and platform conventions
-fn get_zed_settings_path() -> PathBuf {
-    let base_dirs = get_base_dirs();
-
-    // Check for XDG_CONFIG_HOME first (cross-platform)
+/// Get a config path, checking XDG_CONFIG_HOME first, then falling back to ~/.config
+fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
     if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
-        return PathBuf::from(xdg_config).join("zed/settings.json");
+        return PathBuf::from(xdg_config).join(relative_path);
     }
-
-    // Default: use ~/.config/zed/settings.json
-    base_dirs.home_dir().join(".config/zed/settings.json")
+    get_base_dirs().home_dir().join(".config").join(relative_path)
 }
 
 /// Get the path to the ghostty config file, considering XDG and platform conventions
 fn get_ghostty_config_path() -> PathBuf {
-    let base_dirs = get_base_dirs();
-
-    // Check for XDG_CONFIG_HOME first (cross-platform)
-    if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
-        return PathBuf::from(xdg_config).join("ghostty/config");
+    if std::env::var_os("XDG_CONFIG_HOME").is_some() {
+        return get_xdg_or_default_config_path("ghostty/config");
     }
 
-    // Platform-specific defaults
     #[cfg(target_os = "macos")]
     {
-        // macOS: prefer Application Support directory
-        base_dirs
+        get_base_dirs()
             .home_dir()
             .join("Library/Application Support/com.mitchellh.ghostty/config")
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        // Linux/Windows: use ~/.config/ghostty/config
-        base_dirs.home_dir().join(".config/ghostty/config")
+        get_xdg_or_default_config_path("ghostty/config")
     }
 }

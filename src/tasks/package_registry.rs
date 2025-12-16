@@ -1,5 +1,5 @@
 use crate::cli::{PackageRegistryActions, PackageRegistryArgs};
-use crate::logger::log;
+use crate::logger::{log, log_error, log_success};
 use crate::registries::package_registry::{PackageManagerEntry, PackageRegistry};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_package_registry_path;
@@ -120,8 +120,7 @@ fn list_entries(enabled_only: bool, platform_only: bool) {
     let registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load package registry: {}", e);
-            log(&format!("Failed to load package registry: {}", e));
+            log_error("Failed to load package registry", e);
             return;
         }
     };
@@ -174,7 +173,7 @@ fn list_entries(enabled_only: bool, platform_only: bool) {
         if let Some(description) = &entry.description {
             println!("   Description: {}", description);
         }
-        println!("   Platforms: {}", platform_info);
+        println!("   Platforms:{}", platform_info);
         println!();
     }
 
@@ -199,26 +198,22 @@ fn add_entry(
     let mut registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load package registry: {}", e);
-            log(&format!("Failed to load package registry: {}", e));
+            log_error("Failed to load package registry", e);
             return;
         }
     };
 
-    // Check if entry already exists
     if registry.get_entry(&id).is_some() {
         println!("❌ Entry '{}' already exists in the package registry", id);
         return;
     }
 
-    // Parse args
     let args: Vec<String> = args_str
         .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
 
-    // Parse platforms
     let platforms = platforms_str.map(|s| {
         s.split(',')
             .map(|s| s.trim().to_string())
@@ -239,13 +234,12 @@ fn add_entry(
     registry.add_entry(id.clone(), entry);
 
     match registry.save(&package_registry_path) {
-        Ok(_) => {
-            println!("✅ Added package manager entry '{}' ({})", name, id);
+        Ok(()) => {
+            log_success(&format!("Added package manager entry '{}' ({})", name, id));
             log(&format!("Added package manager entry: {}", id));
         }
         Err(e) => {
-            println!("❌ Failed to save package registry: {}", e);
-            log(&format!("Failed to save package registry: {}", e));
+            log_error("Failed to save package registry", e);
         }
     }
 }
@@ -256,21 +250,22 @@ fn remove_entry(id: String) {
     let mut registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load package registry: {}", e);
-            log(&format!("Failed to load package registry: {}", e));
+            log_error("Failed to load package registry", e);
             return;
         }
     };
 
     match registry.remove_entry(&id) {
         Some(entry) => match registry.save(&package_registry_path) {
-            Ok(_) => {
-                println!("✅ Removed package manager entry '{}' ({})", entry.name, id);
+            Ok(()) => {
+                log_success(&format!(
+                    "Removed package manager entry '{}' ({})",
+                    entry.name, id
+                ));
                 log(&format!("Removed package manager entry: {}", id));
             }
             Err(e) => {
-                println!("❌ Failed to save package registry: {}", e);
-                log(&format!("Failed to save package registry: {}", e));
+                log_error("Failed to save package registry", e);
             }
         },
         None => {
@@ -285,22 +280,20 @@ fn toggle_entry(id: String, enable: bool) {
     let mut registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load package registry: {}", e);
-            log(&format!("Failed to load package registry: {}", e));
+            log_error("Failed to load package registry", e);
             return;
         }
     };
 
     match registry.set_entry_enabled(&id, enable) {
-        Ok(_) => match registry.save(&package_registry_path) {
-            Ok(_) => {
+        Ok(()) => match registry.save(&package_registry_path) {
+            Ok(()) => {
                 let action = if enable { "enabled" } else { "disabled" };
-                println!("✅ {} package manager entry '{}'", action, id);
+                log_success(&format!("{} package manager entry '{}'", action, id));
                 log(&format!("{} package manager entry: {}", action, id));
             }
             Err(e) => {
-                println!("❌ Failed to save package registry: {}", e);
-                log(&format!("Failed to save package registry: {}", e));
+                log_error("Failed to save package registry", e);
             }
         },
         Err(e) => {

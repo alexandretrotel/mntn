@@ -1,5 +1,8 @@
 use clap::{Args, Parser, Subcommand};
 
+use crate::profile::ActiveProfile;
+use crate::tasks::migrate::MigrateTarget;
+
 /// Command line interface for `mntn`.
 #[derive(Parser)]
 #[command(
@@ -13,6 +16,60 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+/// Shared arguments for profile resolution
+#[derive(Args, Clone, Default)]
+pub struct ProfileArgs {
+    /// Use a named profile from profile.json
+    #[arg(
+        long,
+        short = 'p',
+        help = "Use a named profile defined in ~/.mntn/profile.json"
+    )]
+    pub profile: Option<String>,
+    /// Override the environment
+    #[arg(long, short = 'e', help = "Override the environment")]
+    pub env: Option<String>,
+    /// Override the machine identifier
+    #[arg(long, short = 'm', help = "Override the machine identifier")]
+    pub machine_id: Option<String>,
+}
+
+impl ProfileArgs {
+    pub fn resolve(&self) -> ActiveProfile {
+        ActiveProfile::resolve(
+            self.profile.as_deref(),
+            self.machine_id.as_deref(),
+            self.env.as_deref(),
+        )
+    }
+}
+
+/// Shared arguments for layer target selection
+#[derive(Args, Clone, Default)]
+pub struct LayerTargetArgs {
+    /// Target the common layer (default)
+    #[arg(long, help = "Target the common layer (shared across all machines)")]
+    pub to_common: bool,
+    /// Target the machine-specific layer
+    #[arg(long, help = "Target the machine-specific layer")]
+    pub to_machine: bool,
+    /// Target the environment-specific layer
+    #[arg(long, help = "Target the environment-specific layer")]
+    pub to_environment: bool,
+}
+
+impl LayerTargetArgs {
+    pub fn to_migrate_target(&self) -> MigrateTarget {
+        if self.to_machine {
+            MigrateTarget::Machine
+        } else if self.to_environment {
+            MigrateTarget::Environment
+        } else {
+            MigrateTarget::Common
+        }
+    }
+}
+
 /// Arguments for the backup command.
 #[derive(Args)]
 pub struct BackupArgs {
@@ -23,32 +80,10 @@ pub struct BackupArgs {
         help = "Show what would be backed up without performing any actions"
     )]
     pub dry_run: bool,
-    /// Backup to the common layer (default)
-    #[arg(long, help = "Backup to the common layer (shared across all machines)")]
-    pub to_common: bool,
-    /// Backup to the machine-specific layer
-    #[arg(long, help = "Backup to the machine-specific layer")]
-    pub to_machine: bool,
-    /// Backup to the environment-specific layer
-    #[arg(long, help = "Backup to the environment-specific layer")]
-    pub to_environment: bool,
-    /// Use a named profile from profile.json
-    #[arg(
-        long,
-        short = 'p',
-        help = "Use a named profile defined in ~/.mntn/profile.json"
-    )]
-    pub profile: Option<String>,
-    /// Override the environment
-    #[arg(long, short = 'e', help = "Override the environment for backup target")]
-    pub env: Option<String>,
-    /// Override the machine identifier
-    #[arg(
-        long,
-        short = 'm',
-        help = "Override the machine identifier for backup target"
-    )]
-    pub machine_id: Option<String>,
+    #[command(flatten)]
+    pub layer: LayerTargetArgs,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the clean command.
@@ -113,27 +148,8 @@ pub struct LinkArgs {
         help = "Show what symlinks would be created without performing any actions"
     )]
     pub dry_run: bool,
-    /// Use a named profile from profile.json
-    #[arg(
-        long,
-        short = 'p',
-        help = "Use a named profile defined in ~/.mntn/profile.json"
-    )]
-    pub profile: Option<String>,
-    /// Override the environment (e.g., dev, work, personal)
-    #[arg(
-        long,
-        short = 'e',
-        help = "Override the environment for layered config resolution"
-    )]
-    pub env: Option<String>,
-    /// Override the machine identifier
-    #[arg(
-        long,
-        short = 'm',
-        help = "Override the machine identifier for layered config resolution"
-    )]
-    pub machine_id: Option<String>,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the restore command.
@@ -182,39 +198,10 @@ pub struct MigrateArgs {
         help = "Show what would be migrated without performing any actions"
     )]
     pub dry_run: bool,
-    /// Migrate files to the common layer (default)
-    #[arg(
-        long,
-        help = "Migrate legacy files to the common layer (shared across all machines)"
-    )]
-    pub to_common: bool,
-    /// Migrate files to the machine-specific layer
-    #[arg(long, help = "Migrate legacy files to the machine-specific layer")]
-    pub to_machine: bool,
-    /// Migrate files to the environment-specific layer
-    #[arg(long, help = "Migrate legacy files to the environment-specific layer")]
-    pub to_environment: bool,
-    /// Use a named profile from profile.json
-    #[arg(
-        long,
-        short = 'p',
-        help = "Use a named profile defined in ~/.mntn/profile.json"
-    )]
-    pub profile: Option<String>,
-    /// Override the environment (e.g., dev, work, personal)
-    #[arg(
-        long,
-        short = 'e',
-        help = "Override the environment for migration target"
-    )]
-    pub env: Option<String>,
-    /// Override the machine identifier
-    #[arg(
-        long,
-        short = 'm',
-        help = "Override the machine identifier for migration target"
-    )]
-    pub machine_id: Option<String>,
+    #[command(flatten)]
+    pub layer: LayerTargetArgs,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the purge command.

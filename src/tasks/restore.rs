@@ -1,8 +1,9 @@
-use crate::logger::log;
+use crate::logger::{log, log_error, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::get_registry_path;
+use crate::utils::system::rsync_directory;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -29,8 +30,7 @@ impl Task for RestoreTask {
         let registry = match ConfigsRegistry::load_or_create(&registry_path) {
             Ok(registry) => registry,
             Err(e) => {
-                println!("❌ Failed to load registry: {}", e);
-                log(&format!("Failed to load registry: {}", e));
+                log_error("Failed to load registry", e);
                 return;
             }
         };
@@ -106,7 +106,6 @@ pub fn run_with_args(args: crate::cli::RestoreArgs) {
 ///
 /// Returns true if the restore was successful, false otherwise.
 fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: &str) -> bool {
-    // Handle both files and directories
     if backup_path.is_dir() {
         return restore_directory(backup_path, target_path, file_name);
     }
@@ -114,8 +113,7 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
     let contents = match fs::read_to_string(backup_path) {
         Ok(c) => c,
         Err(e) => {
-            println!("⚠️ Failed to read backup file for {}: {}", file_name, e);
-            log(&format!(
+            log_warning(&format!(
                 "Failed to read backup file for {}: {}",
                 file_name, e
             ));
@@ -126,8 +124,7 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
     if let Some(parent) = target_path.parent()
         && let Err(e) = fs::create_dir_all(parent)
     {
-        println!("⚠️ Failed to create directory for {}: {}", file_name, e);
-        log(&format!(
+        log_warning(&format!(
             "Failed to create directory for {}: {}",
             file_name, e
         ));
@@ -135,13 +132,12 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
     }
 
     match fs::write(target_path, contents) {
-        Ok(_) => {
+        Ok(()) => {
             log(&format!("Restored {}", file_name));
             true
         }
         Err(e) => {
-            println!("⚠️ Failed to restore {}: {}", file_name, e);
-            log(&format!("Failed to restore {}: {}", file_name, e));
+            log_warning(&format!("Failed to restore {}: {}", file_name, e));
             false
         }
     }
@@ -149,50 +145,21 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
 
 /// Restores a directory from backup to target location
 fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> bool {
-    use std::process::Command;
-
-    // Create target directory if it doesn't exist
     if let Err(e) = fs::create_dir_all(target_path) {
-        println!(
-            "⚠️ Failed to create target directory for {}: {}",
-            dir_name, e
-        );
-        log(&format!(
+        log_warning(&format!(
             "Failed to create target directory for {}: {}",
             dir_name, e
         ));
         return false;
     }
 
-    // Use rsync to copy directory contents
-    let output = Command::new("rsync")
-        .args(["-av", "--delete"])
-        .arg(format!("{}/", backup_path.display())) // trailing slash for rsync
-        .arg(target_path)
-        .output();
-
-    match output {
-        Ok(result) => {
-            if result.status.success() {
-                log(&format!("Restored directory {}", dir_name));
-                true
-            } else {
-                let stderr = match String::from_utf8(result.stderr.clone()) {
-                    Ok(s) => s,
-                    Err(e) => format!("{:?}", e.into_bytes()),
-                };
-
-                println!("⚠️ Failed to restore directory {}: {}", dir_name, stderr);
-                log(&format!(
-                    "Failed to restore directory {}: {}",
-                    dir_name, stderr
-                ));
-                false
-            }
+    match rsync_directory(backup_path, target_path) {
+        Ok(()) => {
+            log(&format!("Restored directory {}", dir_name));
+            true
         }
         Err(e) => {
-            println!("⚠️ Failed to run rsync for {}: {}", dir_name, e);
-            log(&format!("Failed to run rsync for {}: {}", dir_name, e));
+            log_warning(&format!("Failed to restore directory {}: {}", dir_name, e));
             false
         }
     }

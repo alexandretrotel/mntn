@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
-use crate::logger::log;
+use crate::logger::{log, log_error, log_success};
 use crate::registries::configs_registry::{Category, ConfigsRegistry, RegistryEntry};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_registry_path;
@@ -120,8 +120,7 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load registry: {}", e);
-            log(&format!("Failed to load registry: {}", e));
+            log_error("Failed to load registry", e);
             return;
         }
     };
@@ -134,7 +133,6 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
     sorted_categories.sort();
 
     for category in sorted_categories {
-        // Skip categories that don't match the filter
         if let Some(ref filter) = filter_category
             && format!("{:?}", category).to_lowercase() != *filter
         {
@@ -145,7 +143,6 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
         let mut has_entries = false;
 
         for (id, entry) in entries {
-            // Skip disabled entries if enabled_only is true
             if enabled_only && !entry.enabled {
                 continue;
             }
@@ -198,19 +195,16 @@ fn add_entry(
     let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load registry: {}", e);
-            log(&format!("Failed to load registry: {}", e));
+            log_error("Failed to load registry", e);
             return;
         }
     };
 
-    // Check if ID already exists
     if registry.get_entry(&id).is_some() {
         println!("❌ Entry with ID '{}' already exists", id);
         return;
     }
 
-    // Parse category
     let parsed_category = match Category::from_str(&category) {
         Ok(cat) => cat,
         Err(_) => {
@@ -222,7 +216,6 @@ fn add_entry(
         }
     };
 
-    // Create target path
     let target_path = std::path::PathBuf::from(target);
 
     let entry = RegistryEntry {
@@ -237,12 +230,11 @@ fn add_entry(
     registry.add_entry(id.clone(), entry);
 
     if let Err(e) = registry.save(&registry_path) {
-        println!("❌ Failed to save registry: {}", e);
-        log(&format!("Failed to save registry: {}", e));
+        log_error("Failed to save registry", e);
         return;
     }
 
-    println!("✅ Added entry '{}' to registry", name);
+    log_success(&format!("Added entry '{}' to registry", name));
     println!("   ID: {}", id);
     println!("   Category: {}", category);
     log(&format!("Added registry entry: {} ({})", name, id));
@@ -254,8 +246,7 @@ fn remove_entry(id: String) {
     let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load registry: {}", e);
-            log(&format!("Failed to load registry: {}", e));
+            log_error("Failed to load registry", e);
             return;
         }
     };
@@ -263,12 +254,11 @@ fn remove_entry(id: String) {
     match registry.remove_entry(&id) {
         Some(entry) => {
             if let Err(e) = registry.save(&registry_path) {
-                println!("❌ Failed to save registry: {}", e);
-                log(&format!("Failed to save registry: {}", e));
+                log_error("Failed to save registry", e);
                 return;
             }
 
-            println!("✅ Removed entry '{}' from registry", entry.name);
+            log_success(&format!("Removed entry '{}' from registry", entry.name));
             log(&format!("Removed registry entry: {} ({})", entry.name, id));
         }
         None => {
@@ -283,8 +273,7 @@ fn toggle_entry(id: String, enable: bool) {
     let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            println!("❌ Failed to load registry: {}", e);
-            log(&format!("Failed to load registry: {}", e));
+            log_error("Failed to load registry", e);
             return;
         }
     };
@@ -292,14 +281,13 @@ fn toggle_entry(id: String, enable: bool) {
     match registry.set_entry_enabled(&id, enable) {
         Ok(()) => {
             if let Err(e) = registry.save(&registry_path) {
-                println!("❌ Failed to save registry: {}", e);
-                log(&format!("Failed to save registry: {}", e));
+                log_error("Failed to save registry", e);
                 return;
             }
 
             let entry = registry.get_entry(&id).unwrap();
             let action = if enable { "enabled" } else { "disabled" };
-            println!("✅ {} entry '{}'", action, entry.name);
+            log_success(&format!("{} entry '{}'", action, entry.name));
             log(&format!(
                 "{} registry entry: {} ({})",
                 action, entry.name, id
