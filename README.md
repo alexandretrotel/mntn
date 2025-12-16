@@ -197,7 +197,9 @@ done < ~/.mntn/backup/cargo.txt
     ├── bun.txt        # Bun global packages
     ├── cargo.txt      # Cargo packages
     └── uv.txt         # uv tools
-```3. **Commit and push your configurations:**
+```
+
+3. **Commit and push your configurations:**
    ```bash
    cd ~/.mntn
    git add .
