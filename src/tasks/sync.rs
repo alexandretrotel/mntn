@@ -120,10 +120,14 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
         println!("✅ Successfully pulled latest changes");
 
-        // Re-link configurations after pull
         if args.auto_link {
             println!("🔗 Auto-linking configurations...");
-            crate::tasks::link::run_with_args(crate::cli::LinkArgs { dry_run: false });
+            crate::tasks::link::run_with_args(crate::cli::LinkArgs {
+                dry_run: false,
+                profile: None,
+                env: None,
+                machine_id: None,
+            });
         }
     }
 

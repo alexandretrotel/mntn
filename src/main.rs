@@ -1,5 +1,6 @@
 mod cli;
 mod logger;
+mod profile;
 mod registries;
 mod registry;
 mod tasks;
@@ -9,7 +10,7 @@ use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 use tasks::{
     backup, biometric_sudo, clean, configs_registry as configs_registry_task, delete, install,
-    link, package_registry as package_registry_task, purge, restore, sync, validate,
+    link, migrate, package_registry as package_registry_task, purge, restore, sync, validate,
 };
 
 fn main() {
@@ -28,6 +29,7 @@ fn main() {
         Some(Commands::PackageRegistry(args)) => package_registry_task::run_with_args(args),
         Some(Commands::Sync(args)) => sync::run_with_args(args),
         Some(Commands::Validate(args)) => validate::run_with_args(args),
+        Some(Commands::Migrate(args)) => migrate::run_with_args(args),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }

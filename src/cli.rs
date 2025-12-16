@@ -23,6 +23,32 @@ pub struct BackupArgs {
         help = "Show what would be backed up without performing any actions"
     )]
     pub dry_run: bool,
+    /// Backup to the common layer (default)
+    #[arg(long, help = "Backup to the common layer (shared across all machines)")]
+    pub to_common: bool,
+    /// Backup to the machine-specific layer
+    #[arg(long, help = "Backup to the machine-specific layer")]
+    pub to_machine: bool,
+    /// Backup to the environment-specific layer
+    #[arg(long, help = "Backup to the environment-specific layer")]
+    pub to_environment: bool,
+    /// Use a named profile from profile.json
+    #[arg(
+        long,
+        short = 'p',
+        help = "Use a named profile defined in ~/.mntn/profile.json"
+    )]
+    pub profile: Option<String>,
+    /// Override the environment
+    #[arg(long, short = 'e', help = "Override the environment for backup target")]
+    pub env: Option<String>,
+    /// Override the machine identifier
+    #[arg(
+        long,
+        short = 'm',
+        help = "Override the machine identifier for backup target"
+    )]
+    pub machine_id: Option<String>,
 }
 
 /// Arguments for the clean command.
@@ -87,6 +113,27 @@ pub struct LinkArgs {
         help = "Show what symlinks would be created without performing any actions"
     )]
     pub dry_run: bool,
+    /// Use a named profile from profile.json
+    #[arg(
+        long,
+        short = 'p',
+        help = "Use a named profile defined in ~/.mntn/profile.json"
+    )]
+    pub profile: Option<String>,
+    /// Override the environment (e.g., dev, work, personal)
+    #[arg(
+        long,
+        short = 'e',
+        help = "Override the environment for layered config resolution"
+    )]
+    pub env: Option<String>,
+    /// Override the machine identifier
+    #[arg(
+        long,
+        short = 'm',
+        help = "Override the machine identifier for layered config resolution"
+    )]
+    pub machine_id: Option<String>,
 }
 
 /// Arguments for the restore command.
@@ -123,6 +170,51 @@ pub struct ValidateArgs {
         help = "Show what would be validated without performing any actions"
     )]
     pub dry_run: bool,
+}
+
+/// Arguments for the migrate command.
+#[derive(Args)]
+pub struct MigrateArgs {
+    /// Preview what would be migrated without actually performing the migration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be migrated without performing any actions"
+    )]
+    pub dry_run: bool,
+    /// Migrate files to the common layer (default)
+    #[arg(
+        long,
+        help = "Migrate legacy files to the common layer (shared across all machines)"
+    )]
+    pub to_common: bool,
+    /// Migrate files to the machine-specific layer
+    #[arg(long, help = "Migrate legacy files to the machine-specific layer")]
+    pub to_machine: bool,
+    /// Migrate files to the environment-specific layer
+    #[arg(long, help = "Migrate legacy files to the environment-specific layer")]
+    pub to_environment: bool,
+    /// Use a named profile from profile.json
+    #[arg(
+        long,
+        short = 'p',
+        help = "Use a named profile defined in ~/.mntn/profile.json"
+    )]
+    pub profile: Option<String>,
+    /// Override the environment (e.g., dev, work, personal)
+    #[arg(
+        long,
+        short = 'e',
+        help = "Override the environment for migration target"
+    )]
+    pub env: Option<String>,
+    /// Override the machine identifier
+    #[arg(
+        long,
+        short = 'm',
+        help = "Override the machine identifier for migration target"
+    )]
+    pub machine_id: Option<String>,
 }
 
 /// Arguments for the purge command.
@@ -385,4 +477,8 @@ pub enum Commands {
     /// Validate configuration files and symlinks
     #[command(about = "Validate JSON configs, symlinks, and registry files")]
     Validate(ValidateArgs),
+
+    /// Migrate legacy backup files to the layered structure
+    #[command(about = "Migrate legacy backup files to common/machine/environment layers")]
+    Migrate(MigrateArgs),
 }

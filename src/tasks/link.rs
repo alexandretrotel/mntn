@@ -1,13 +1,21 @@
 use crate::logger::log;
+use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::filesystem::{backup_existing_target, copy_dir_to_source};
-use crate::utils::paths::{get_backup_path, get_registry_path, get_symlinks_path};
+use crate::utils::paths::{get_registry_path, get_symlinks_path};
 use std::fs;
 use std::path::Path;
 
-/// Link task that creates symbolic links for dotfiles and configurations
-pub struct LinkTask;
+pub struct LinkTask {
+    profile: ActiveProfile,
+}
+
+impl LinkTask {
+    pub fn new(profile: ActiveProfile) -> Self {
+        Self { profile }
+    }
+}
 
 impl Task for LinkTask {
     fn name(&self) -> &str {
@@ -16,6 +24,10 @@ impl Task for LinkTask {
 
     fn execute(&mut self) {
         println!("🔗 Creating symlinks...");
+        println!(
+            "   Profile: machine={}, env={}",
+            self.profile.machine_id, self.profile.environment
+        );
 
         let symlinks_dir = get_symlinks_path();
         if let Err(e) = fs::create_dir_all(&symlinks_dir) {
@@ -34,8 +46,8 @@ impl Task for LinkTask {
             }
         };
 
-        let backup_dir = get_backup_path();
         let mut links_processed = 0;
+        let mut links_skipped = 0;
         let links_total = registry.get_enabled_entries().count();
 
         if links_total == 0 {
@@ -46,33 +58,58 @@ impl Task for LinkTask {
         println!("📋 Found {} enabled entries in registry", links_total);
 
         for (id, entry) in registry.get_enabled_entries() {
-            let src = backup_dir.join(&entry.source_path);
             let dst = &entry.target_path;
 
-            println!("🔗 Processing: {} ({})", entry.name, id);
-            process_link(&src, dst, &symlinks_dir);
-            links_processed += 1;
+            match self.profile.resolve_source(&entry.source_path) {
+                Some(resolved) => {
+                    println!(
+                        "🔗 Processing: {} ({}) [{}]",
+                        entry.name, id, resolved.layer
+                    );
+                    process_link(&resolved.path, dst, &symlinks_dir);
+                    links_processed += 1;
+                }
+                None => {
+                    println!(
+                        "⚠️  Skipping: {} ({}) - no source found in any layer",
+                        entry.name, id
+                    );
+                    log(&format!(
+                        "No source found for {} in any layer (checked: environment/{}, machines/{}, common, legacy)",
+                        entry.source_path, self.profile.environment, self.profile.machine_id
+                    ));
+                    links_skipped += 1;
+                }
+            }
         }
 
         println!(
-            "✅ Symlink creation complete. Processed {}/{} entries.",
-            links_processed, links_total
+            "✅ Symlink creation complete. Processed: {}, Skipped: {}",
+            links_processed, links_skipped
         );
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let backup_dir = get_backup_path();
 
         if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
             for (_id, entry) in registry.get_enabled_entries() {
-                let src = backup_dir.join(&entry.source_path);
                 let dst = &entry.target_path;
 
-                operations.push(PlannedOperation::with_target(
-                    format!("Link {}", entry.name),
-                    format!("{} -> {}", dst.display(), src.display()),
-                ));
+                match self.profile.resolve_source(&entry.source_path) {
+                    Some(resolved) => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Link {} [{}]", entry.name, resolved.layer),
+                            format!("{} -> {}", dst.display(), resolved.path.display()),
+                        ));
+                    }
+                    None => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Skip {} (no source)", entry.name),
+                            format!("{} -> ???", dst.display()),
+                        ));
+                    }
+                }
             }
         }
 
@@ -80,10 +117,16 @@ impl Task for LinkTask {
     }
 }
 
-/// Run with CLI args
 pub fn run_with_args(args: crate::cli::LinkArgs) {
     use crate::tasks::core::TaskExecutor;
-    TaskExecutor::run(&mut LinkTask, args.dry_run);
+
+    let profile = ActiveProfile::resolve(
+        args.profile.as_deref(),
+        args.machine_id.as_deref(),
+        args.env.as_deref(),
+    );
+
+    TaskExecutor::run(&mut LinkTask::new(profile), args.dry_run);
 }
 
 /// Copies from dst to src if src is missing, handling both files and directories

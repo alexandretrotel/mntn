@@ -1,15 +1,36 @@
 use crate::logger::log;
+use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
-use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
+use crate::tasks::migrate::MigrateTarget;
+use crate::utils::paths::{
+    get_backup_common_path, get_backup_environment_path, get_backup_machine_path, get_backup_root,
+    get_package_registry_path, get_registry_path,
+};
 use crate::utils::system::run_cmd;
 use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Backup task that saves package lists and configuration files
-pub struct BackupTask;
+pub struct BackupTask {
+    profile: ActiveProfile,
+    target: MigrateTarget,
+}
+
+impl BackupTask {
+    pub fn new(profile: ActiveProfile, target: MigrateTarget) -> Self {
+        Self { profile, target }
+    }
+
+    fn get_backup_dir(&self) -> PathBuf {
+        match self.target {
+            MigrateTarget::Common => get_backup_common_path(),
+            MigrateTarget::Machine => get_backup_machine_path(&self.profile.machine_id),
+            MigrateTarget::Environment => get_backup_environment_path(&self.profile.environment),
+        }
+    }
+}
 
 impl Task for BackupTask {
     fn name(&self) -> &str {
@@ -17,15 +38,19 @@ impl Task for BackupTask {
     }
 
     fn execute(&mut self) {
-        let backup_dir = get_backup_path();
+        let backup_dir = self.get_backup_dir();
         fs::create_dir_all(&backup_dir).unwrap();
 
         println!("🔁 Backing up...");
+        println!(
+            "   Target: {} (machine={}, env={})",
+            self.target, self.profile.machine_id, self.profile.environment
+        );
 
-        // Backup package managers using registry
-        backup_package_managers(&backup_dir);
+        let package_dir = get_backup_root();
+        fs::create_dir_all(&package_dir).unwrap();
+        backup_package_managers(&package_dir);
 
-        // Backup config files using registry
         backup_config_files_from_registry(&backup_dir);
 
         println!("✅ Backup complete.");
@@ -33,24 +58,23 @@ impl Task for BackupTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let backup_dir = get_backup_path();
+        let backup_dir = self.get_backup_dir();
+        let package_dir = get_backup_root();
 
-        // Package managers
         if let Ok(registry) = PackageRegistry::load_or_create(&get_package_registry_path()) {
             let current_platform = PackageRegistry::get_current_platform();
             for (_id, entry) in registry.get_platform_compatible_entries(&current_platform) {
                 operations.push(PlannedOperation::with_target(
                     format!("Backup {} package list", entry.name),
-                    backup_dir.join(&entry.output_file).display().to_string(),
+                    package_dir.join(&entry.output_file).display().to_string(),
                 ));
             }
         }
 
-        // Config files
         if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
             for (_id, entry) in registry.get_enabled_entries() {
                 operations.push(PlannedOperation::with_target(
-                    format!("Backup {}", entry.name),
+                    format!("Backup {} [{}]", entry.name, self.target),
                     backup_dir.join(&entry.source_path).display().to_string(),
                 ));
             }
@@ -60,10 +84,24 @@ impl Task for BackupTask {
     }
 }
 
-/// Run with CLI args
 pub fn run_with_args(args: crate::cli::BackupArgs) {
     use crate::tasks::core::TaskExecutor;
-    TaskExecutor::run(&mut BackupTask, args.dry_run);
+
+    let profile = ActiveProfile::resolve(
+        args.profile.as_deref(),
+        args.machine_id.as_deref(),
+        args.env.as_deref(),
+    );
+
+    let target = if args.to_machine {
+        MigrateTarget::Machine
+    } else if args.to_environment {
+        MigrateTarget::Environment
+    } else {
+        MigrateTarget::Common
+    };
+
+    TaskExecutor::run(&mut BackupTask::new(profile, target), args.dry_run);
 }
 
 /// Backs up package managers based on the package registry entries

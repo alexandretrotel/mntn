@@ -1,12 +1,20 @@
 use crate::logger::log;
+use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
-use crate::utils::paths::{get_backup_path, get_registry_path};
+use crate::utils::paths::get_registry_path;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Restore task that restores configuration files from backup
-pub struct RestoreTask;
+pub struct RestoreTask {
+    profile: ActiveProfile,
+}
+
+impl RestoreTask {
+    pub fn new(profile: ActiveProfile) -> Self {
+        Self { profile }
+    }
+}
 
 impl Task for RestoreTask {
     fn name(&self) -> &str {
@@ -14,15 +22,11 @@ impl Task for RestoreTask {
     }
 
     fn execute(&mut self) {
-        let backup_dir = get_backup_path();
-
-        if !backup_dir.exists() {
-            println!("❌ Backup directory not found. Run backup first.");
-            log("Backup directory not found");
-            return;
-        }
-
         println!("🔄 Starting restore process...");
+        println!(
+            "   Profile: machine={}, env={}",
+            self.profile.machine_id, self.profile.environment
+        );
 
         let registry_path = get_registry_path();
         let registry = match ConfigsRegistry::load_or_create(&registry_path) {
@@ -38,23 +42,21 @@ impl Task for RestoreTask {
         let mut skipped_count = 0;
 
         for (id, entry) in registry.get_enabled_entries() {
-            let backup_source = backup_dir.join(&entry.source_path);
             let target_path = &entry.target_path;
 
-            if backup_source.exists() {
-                println!("🔄 Restoring: {} ({})", entry.name, id);
-                if restore_config_file(&backup_source, target_path, &entry.name) {
-                    restored_count += 1;
-                } else {
+            match self.profile.resolve_source(&entry.source_path) {
+                Some(resolved) => {
+                    println!("🔄 Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
+                    if restore_config_file(&resolved.path, target_path, &entry.name) {
+                        restored_count += 1;
+                    } else {
+                        skipped_count += 1;
+                    }
+                }
+                None => {
+                    println!("ℹ️ No backup found for {} in any layer", entry.name);
                     skipped_count += 1;
                 }
-            } else {
-                println!(
-                    "ℹ️ No backup found for {}: {}",
-                    entry.name,
-                    backup_source.display()
-                );
-                skipped_count += 1;
             }
         }
 
@@ -66,22 +68,24 @@ impl Task for RestoreTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let backup_dir = get_backup_path();
-
-        if !backup_dir.exists() {
-            return operations;
-        }
 
         if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
             for (_id, entry) in registry.get_enabled_entries() {
-                let backup_source = backup_dir.join(&entry.source_path);
                 let target_path = &entry.target_path;
 
-                if backup_source.exists() {
-                    operations.push(PlannedOperation::with_target(
-                        format!("Restore {}", entry.name),
-                        format!("{} -> {}", backup_source.display(), target_path.display()),
-                    ));
+                match self.profile.resolve_source(&entry.source_path) {
+                    Some(resolved) => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Restore {} [{}]", entry.name, resolved.layer),
+                            format!("{} -> {}", resolved.path.display(), target_path.display()),
+                        ));
+                    }
+                    None => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Skip {} (no source)", entry.name),
+                            format!("??? -> {}", target_path.display()),
+                        ));
+                    }
                 }
             }
         }
@@ -90,10 +94,10 @@ impl Task for RestoreTask {
     }
 }
 
-/// Run with CLI args
 pub fn run_with_args(args: crate::cli::RestoreArgs) {
     use crate::tasks::core::TaskExecutor;
-    TaskExecutor::run(&mut RestoreTask, args.dry_run);
+    let profile = ActiveProfile::from_defaults();
+    TaskExecutor::run(&mut RestoreTask::new(profile), args.dry_run);
 }
 
 /// Attempts to restore a configuration file from a backup to its target location.
