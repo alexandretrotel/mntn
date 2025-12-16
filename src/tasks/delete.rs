@@ -102,9 +102,10 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
         let entry = entry?;
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "app")
-            && let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                app_names.push(name.to_string());
-            }
+            && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+        {
+            app_names.push(name.to_string());
+        }
     }
 
     if app_names.is_empty() {
@@ -321,16 +322,15 @@ fn process_directory(
         let name = path.file_name().unwrap_or_default();
 
         let matches = name.to_str().is_some_and(|name_str| {
-            re_app.is_match(name_str)
-                || re_bundle.as_ref().is_some_and(|re| re.is_match(name_str))
+            re_app.is_match(name_str) || re_bundle.as_ref().is_some_and(|re| re.is_match(name_str))
         });
 
         if matches
             && ((is_app_dir && path.is_dir())
                 || (!is_app_dir && path.extension().is_some_and(|ext| ext == "plist")))
-            {
-                results.push(path);
-            }
+        {
+            results.push(path);
+        }
     }
 }
 

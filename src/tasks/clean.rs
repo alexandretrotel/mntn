@@ -214,9 +214,10 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
 
             // Skip files modified within the last 24 hours
             if let Ok(modified) = metadata.modified()
-                && now.duration_since(modified).unwrap_or_default() < min_age {
-                    continue;
-                }
+                && now.duration_since(modified).unwrap_or_default() < min_age
+            {
+                continue;
+            }
         }
 
         let space = calculate_dir_size(&entry).unwrap_or(0);
@@ -304,9 +305,10 @@ fn clean_trash(args: &CleanArgs) -> u64 {
                         .arg("-u")
                         .output()
                         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-                        && dir_name == current_uid {
-                            total_freed += clean_directory_contents(&entry, false, args);
-                        }
+                    && dir_name == current_uid
+                {
+                    total_freed += clean_directory_contents(&entry, false, args);
+                }
             }
         }
 

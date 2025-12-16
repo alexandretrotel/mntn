@@ -87,22 +87,13 @@ pub struct SyncArgs {
     )]
     pub init: bool,
     /// Remote URL for git repository initialization
-    #[arg(
-        long,
-        help = "Remote repository URL (required with --init)"
-    )]
+    #[arg(long, help = "Remote repository URL (required with --init)")]
     pub remote_url: Option<String>,
     /// Pull changes from remote repository
-    #[arg(
-        long,
-        help = "Pull latest changes from remote repository"
-    )]
+    #[arg(long, help = "Pull latest changes from remote repository")]
     pub pull: bool,
     /// Push changes to remote repository
-    #[arg(
-        long,
-        help = "Push local changes to remote repository"
-    )]
+    #[arg(long, help = "Push local changes to remote repository")]
     pub push: bool,
     /// Sync both ways (pull then push)
     #[arg(
@@ -118,10 +109,7 @@ pub struct SyncArgs {
     )]
     pub message: Option<String>,
     /// Automatically run 'mntn link' after pulling changes
-    #[arg(
-        long,
-        help = "Automatically run 'mntn link' after pulling changes"
-    )]
+    #[arg(long, help = "Automatically run 'mntn link' after pulling changes")]
     pub auto_link: bool,
 }
 

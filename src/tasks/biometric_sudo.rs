@@ -74,11 +74,9 @@ fn configure_biometric_sudo() -> io::Result<()> {
     temp_file.write_all(new_content.as_bytes())?;
 
     // Persist the temporary file to the target path
-    temp_file.persist(sudo_path).map_err(|e| {
-        io::Error::other(
-            format!("Failed to persist updated PAM file: {}", e),
-        )
-    })?;
+    temp_file
+        .persist(sudo_path)
+        .map_err(|e| io::Error::other(format!("Failed to persist updated PAM file: {}", e)))?;
 
     Ok(())
 }
