@@ -2,9 +2,9 @@ use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 
 /// Severity level for validation errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,7 +192,7 @@ impl Validator for SymlinkValidator {
         let backup_dir = get_backup_path();
         for (id, entry) in registry.get_enabled_entries() {
             let source = backup_dir.join(&entry.source_path);
-            let target: PathBuf = entry.target_path.clone().into(); // Assuming target_path is String or impl Into<PathBuf>
+            let target: PathBuf = entry.target_path.clone(); // Assuming target_path is String or impl Into<PathBuf>
             if !source.exists() {
                 errors.push(
                     ValidationError::warning(format!(
