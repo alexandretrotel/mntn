@@ -1,5 +1,6 @@
 use crate::cli::InstallArgs;
 use crate::logger::log;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_base_dirs;
 use std::fs;
 #[cfg(target_os = "linux")]
@@ -7,38 +8,92 @@ use std::path::PathBuf;
 use std::process::Command;
 use which::which;
 
-/// Installs macOS LaunchAgents to automate recurring maintenance tasks.
-///
-/// This function creates `.plist` files in `~/Library/LaunchAgents` for:
-/// - `com.mntn.backup` → runs `mntn backup` every hour
-/// - `com.mntn.clean` → runs `mntn clean` every day
-/// - `com.mntn.topgrade` → runs `topgrade` every day (only if installed)
-///
-/// After writing each agent's configuration, it loads the agent with `launchctl`.
-pub fn run(args: InstallArgs) {
-    println!("📦 Installing scheduled tasks...");
-    log("Starting scheduled task installation");
+/// Install task that sets up scheduled maintenance tasks
+pub struct InstallTask {
+    pub with_clean: bool,
+}
 
-    let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
-    if which("topgrade").is_ok() {
-        tasks.push(ScheduledTask::topgrade_daily());
-    } else {
-        println!("⚠️ topgrade not found, skipping daily topgrade task.");
-        log("topgrade not found, skipping daily topgrade task");
+impl InstallTask {
+    pub fn new(with_clean: bool) -> Self {
+        Self { with_clean }
     }
-    if args.with_clean {
-        tasks.push(ScheduledTask::clean_daily());
+}
+
+impl Task for InstallTask {
+    fn name(&self) -> &str {
+        "Install"
     }
 
-    for task in tasks.into_iter() {
-        if let Err(e) = task.install() {
-            println!("❌ Failed to install {}: {}", task.label(), e);
-            log(&format!("Failed to install {}: {}", task.label(), e));
+    fn execute(&mut self) {
+        println!("📦 Installing scheduled tasks...");
+
+        let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
+        if which("topgrade").is_ok() {
+            tasks.push(ScheduledTask::topgrade_daily());
+        } else {
+            println!("⚠️ topgrade not found, skipping daily topgrade task.");
+            log("topgrade not found, skipping daily topgrade task");
         }
+        if self.with_clean {
+            tasks.push(ScheduledTask::clean_daily());
+        }
+
+        for task in tasks.into_iter() {
+            if let Err(e) = task.install() {
+                println!("❌ Failed to install {}: {}", task.label(), e);
+                log(&format!("Failed to install {}: {}", task.label(), e));
+            }
+        }
+
+        println!("✅ Scheduled tasks installed.");
     }
 
-    println!("✅ Scheduled tasks installed.");
-    log("Scheduled tasks installed");
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+
+        operations.push(PlannedOperation::new(
+            "Install hourly backup task (mntn backup)",
+        ));
+
+        if which("topgrade").is_ok() {
+            operations.push(PlannedOperation::new("Install daily topgrade task"));
+        }
+
+        if self.with_clean {
+            operations.push(PlannedOperation::new(
+                "Install daily clean task (mntn clean)",
+            ));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Create LaunchAgent plist files".to_string(),
+                "~/Library/LaunchAgents/".to_string(),
+            ));
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Create systemd user services and timers".to_string(),
+                "~/.config/systemd/user/".to_string(),
+            ));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            operations.push(PlannedOperation::new("Create Windows scheduled tasks"));
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: InstallArgs) {
+    let mut task = InstallTask::new(args.with_clean);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 struct ScheduledTask {

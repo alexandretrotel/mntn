@@ -1,4 +1,5 @@
 use crate::cli::SyncArgs;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd_in_dir;
 use chrono::Utc;
@@ -6,12 +7,91 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Run git sync command with the provided arguments
-pub fn run(args: SyncArgs) {
-    if let Err(e) = sync_with_git(args) {
-        eprintln!("❌ Sync failed: {}", e);
-        std::process::exit(1);
+/// Sync task that synchronizes configurations with a git repository
+pub struct SyncTask {
+    pub init: bool,
+    pub remote_url: Option<String>,
+    pub pull: bool,
+    pub push: bool,
+    pub sync: bool,
+    pub message: Option<String>,
+    pub auto_link: bool,
+}
+
+impl SyncTask {
+    pub fn from_args(args: &SyncArgs) -> Self {
+        Self {
+            init: args.init,
+            remote_url: args.remote_url.clone(),
+            pull: args.pull,
+            push: args.push,
+            sync: args.sync,
+            message: args.message.clone(),
+            auto_link: args.auto_link,
+        }
     }
+}
+
+impl Task for SyncTask {
+    fn name(&self) -> &str {
+        "Sync"
+    }
+
+    fn execute(&mut self) {
+        let args = SyncArgs {
+            init: self.init,
+            remote_url: self.remote_url.clone(),
+            pull: self.pull,
+            push: self.push,
+            sync: self.sync,
+            message: self.message.clone(),
+            auto_link: self.auto_link,
+        };
+
+        if let Err(e) = sync_with_git(args) {
+            eprintln!("❌ Sync failed: {}", e);
+        }
+    }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let mntn_dir = get_mntn_dir();
+
+        if self.init {
+            operations.push(PlannedOperation::with_target(
+                "Initialize git repository".to_string(),
+                mntn_dir.display().to_string(),
+            ));
+            if let Some(url) = &self.remote_url {
+                operations.push(PlannedOperation::with_target(
+                    "Add remote origin".to_string(),
+                    url.clone(),
+                ));
+            }
+        }
+
+        if self.pull || self.sync {
+            operations.push(PlannedOperation::new("Pull latest changes from remote"));
+            if self.auto_link {
+                operations.push(PlannedOperation::new("Auto-link configurations after pull"));
+            }
+        }
+
+        if self.push || self.sync {
+            operations.push(PlannedOperation::new("Stage all changes"));
+            operations.push(PlannedOperation::new("Commit changes"));
+            operations.push(PlannedOperation::new("Push to remote repository"));
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: SyncArgs) {
+    let mut task = SyncTask::from_args(&args);
+    // Sync doesn't really have a meaningful dry-run since git operations are transactional
+    TaskExecutor::run(&mut task, false);
 }
 
 fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
@@ -43,7 +123,7 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         // Re-link configurations after pull
         if args.auto_link {
             println!("🔗 Auto-linking configurations...");
-            crate::tasks::link::run();
+            crate::tasks::link::run_with_args(crate::cli::LinkArgs { dry_run: false });
         }
     }
 

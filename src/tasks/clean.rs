@@ -5,55 +5,136 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use crate::cli::CleanArgs;
-use crate::logger::log;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::filesystem::calculate_dir_size;
 use crate::utils::format::bytes_to_human_readable;
 use crate::utils::paths::get_base_dirs;
 use crate::utils::system::run_cmd;
 
-/// Performs a system junk cleanup by deleting cache, logs, trash, and other temporary files.
-///
-/// The cleanup is divided into two categories:
-/// - User-level cleanup: Files owned by the current user (default behavior)
-/// - System-level cleanup: System-wide files requiring sudo (with --system flag)
-///
-/// The function is cross-platform aware and only applies platform-specific
-/// cleanup operations when running on the appropriate OS.
-pub fn run(args: CleanArgs) {
-    log(&format!("Starting clean (system: {})", args.system));
+/// Clean task that removes cache, logs, trash, and other temporary files
+pub struct CleanTask {
+    pub system: bool,
+}
 
-    if args.dry_run {
-        println!("🔍 Running in dry-run mode - no files will be deleted");
+impl CleanTask {
+    pub fn new(system: bool) -> Self {
+        Self { system }
+    }
+}
+
+impl Task for CleanTask {
+    fn name(&self) -> &str {
+        "Clean"
     }
 
-    println!("🧹 Cleaning system junk...");
+    fn execute(&mut self) {
+        println!("🧹 Cleaning system junk...");
 
-    let mut total_space_saved: u64 = 0;
+        let args = CleanArgs {
+            system: self.system,
+            dry_run: false,
+        };
 
-    // Always clean user-level directories
-    total_space_saved += clean_user_directories(&args);
+        let mut total_space_saved: u64 = 0;
 
-    // Clean system-level directories only if requested
-    if args.system {
-        println!("⚠️  Cleaning system-wide files (requires sudo)...");
-        total_space_saved += clean_system_directories(&args);
+        total_space_saved += clean_user_directories(&args);
+
+        if self.system {
+            println!("⚠️  Cleaning system-wide files (requires sudo)...");
+            total_space_saved += clean_system_directories(&args);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            clean_macos_specific(&args);
+        }
+
+        total_space_saved += clean_package_managers(&args);
+        total_space_saved += clean_trash(&args);
+
+        let space_saved_str = bytes_to_human_readable(total_space_saved);
+        println!("✅ System cleaned. Freed {}.", space_saved_str);
     }
 
-    // Platform-specific cleanup
-    #[cfg(target_os = "macos")]
-    {
-        clean_macos_specific(&args);
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let base_dirs = get_base_dirs();
+        let home_dir = base_dirs.home_dir();
+        let cache_dir = base_dirs.cache_dir();
+
+        // User directories
+        operations.push(PlannedOperation::with_target(
+            "Clean user cache".to_string(),
+            cache_dir.display().to_string(),
+        ));
+        operations.push(PlannedOperation::with_target(
+            "Clean temp directory".to_string(),
+            std::env::temp_dir().display().to_string(),
+        ));
+
+        #[cfg(target_os = "macos")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Clean user logs".to_string(),
+                home_dir.join("Library/Logs").display().to_string(),
+            ));
+            operations.push(PlannedOperation::with_target(
+                "Clean saved application state".to_string(),
+                home_dir
+                    .join("Library/Saved Application State")
+                    .display()
+                    .to_string(),
+            ));
+        }
+
+        if self.system {
+            #[cfg(target_os = "macos")]
+            {
+                operations.push(PlannedOperation::with_target(
+                    "Clean system caches".to_string(),
+                    "/Library/Caches".to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Clean system logs".to_string(),
+                    "/private/var/log".to_string(),
+                ));
+            }
+            #[cfg(target_os = "linux")]
+            {
+                operations.push(PlannedOperation::with_target(
+                    "Clean system logs".to_string(),
+                    "/var/log".to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Clean system cache".to_string(),
+                    "/var/cache".to_string(),
+                ));
+            }
+        }
+
+        // Package managers
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if which::which("brew").is_ok() {
+            operations.push(PlannedOperation::new("Run brew cleanup"));
+        }
+        if which::which("npm").is_ok() {
+            operations.push(PlannedOperation::new("Clean npm cache"));
+        }
+        if which::which("pnpm").is_ok() {
+            operations.push(PlannedOperation::new("Clean pnpm cache"));
+        }
+
+        // Trash
+        operations.push(PlannedOperation::new("Empty trash"));
+
+        operations
     }
+}
 
-    // Cross-platform package manager cleanup
-    total_space_saved += clean_package_managers(&args);
-
-    // Clean trash for current user
-    total_space_saved += clean_trash(&args);
-
-    let space_saved_str = bytes_to_human_readable(total_space_saved);
-    println!("✅ System cleaned. Freed {}.", space_saved_str);
-    log(&format!("Clean complete. Freed {}.", space_saved_str));
+/// Run with CLI args
+pub fn run_with_args(args: CleanArgs) {
+    let mut task = CleanTask::new(args.system);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 /// Clean user-level directories that don't require sudo

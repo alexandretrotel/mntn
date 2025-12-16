@@ -1,66 +1,99 @@
 use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
+use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{get_backup_path, get_registry_path};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Main function to run the restore process.
-pub fn run() {
-    let backup_dir = get_backup_path();
+/// Restore task that restores configuration files from backup
+pub struct RestoreTask;
 
-    if !backup_dir.exists() {
-        println!("❌ Backup directory not found. Run backup first.");
-        log("Backup directory not found");
-        return;
+impl Task for RestoreTask {
+    fn name(&self) -> &str {
+        "Restore"
     }
 
-    println!("🔄 Starting restore process...");
-    log("Starting restore");
+    fn execute(&mut self) {
+        let backup_dir = get_backup_path();
 
-    // Load the registry
-    let registry_path = get_registry_path();
-    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
-        Ok(registry) => registry,
-        Err(e) => {
-            println!("❌ Failed to load registry: {}", e);
-            log(&format!("Failed to load registry: {}", e));
+        if !backup_dir.exists() {
+            println!("❌ Backup directory not found. Run backup first.");
+            log("Backup directory not found");
             return;
         }
-    };
 
-    let mut restored_count = 0;
-    let mut skipped_count = 0;
+        println!("🔄 Starting restore process...");
 
-    // Process each enabled entry from the registry
-    for (id, entry) in registry.get_enabled_entries() {
-        let backup_source = backup_dir.join(&entry.source_path);
-        let target_path = &entry.target_path;
+        let registry_path = get_registry_path();
+        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
+            Ok(registry) => registry,
+            Err(e) => {
+                println!("❌ Failed to load registry: {}", e);
+                log(&format!("Failed to load registry: {}", e));
+                return;
+            }
+        };
 
-        if backup_source.exists() {
-            println!("🔄 Restoring: {} ({})", entry.name, id);
-            if restore_config_file(&backup_source, target_path, &entry.name) {
-                restored_count += 1;
+        let mut restored_count = 0;
+        let mut skipped_count = 0;
+
+        for (id, entry) in registry.get_enabled_entries() {
+            let backup_source = backup_dir.join(&entry.source_path);
+            let target_path = &entry.target_path;
+
+            if backup_source.exists() {
+                println!("🔄 Restoring: {} ({})", entry.name, id);
+                if restore_config_file(&backup_source, target_path, &entry.name) {
+                    restored_count += 1;
+                } else {
+                    skipped_count += 1;
+                }
             } else {
+                println!(
+                    "ℹ️ No backup found for {}: {}",
+                    entry.name,
+                    backup_source.display()
+                );
                 skipped_count += 1;
             }
-        } else {
-            println!(
-                "ℹ️ No backup found for {}: {}",
-                entry.name,
-                backup_source.display()
-            );
-            skipped_count += 1;
         }
+
+        println!(
+            "✅ Restore complete. {} restored, {} skipped.",
+            restored_count, skipped_count
+        );
     }
 
-    println!(
-        "✅ Restore complete. {} restored, {} skipped.",
-        restored_count, skipped_count
-    );
-    log(&format!(
-        "Restore complete. {} restored, {} skipped",
-        restored_count, skipped_count
-    ));
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let backup_dir = get_backup_path();
+
+        if !backup_dir.exists() {
+            return operations;
+        }
+
+        if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
+            for (_id, entry) in registry.get_enabled_entries() {
+                let backup_source = backup_dir.join(&entry.source_path);
+                let target_path = &entry.target_path;
+
+                if backup_source.exists() {
+                    operations.push(PlannedOperation::with_target(
+                        format!("Restore {}", entry.name),
+                        format!("{} -> {}", backup_source.display(), target_path.display()),
+                    ));
+                }
+            }
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: crate::cli::RestoreArgs) {
+    use crate::tasks::core::TaskExecutor;
+    TaskExecutor::run(&mut RestoreTask, args.dry_run);
 }
 
 /// Attempts to restore a configuration file from a backup to its target location.

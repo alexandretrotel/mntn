@@ -1,5 +1,6 @@
 use crate::cli::PurgeArgs;
 use crate::logger::log;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_base_dirs;
 use crate::utils::system::run_cmd;
 use inquire::MultiSelect;
@@ -37,78 +38,89 @@ enum ServiceType {
     StartupProgram,
 }
 
-/// Lists all system services and startup programs from standard directories,
-/// prompts the user to select which ones to delete, and deletes the selected files.
-pub fn run(args: PurgeArgs) {
-    #[cfg(target_os = "macos")]
-    {
-        println!("🧼 Listing all launch agents and daemons...");
-        log("Starting plist listing");
+/// Purge task that removes system services and startup programs
+pub struct PurgeTask {
+    pub system: bool,
+}
+
+impl PurgeTask {
+    pub fn new(system: bool) -> Self {
+        Self { system }
     }
-    #[cfg(target_os = "linux")]
-    {
-        println!("🧼 Listing all systemd services and autostart programs...");
-        log("Starting systemd service listing");
-    }
-    #[cfg(target_os = "windows")]
-    {
-        println!("🧼 Listing all Windows services and startup programs...");
-        log("Starting Windows service listing");
+}
+
+impl Task for PurgeTask {
+    fn name(&self) -> &str {
+        "Purge"
     }
 
-    let targets = get_directory_targets(args.system);
-    let service_files = scan_service_files(&targets);
-
-    if service_files.is_empty() {
+    fn execute(&mut self) {
         #[cfg(target_os = "macos")]
-        println!("📁 No .plist files found.");
+        println!("🧼 Listing all launch agents and daemons...");
         #[cfg(target_os = "linux")]
-        println!("📁 No systemd services or autostart programs found.");
+        println!("🧼 Listing all systemd services and autostart programs...");
         #[cfg(target_os = "windows")]
-        println!("📁 No Windows services or startup programs found.");
-        log("No service files found.");
-        return;
-    }
+        println!("🧼 Listing all Windows services and startup programs...");
 
-    // Collect display labels for user selection prompt
-    let options: Vec<String> = service_files
-        .iter()
-        .map(|f| f.display_label.clone())
-        .collect();
+        let targets = get_directory_targets(self.system);
+        let service_files = scan_service_files(&targets);
 
-    // Prompt user to select files to delete (multi-select)
-    let action_verb = if args.dry_run {
-        "preview deletion for"
-    } else {
-        "delete"
-    };
-    let service_type_name = get_service_type_name();
-    let prompt_message = format!("Select {} to {}:", service_type_name, action_verb);
-
-    let to_delete = MultiSelect::new(&prompt_message, options.clone())
-        .prompt()
-        .unwrap_or_default();
-
-    if args.dry_run {
-        println!("🔍 Dry run - would delete the following items:");
-        for selected in to_delete {
-            if let Some(service_file) = service_files.iter().find(|f| f.display_label == selected) {
-                println!("  - {}", service_file.path.display());
-                log(&format!("Would delete: {}", service_file.path.display()));
-            }
+        if service_files.is_empty() {
+            #[cfg(target_os = "macos")]
+            println!("📁 No .plist files found.");
+            #[cfg(target_os = "linux")]
+            println!("📁 No systemd services or autostart programs found.");
+            #[cfg(target_os = "windows")]
+            println!("📁 No Windows services or startup programs found.");
+            return;
         }
-        println!("✅ Dry run complete. No files were actually deleted.");
-        log("Dry run complete");
-    } else {
+
+        let options: Vec<String> = service_files
+            .iter()
+            .map(|f| f.display_label.clone())
+            .collect();
+
+        let service_type_name = get_service_type_name();
+        let prompt_message = format!("Select {} to delete:", service_type_name);
+
+        let to_delete = MultiSelect::new(&prompt_message, options.clone())
+            .prompt()
+            .unwrap_or_default();
+
         for selected in to_delete {
             if let Some(service_file) = service_files.iter().find(|f| f.display_label == selected) {
                 delete_service_file(service_file);
                 log(&format!("Deleted: {}", service_file.path.display()));
             }
         }
-        log("Service deletion complete");
+
         println!("✅ Selected items deleted.");
     }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let targets = get_directory_targets(self.system);
+        let service_files = scan_service_files(&targets);
+
+        for service_file in service_files {
+            operations.push(PlannedOperation::with_target(
+                format!("Would scan: {}", service_file.display_label),
+                service_file.path.display().to_string(),
+            ));
+        }
+
+        if operations.is_empty() {
+            operations.push(PlannedOperation::new("No service files found to purge"));
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: PurgeArgs) {
+    let mut task = PurgeTask::new(args.system);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 /// Returns the directory targets to scan based on the system flag and platform

@@ -1,34 +1,69 @@
 use crate::logger::log;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
+use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{get_backup_path, get_package_registry_path, get_registry_path};
 use crate::utils::system::run_cmd;
 use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Runs the full backup process.
-///
-/// This function:
-/// - Ensures the backup directory exists.
-/// - Logs and prints start and completion messages.
-/// - Collects global package lists from various package managers, saving each to individual text files.
-/// - Backs up key configuration files.
-pub fn run() {
-    let backup_dir = get_backup_path();
-    fs::create_dir_all(&backup_dir).unwrap();
+/// Backup task that saves package lists and configuration files
+pub struct BackupTask;
 
-    println!("🔁 Backing up packages...");
-    log("Starting backup");
+impl Task for BackupTask {
+    fn name(&self) -> &str {
+        "Backup"
+    }
 
-    // Backup package managers using registry
-    backup_package_managers(&backup_dir);
+    fn execute(&mut self) {
+        let backup_dir = get_backup_path();
+        fs::create_dir_all(&backup_dir).unwrap();
 
-    // Backup config files using registry
-    backup_config_files_from_registry(&backup_dir);
+        println!("🔁 Backing up...");
 
-    println!("✅ Backup complete.");
-    log("Backup complete");
+        // Backup package managers using registry
+        backup_package_managers(&backup_dir);
+
+        // Backup config files using registry
+        backup_config_files_from_registry(&backup_dir);
+
+        println!("✅ Backup complete.");
+    }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let backup_dir = get_backup_path();
+
+        // Package managers
+        if let Ok(registry) = PackageRegistry::load_or_create(&get_package_registry_path()) {
+            let current_platform = PackageRegistry::get_current_platform();
+            for (_id, entry) in registry.get_platform_compatible_entries(&current_platform) {
+                operations.push(PlannedOperation::with_target(
+                    format!("Backup {} package list", entry.name),
+                    backup_dir.join(&entry.output_file).display().to_string(),
+                ));
+            }
+        }
+
+        // Config files
+        if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
+            for (_id, entry) in registry.get_enabled_entries() {
+                operations.push(PlannedOperation::with_target(
+                    format!("Backup {}", entry.name),
+                    backup_dir.join(&entry.source_path).display().to_string(),
+                ));
+            }
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: crate::cli::BackupArgs) {
+    use crate::tasks::core::TaskExecutor;
+    TaskExecutor::run(&mut BackupTask, args.dry_run);
 }
 
 /// Backs up package managers based on the package registry entries
