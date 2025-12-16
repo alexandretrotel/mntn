@@ -481,4 +481,8 @@ pub enum Commands {
     /// Migrate legacy backup files to the layered structure
     #[command(about = "Migrate legacy backup files to common/machine/environment layers")]
     Migrate(MigrateArgs),
+
+    /// Interactive setup wizard for new users
+    #[command(about = "Interactive wizard to configure mntn for your system")]
+    Setup,
 }
