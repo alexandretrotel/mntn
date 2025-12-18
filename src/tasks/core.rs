@@ -75,6 +75,8 @@ impl TaskExecutor {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
 
     #[test]
@@ -156,8 +158,9 @@ mod tests {
             &self.name
         }
 
-        fn execute(&mut self) {
+        fn execute(&mut self) -> Result<(), Box<dyn Error>> {
             self.executed = true;
+            Ok(())
         }
 
         fn dry_run(&self) -> Vec<PlannedOperation> {
@@ -176,7 +179,7 @@ mod tests {
         let mut task = MockTask::new("Execute Test");
         assert!(!task.executed);
 
-        task.execute();
+        let _ = task.execute();
         assert!(task.executed);
     }
 
@@ -260,8 +263,9 @@ mod tests {
             &self.name
         }
 
-        fn execute(&mut self) {
+        fn execute(&mut self) -> Result<(), Box<dyn Error>> {
             self.execute_count += 1;
+            Ok(())
         }
 
         fn dry_run(&self) -> Vec<PlannedOperation> {
