@@ -24,8 +24,6 @@ struct ServiceFile {
     display_label: String,
     path: PathBuf,
     is_system: bool,
-    #[allow(dead_code)] // Used on Linux and Windows platforms
-    service_type: ServiceType,
 }
 
 /// Types of services that can be managed
@@ -223,7 +221,6 @@ fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
                         display_label,
                         path: service_path,
                         is_system: target.is_system,
-                        service_type,
                     });
                 }
             }
