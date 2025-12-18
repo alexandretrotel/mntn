@@ -1,19 +1,51 @@
 # mntn
 
-A Rust-based CLI tool for system maintenance.
+A Rust-based CLI tool for system maintenance and dotfiles management.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Platform Support](#platform-support)
+- [Guides](#guides)
+  - [Interactive Setup Wizard](#interactive-setup-wizard)
+  - [Layered Dotfiles Management](#layered-dotfiles-management)
+    - [Directory Structure](#directory-structure)
+    - [Layer Priority](#layer-priority)
+    - [Profile Configuration](#profile-configuration)
+    - [Using Profiles](#using-profiles)
+  - [Migration Guide](#migration-guide)
+  - [Backup and Restore Guide](#backup-and-restore-guide)
+  - [Configuration Management with Version Control](#configuration-management-with-version-control)
+  - [Git Integration and Sync Guide](#git-integration-and-sync-guide)
+  - [Validation Guide](#validation-guide)
+  - [Package Registry Management](#package-registry-management)
+  - [Configuration Registry Management](#configuration-registry-management)
+  - [Automated Maintenance Setup](#automated-maintenance-setup)
+  - [System Cleaning Guide](#system-cleaning-guide)
+  - [Service Management with Purge](#service-management-with-purge)
+  - [Biometric Sudo Setup (macOS)](#biometric-sudo-setup-macos)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Features
 
-- **Backup**: Saves global package lists (e.g., brew, npm, cargo, bun, uv) and configuration files using registry-based management.
-- **Biometric Sudo [macOS]**: Configures Touch ID authentication for sudo commands.
+- **Setup**: Interactive wizard to configure mntn for your system with guided machine/environment setup.
+- **Layered Dotfiles**: Machine-specific and environment-based configuration management with automatic layer resolution.
+- **Backup**: Saves package lists and configuration files to layered backup directories.
+- **Biometric Sudo [macOS only]**: Configures Touch ID authentication for sudo commands.
 - **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup.
-- **Delete [macOS]**: Removes applications and their related files with interactive selection.
+- **Delete [macOS only]**: Removes applications and their related files with interactive selection.
 - **Install**: Sets up automated services for backups, cleaning, and system updates.
-- **Link**: Creates symlinks for dotfiles (e.g., .mntn, .zshrc, .vimrc, .config, VSCode settings).
+- **Link**: Creates symlinks for dotfiles with profile-aware layer resolution.
+- **Migrate**: Moves configuration files between layers (common, machine, environment).
 - **Package Registry**: Centralized management of package managers for backup operations.
 - **Purge**: Deletes unused services with user confirmation.
-- **Registry**: Centralized management of configuration files and directories to backup and link.
-- **Restore**: Restores configuration files from backups using the registry system.
+- **Registry**: Centralized management of configuration files and directories.
+- **Restore**: Restores configuration files from backups using profile-aware resolution.
+- **Sync**: Git integration for synchronizing configurations across machines.
+- **Validate**: Checks configuration files, symlinks, and layer resolution status.
 
 ## Installation
 
@@ -24,430 +56,465 @@ cargo install mntn
 ## Quick Start
 
 ```bash
-# Create your first backup
-mntn backup
+# Run the interactive setup wizard (recommended for new users)
+mntn setup
 
-# Set up automated maintenance
-mntn install --with-clean
-
-# Link your dotfiles to your system files (requires ~/.mntn/backup to exist)
-mntn link
-
-# Clean system junk
-mntn clean
+# Or manually configure:
+mntn backup                    # Create your first backup
+mntn link                      # Link dotfiles to system locations
+mntn validate                  # Check configuration status
 
 # Enable Touch ID for sudo (macOS only)
 mntn biometric-sudo
+
+# Sync with git repository
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+mntn sync --sync --auto-link
 ```
 
+## Platform Support
+
+mntn supports **macOS**, **Linux**, and **Windows** with platform-specific features:
+
+- **All platforms**: setup, backup, clean, install, link, migrate, purge, restore, registry management, sync, validate
+- **macOS only**: biometric-sudo, delete command, Homebrew cask support
+- **Linux/Windows**: systemd services (Linux) and Task Scheduler (Windows) for automation
+
 ## Guides
+
+### Interactive Setup Wizard
+
+The `setup` command provides an interactive wizard for configuring mntn:
+
+```bash
+mntn setup
+```
+
+**The wizard guides you through:**
+
+1. **Machine Identifier**: Set a custom name or use auto-detected hostname
+2. **Environment Selection**: Choose from default, work, personal, dev, or custom
+3. **Legacy Migration**: Automatically detect and migrate existing configs to the layered structure
+4. **Initial Backup**: Optionally run first backup
+5. **Symlink Creation**: Optionally link configurations to system locations
+6. **Scheduled Tasks**: Optionally install automated backups
+
+**Example output:**
+```
+🚀 Welcome to mntn interactive setup!
+   This wizard will help you configure your dotfiles management.
+
+📍 Machine Identifier
+   Auto-detected: alex-macbook-pro
+? Set a custom machine identifier? Yes
+? Enter machine identifier: work-laptop
+   ✓ Saved machine ID: work-laptop
+
+🌍 Environment
+? Select your environment: work
+   ✓ Environment: work
+
+📁 Legacy Files Detected
+   Found files in ~/.mntn/backup/ that aren't in the layered structure.
+? Migrate legacy files to common/ layer? Yes
+
+📋 Setup Summary:
+   Machine ID: work-laptop
+   Environment: work
+   ✓ Migrate legacy files to common/
+   ✓ Run initial backup
+   ✓ Create symlinks
+
+? Proceed with setup? Yes
+
+✅ Setup complete!
+```
+
+### Layered Dotfiles Management
+
+mntn supports a layered approach to dotfiles management, allowing you to have:
+- **Common configs** shared across all machines
+- **Machine-specific configs** for individual computers
+- **Environment-specific configs** for different contexts (work, personal, dev)
+
+#### Directory Structure
+
+```
+~/.mntn/
+├── backup/
+│   ├── common/                    # Shared across all machines
+│   │   ├── .zshrc
+│   │   ├── .vimrc
+│   │   └── config/
+│   ├── machines/
+│   │   ├── work-laptop/           # Machine-specific overrides
+│   │   │   └── .gitconfig
+│   │   └── home-desktop/
+│   │       └── .zshrc
+│   ├── environments/
+│   │   ├── work/                  # Environment-specific overrides
+│   │   │   └── config/git/config
+│   │   └── personal/
+│   │       └── .gitconfig
+│   ├── brew.txt                   # Package lists (at root level)
+│   └── npm.txt
+├── profile.json                   # Profile definitions
+├── .machine-id                    # Current machine identifier
+├── registry.json                  # Configuration registry
+├── package_registry.json          # Package manager registry
+└── symlinks/                      # Backup of original files
+```
+
+#### Layer Priority
+
+When linking or restoring, mntn resolves sources in this order (highest priority first):
+
+1. **Environment** (`environments/<env>/`) - Most specific
+2. **Machine** (`machines/<machine-id>/`)
+3. **Common** (`common/`)
+4. **Legacy** (root `backup/`) - Lowest priority, for backwards compatibility
+
+**Example:** If you have:
+- `common/.zshrc` - Base shell config
+- `machines/work-laptop/.zshrc` - Machine-specific overrides
+- `environments/work/.zshrc` - Environment-specific overrides
+
+With `machine=work-laptop` and `env=work`, the environment version is used.
+
+#### Profile Configuration
+
+Create named profiles in `~/.mntn/profile.json`:
+
+```json
+{
+  "version": "1.0.0",
+  "default_profile": "work-laptop-work",
+  "profiles": {
+    "work-laptop-work": {
+      "machine_id": "work-laptop",
+      "environment": "work",
+      "description": "Work laptop in work environment"
+    },
+    "home": {
+      "machine_id": "home-desktop",
+      "environment": "personal",
+      "description": "Home desktop configuration"
+    }
+  }
+}
+```
+
+#### Using Profiles
+
+**Override via CLI flags:**
+```bash
+# Use specific environment
+mntn link --env work
+
+# Use specific machine
+mntn link --machine-id work-laptop
+
+# Use both
+mntn backup --env work --machine-id work-laptop --to-machine
+
+# Use a named profile
+mntn link --profile home
+```
+
+**Environment variable:**
+```bash
+export MNTN_ENV=work
+mntn link  # Uses 'work' environment
+```
+
+**Machine ID file:**
+```bash
+echo "work-laptop" > ~/.mntn/.machine-id
+mntn link  # Uses 'work-laptop' machine
+```
+
+### Migration Guide
+
+The `migrate` command moves files from the legacy location to the layered structure:
+
+```bash
+# Preview what would be migrated
+mntn migrate --dry-run
+
+# Migrate to common layer (recommended for shared configs)
+mntn migrate --to-common
+
+# Migrate to machine-specific layer
+mntn migrate --to-machine
+
+# Migrate to environment-specific layer
+mntn migrate --to-environment --env work
+```
+
+**When to use each layer:**
+
+| Layer | Use Case |
+|-------|----------|
+| `--to-common` | Configs shared across all machines (default) |
+| `--to-machine` | Hardware-specific settings, paths with machine names |
+| `--to-environment` | Context-specific: work email, personal git config |
 
 ### Backup and Restore Guide
 
 #### Creating Backups
 
-The `backup` command saves your system's package lists and configuration files to `~/.mntn/backup/`:
-
 ```bash
+# Backup to common layer (default)
 mntn backup
+
+# Backup to machine-specific layer
+mntn backup --to-machine
+
+# Backup to environment layer
+mntn backup --to-environment --env work
+
+# Preview what would be backed up
+mntn backup --dry-run
 ```
 
 **What gets backed up:**
-- **Package lists**: Managed through the package registry system - Homebrew packages (`brew.txt`, `brew-cask.txt`), npm global packages (`npm.txt`), Yarn global packages (`yarn.txt`), pnpm global packages (`pnpm.txt`), Bun global packages (`bun.txt`), uv packages (`uv.txt`), and Cargo installed packages (`cargo.txt`)
-- **Configuration files**: Managed through the configuration registry - VS Code settings and keybindings, Ghostty terminal config, shell configurations, and other dotfiles
-
-**Backup location**: `~/.mntn/backup/`
+- **Package lists**: brew, npm, cargo, bun, uv, etc. (stored at backup root)
+- **Configuration files**: Based on registry entries (stored in specified layer)
 
 #### Restoring from Backups
 
-To restore your configuration files from a previous backup:
-
 ```bash
+# Restore using current profile settings
 mntn restore
+
+# Preview what would be restored
+mntn restore --dry-run
 ```
 
-This will restore VS Code settings, keybindings, and Ghostty configuration from your backup.
-
-**Note**: Package restoration must be done manually using the generated package lists. The package registry system ensures only enabled and platform-compatible package managers are backed up. For example:
-```bash
-# Restore Homebrew packages
-brew install $(cat ~/.mntn/backup/brew.txt)
-
-# Restore npm global packages (parse npm ls output format)
-npm install -g $(cat ~/.mntn/backup/npm.txt | grep -E '^[├└]' | sed 's/^[├└]── //' | cut -d'@' -f1 | tr '\n' ' ')
-
-# Restore cargo packages
-while read -r line; do
-  cargo install "$(echo "$line" | cut -d' ' -f1)"
-done < ~/.mntn/backup/cargo.txt
-```
+Restore uses layer resolution to find the best source for each config file.
 
 ### Configuration Management with Version Control
 
-#### Setting up Version Control for Your Configurations
-
-1. **Initialize git repository in the mntn directory:**
-   ```bash
-   # Create your first backup to set up the folder structure
-   mntn backup
-   
-   # Initialize git repository in the mntn directory (includes full context)
-   cd ~/.mntn
-   git init
-   git remote add origin https://github.com/yourusername/dotfiles.git
-   
-   # mntn will automatically create a .gitignore with mntn.log excluded
-   ```
-
-2. **Your mntn directory structure will look like:**
-   ```
-   ~/.mntn/
-   ├── .git/               # Git repository
-   ├── .gitignore          # Automatically created (excludes mntn.log)
-   ├── registry.json       # Configuration registry
-   ├── package_registry.json # Package manager registry
-   ├── mntn.log           # Log file (ignored by git)
-   ├── symlinks/          # Backup of original files
-   └── backup/            # Your dotfiles and configs
-       ├── .zshrc         # Shell configuration
-       ├── .vimrc         # Vim configuration
-       ├── config/        # This becomes ~/.config
-       │   ├── nvim/
-       │   └── git/
-       ├── vscode/
-       │   ├── settings.json
-       │   └── keybindings.json
-       ├── brew.txt       # package managers, etc.
-       ├── npm.txt
-       └── cargo.txt
-   ```
-
-3. **Commit and push your configurations:**
-   ```bash
-   cd ~/.mntn
-   git add .
-   git commit -m "Initial mntn setup with full context"
-   git push -u origin main
-   ```
-
-#### Using mntn for Configuration Management
-
-Once your backup repository is set up, use `mntn link` to create symlinks:
+#### Setting up Version Control
 
 ```bash
-mntn link
+# Create your first backup
+mntn backup
+
+# Initialize git repository
+cd ~/.mntn
+git init
+git remote add origin https://github.com/yourusername/dotfiles.git
+
+# The setup wizard or validate command will create profile.json
+mntn validate
+
+# Commit everything
+git add .
+git commit -m "Initial mntn setup"
+git push -u origin main
 ```
 
-**What it does:**
-- Links `~/.mntn/backup/.zshrc` → `~/.zshrc`
-- Links `~/.mntn/backup/.vimrc` → `~/.vimrc`
-- Links `~/.mntn/backup/config` → `~/.config`
-- Links `~/.mntn/backup/vscode/settings.json` → `~/Library/Application Support/Code/User/settings.json`
-- Links `~/.mntn/backup/vscode/keybindings.json` → `~/Library/Application Support/Code/User/keybindings.json`
+#### Repository Structure
 
-**Safety features:**
-- Automatically backs up existing files to `~/.mntn/symlinks/`
-- If source doesn't exist but target does, copies target to source first
-- Won't overwrite existing correct symlinks
+```
+~/.mntn/                    # Git repository root
+├── .git/
+├── .gitignore              # Excludes mntn.log
+├── profile.json            # Profile definitions (versioned)
+├── .machine-id             # Machine identifier (may want to .gitignore)
+├── registry.json           # Configuration registry
+├── package_registry.json   # Package manager registry
+├── backup/
+│   ├── common/             # Shared configs
+│   ├── machines/           # Machine-specific
+│   └── environments/       # Environment-specific
+└── symlinks/               # Backup of originals
+```
 
-#### Setting up on a New Machine
+**Tip:** Add `.machine-id` to `.gitignore` if you want each machine to auto-detect its own name.
+
+#### Setting up a New Machine
 
 ```bash
 # Install mntn
 cargo install mntn
 
-# Clone your mntn repository (includes full context and registries)
+# Clone your configurations
 git clone https://github.com/yourusername/dotfiles.git ~/.mntn
 
-# Create symlinks for your configurations
+# Run setup wizard to configure machine/environment
+mntn setup
+
+# Or manually set machine ID
+echo "new-laptop" > ~/.mntn/.machine-id
+
+# Link configurations
 mntn link
+```
 
-# Run backup to update with any new package installations
-mntn backup
+### Git Integration and Sync Guide
 
-# The repository now includes your registries and full mntn context
+```bash
+# Initialize new repository
+mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
+
+# Pull latest changes
+mntn sync --pull
+
+# Pull and re-link configurations
+mntn sync --pull --auto-link
+
+# Push local changes
+mntn sync --push --message "Update configs"
+
+# Bidirectional sync
+mntn sync --sync --auto-link
+```
+
+### Validation Guide
+
+The `validate` command checks your configuration status:
+
+```bash
+mntn validate
+```
+
+**What it validates:**
+- **Registry files**: JSON syntax and consistency
+- **Layer resolution**: Shows which layer each config comes from
+- **JSON configs**: Validates VS Code, Zed settings syntax
+- **Symlinks**: Checks if links point to correct locations
+
+**Example output:**
+```
+🔍 Validating configuration...
+   Profile: machine=work-laptop, env=work
+
+ Registry Files OK
+ Layer Resolution
+ ! Some configs are still in legacy location (/Users/alex/.mntn/backup)
+ Fix: Run 'mntn migrate --to-common' to migrate to the layered structure
+ JSON Configuration Files OK
+ Symlink Configuration
+ i VSCode Settings (vscode_settings): Target exists but is not a symlink
+ Fix: Run 'mntn link' to create symlink (existing file will be backed up)
+
+⚠️  Validation complete: 0 error(s), 1 warning(s)
 ```
 
 ### Package Registry Management
 
-The `package-registry` command provides centralized management of package managers used during backup operations. This system allows you to configure which package managers to include, customize their commands, and control platform-specific behavior.
-
-#### Viewing Package Manager Entries
-
 ```bash
-# List all package manager entries
+# List all package managers
 mntn package-registry list
 
-# List only enabled entries
-mntn package-registry list --enabled-only
-
-# List only entries compatible with current platform
+# List platform-compatible entries
 mntn package-registry list --platform-only
-```
 
-**Default Package Managers:**
-- `brew` - Homebrew packages (macOS/Linux)
-- `brew_cask` - Homebrew casks/applications (macOS only)
-- `npm` - npm global packages (all platforms)
-- `yarn` - Yarn global packages (all platforms)
-- `pnpm` - pnpm global packages (all platforms)
-- `bun` - Bun global packages (all platforms)
-- `cargo` - Cargo installed packages (all platforms)
-- `uv` - uv installed tools (all platforms)
-- `pip` - pip packages (disabled by default)
-
-#### Adding Custom Package Managers
-
-```bash
-# Add a new package manager
+# Add custom package manager
 mntn package-registry add pipx \
   --name "pipx Applications" \
   --command "pipx" \
   --args "list" \
-  --output-file "pipx.txt" \
-  --description "pipx installed Python applications"
+  --output-file "pipx.txt"
 
-# Add with platform restrictions
-mntn package-registry add winget \
-  --name "Windows Package Manager" \
-  --command "winget" \
-  --args "list" \
-  --output-file "winget.txt" \
-  --platforms "windows"
-```
-
-#### Managing Package Manager Entries
-
-```bash
-# Enable or disable a package manager
-mntn package-registry toggle npm --enable
-mntn package-registry toggle pip --disable
-
-# Remove a package manager from the registry
-mntn package-registry remove custom_manager
-```
-
-#### Package Registry File Location
-
-The package registry is stored as JSON at `~/.mntn/package_registry.json`. You can edit it manually if needed, but using the CLI commands is recommended for consistency.
-
-**Example package manager entry:**
-```json
-{
-  "name": "Homebrew Packages",
-  "command": "brew",
-  "args": ["leaves"],
-  "output_file": "brew.txt",
-  "enabled": true,
-  "description": "Homebrew installed packages (leaves only)",
-  "platforms": ["macos", "linux"]
-}
+# Enable/disable entries
+mntn package-registry toggle pip --enable
 ```
 
 ### Configuration Registry Management
 
-The `registry` command provides a centralized way to manage what configuration files and folders are backed up and linked. The registry stores metadata about each configuration entry including source paths, target locations, and categories.
-
-#### Viewing Registry Entries
-
 ```bash
-# List all entries in the registry
+# List all entries
 mntn registry list
 
-# List only enabled entries
-mntn registry list --enabled-only
-
-# List entries in a specific category
+# List by category
 mntn registry list --category editor
-```
 
-**Registry Categories:**
-- `shell` - Shell configuration files (.zshrc, .bashrc, etc.)
-- `editor` - Text editors and IDEs (vim, vscode, etc.)
-- `terminal` - Terminal emulators and related tools
-- `system` - System-wide configuration
-- `development` - Development tools and environments
-- `application` - Application-specific configs
-
-#### Adding New Entries
-
-```bash
-# Add a new configuration file to track
-mntn registry add my_app_config \
-  --name "My App Config" \
+# Add new entry
+mntn registry add my_config \
+  --name "My Config" \
   --source "myapp/config.json" \
-  --target "~/.config/myapp/config.json" \
-  --category application \
-  --description "Configuration for My App"
-```
+  --target "/Users/alex/.config/myapp/config.json" \
+  --category application
 
-**Target Path Types:**
-- `~/path` - Home directory relative paths
-- `.config/path` - Config directory relative paths  
-- `/absolute/path` - Absolute paths
-- Automatic detection based on path patterns
-
-#### Managing Entries
-
-```bash
-# Enable or disable an entry
-mntn registry toggle my_app_config --enable
-mntn registry toggle my_app_config --disable
-
-# Remove an entry from the registry
-mntn registry remove my_app_config
-```
-
-#### Registry File Location
-
-The registry is stored as JSON at `~/.mntn/registry.json`. You can edit it manually if needed, but using the CLI commands is recommended for consistency.
-
-**Example registry entry:**
-```json
-{
-  "name": "Zsh Configuration",
-  "source_path": ".zshrc",
-  "target_path": {
-    "Home": ".zshrc"
-  },
-  "category": "Shell",
-  "enabled": true,
-  "description": "Main Zsh shell configuration file"
-}
+# Enable/disable entries
+mntn registry toggle my_config --enable
 ```
 
 ### Automated Maintenance Setup
 
-The `install` command sets up automated maintenance tasks using your system's scheduler:
-
 ```bash
-# Basic installation (backup every hour)
+# Install hourly backup task
 mntn install
 
 # Include daily cleaning
 mntn install --with-clean
+
+# Preview what would be installed
+mntn install --dry-run
 ```
-
-**What gets installed:**
-
-- **macOS**: Creates LaunchAgents in `~/Library/LaunchAgents/`
-- **Linux**: Creates systemd user services and timers
-- **Windows**: Creates scheduled tasks
-
-**Scheduled tasks:**
-- `mntn-backup`: Runs `mntn backup` every hour
-- `mntn-clean`: Runs `mntn clean` daily (with `--with-clean` flag)
-- `mntn-topgrade`: Runs `topgrade` daily (if topgrade is installed)
-
-**Task logs:** 
-- **macOS**: `/tmp/mntn-*.out` and `/tmp/mntn-*.err`
-- **Linux**: Use `journalctl --user -u mntn-*.service`
 
 ### System Cleaning Guide
 
-The `clean` command removes unnecessary files and frees up disk space:
-
 ```bash
-# Clean user-level files only
+# Clean user-level files
 mntn clean
 
-# Also clean system files (requires sudo)
+# Include system files (requires sudo)
 mntn clean --system
 
-# Preview what would be cleaned without actually deleting
+# Preview what would be cleaned
 mntn clean --dry-run
 ```
 
-**What gets cleaned:**
-
-**User-level cleanup (default):**
-- Cache directories (`~/Library/Caches` on macOS, `~/.cache` on Linux)
-- Temporary files
-- Application logs and saved states (macOS)
-- Quick Look cache reset (macOS)
-
-**System-level cleanup (with `--system`):**
-- System caches (`/Library/Caches`, `/var/cache`)
-- System logs (`/private/var/log`, `/var/log`)
-- Diagnostic reports (macOS)
-- Volume trash folders (macOS)
-
-**Package manager cleanup:**
-- Homebrew: `brew cleanup`
-- npm: `npm cache clean --force`
-- pnpm: `pnpm cache delete`
-
-**Safety features:**
-- Skips files modified in the last 24 hours
-- Skips symbolic links
-- Skips system-critical directories (`.X11-unix`, `systemd-private`, etc.)
-
 ### Service Management with Purge
 
-Remove unused services and startup programs interactively:
-
 ```bash
-# List and remove user services
+# Remove unused user services
 mntn purge
 
-# Include system services (requires sudo)
+# Include system services
 mntn purge --system
 
 # Preview what would be removed
 mntn purge --dry-run
 ```
 
-**What it manages:**
-
-- **macOS**: LaunchAgents (`.plist` files) in `~/Library/LaunchAgents/` and `/Library/LaunchAgents/`
-- **Linux**: systemd user services and autostart programs
-- **Windows**: Windows services and startup programs (planned)
-
-**Interactive selection:**
-- Lists all found services/programs
-- Multi-select interface to choose what to delete
-- Shows full paths for transparency
-- Confirmation before deletion
-
 ### Biometric Sudo Setup (macOS)
-
-Enable Touch ID authentication for sudo commands:
 
 ```bash
 mntn biometric-sudo
 ```
 
-**What it does:**
-1. Backs up `/etc/pam.d/sudo` to `/etc/pam.d/sudo.bak`
-2. Adds Touch ID PAM module (`pam_tid.so`) to the sudo configuration
-3. Enables Touch ID authentication for all sudo commands
-
-**After setup:**
-- Use Touch ID instead of typing your password for sudo commands
-- Fallback to password if Touch ID fails
-- Works with Terminal, VS Code integrated terminal, and other applications
-
-**Requirements:**
-- macOS with Touch ID capability
-- Administrator privileges (will prompt for password during setup)
+Enables Touch ID authentication for sudo commands.
 
 ## Troubleshooting
 
+### Setup Issues
+- **Profile not saving**: Ensure `~/.mntn/` directory exists and is writable
+- **Machine ID not detected**: Set manually with `echo "my-machine" > ~/.mntn/.machine-id`
+
 ### Backup Issues
-- **Permission denied**: Ensure you have read access to config directories
-- **Missing package managers**: Commands will be skipped if tools aren't installed
+- **Wrong layer**: Use `--to-common`, `--to-machine`, or `--to-environment` flags
+- **Permission denied**: Ensure read access to config directories
 
 ### Link Issues
-- **Symlink conflicts**: Use `mntn purge` to clean up old services, then retry
-- **Permission issues**: Ensure write access to target directories
+- **Wrong source used**: Check layer priority with `mntn validate`
+- **Symlink conflicts**: Run `mntn link` to update, original files backed up to `symlinks/`
 
-### Clean Issues
-- **System clean fails**: Use `mntn clean --system` and enter password when prompted
-- **Space not freed**: Some applications may recreate caches immediately
+### Migration Issues
+- **Files not detected**: Only registry entries are migrated; add entries first with `mntn registry add`
+- **Already migrated**: Files in `common/`, `machines/`, or `environments/` are skipped
 
-### Restore Issues
-- **Files not found**: Run `mntn backup` first to create initial backups
-- **Permission denied**: Ensure write access to target config directories
+### Sync Issues
+- **No git repository**: Run `mntn sync --init --remote-url <URL>`
+- **Merge conflicts**: Resolve in `~/.mntn` using standard git commands
+
+### Validation Issues
+- **Legacy files warning**: Run `mntn migrate --to-common` to update structure
+- **Layer conflicts**: Intentional overrides show as info, not errors
 
 ## License
 

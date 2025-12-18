@@ -1,5 +1,8 @@
 use clap::{Args, Parser, Subcommand};
 
+use crate::profile::ActiveProfile;
+use crate::tasks::migrate::MigrateTarget;
+
 /// Command line interface for `mntn`.
 #[derive(Parser)]
 #[command(
@@ -11,6 +14,76 @@ pub struct Cli {
     /// Subcommand to run
     #[command(subcommand)]
     pub command: Option<Commands>,
+}
+
+/// Shared arguments for profile resolution
+#[derive(Args, Clone, Default)]
+pub struct ProfileArgs {
+    /// Use a named profile from profile.json
+    #[arg(
+        long,
+        short = 'p',
+        help = "Use a named profile defined in ~/.mntn/profile.json"
+    )]
+    pub profile: Option<String>,
+    /// Override the environment
+    #[arg(long, short = 'e', help = "Override the environment")]
+    pub env: Option<String>,
+    /// Override the machine identifier
+    #[arg(long, short = 'm', help = "Override the machine identifier")]
+    pub machine_id: Option<String>,
+}
+
+impl ProfileArgs {
+    pub fn resolve(&self) -> ActiveProfile {
+        ActiveProfile::resolve(
+            self.profile.as_deref(),
+            self.machine_id.as_deref(),
+            self.env.as_deref(),
+        )
+    }
+}
+
+/// Shared arguments for layer target selection
+#[derive(Args, Clone, Default)]
+pub struct LayerTargetArgs {
+    /// Target the common layer (default)
+    #[arg(long, help = "Target the common layer (shared across all machines)")]
+    pub to_common: bool,
+    /// Target the machine-specific layer
+    #[arg(long, help = "Target the machine-specific layer")]
+    pub to_machine: bool,
+    /// Target the environment-specific layer
+    #[arg(long, help = "Target the environment-specific layer")]
+    pub to_environment: bool,
+}
+
+impl LayerTargetArgs {
+    pub fn to_migrate_target(&self) -> MigrateTarget {
+        if self.to_machine {
+            MigrateTarget::Machine
+        } else if self.to_environment {
+            MigrateTarget::Environment
+        } else {
+            MigrateTarget::Common
+        }
+    }
+}
+
+/// Arguments for the backup command.
+#[derive(Args)]
+pub struct BackupArgs {
+    /// Preview what would be backed up without actually performing the backup
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be backed up without performing any actions"
+    )]
+    pub dry_run: bool,
+    #[command(flatten)]
+    pub layer: LayerTargetArgs,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the clean command.
@@ -56,6 +129,79 @@ pub struct InstallArgs {
         help = "Set up automatic daily cleaning in addition to installing"
     )]
     pub with_clean: bool,
+    /// Preview what tasks would be installed without actually installing them
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be installed without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the link command.
+#[derive(Args)]
+pub struct LinkArgs {
+    /// Preview what symlinks would be created without actually creating them
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what symlinks would be created without performing any actions"
+    )]
+    pub dry_run: bool,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
+}
+
+/// Arguments for the restore command.
+#[derive(Args)]
+pub struct RestoreArgs {
+    /// Preview what would be restored without actually restoring
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be restored without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the biometric sudo command.
+#[derive(Args)]
+pub struct BiometricSudoArgs {
+    /// Preview what would be configured without actually performing the configuration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be configured without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the validate command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Preview what would be validated without actually performing the validation
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be validated without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the migrate command.
+#[derive(Args)]
+pub struct MigrateArgs {
+    /// Preview what would be migrated without actually performing the migration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be migrated without performing any actions"
+    )]
+    pub dry_run: bool,
+    #[command(flatten)]
+    pub layer: LayerTargetArgs,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the purge command.
@@ -77,16 +223,59 @@ pub struct PurgeArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the sync command.
+#[derive(Args)]
+pub struct SyncArgs {
+    /// Initialize a new git repository in ~/.mntn
+    #[arg(
+        long,
+        help = "Initialize a new git repository in ~/.mntn with the provided remote URL"
+    )]
+    pub init: bool,
+    /// Remote URL for git repository initialization
+    #[arg(long, help = "Remote repository URL (required with --init)")]
+    pub remote_url: Option<String>,
+    /// Pull changes from remote repository
+    #[arg(long, help = "Pull latest changes from remote repository")]
+    pub pull: bool,
+    /// Push changes to remote repository
+    #[arg(long, help = "Push local changes to remote repository")]
+    pub push: bool,
+    /// Sync both ways (pull then push)
+    #[arg(
+        long,
+        help = "Sync both ways: pull latest changes then push local changes"
+    )]
+    pub sync: bool,
+    /// Custom commit message for push operations
+    #[arg(
+        long,
+        short = 'm',
+        help = "Custom commit message (default: timestamp-based message)"
+    )]
+    pub message: Option<String>,
+    /// Automatically run 'mntn link' after pulling changes
+    #[arg(long, help = "Automatically run 'mntn link' after pulling changes")]
+    pub auto_link: bool,
+}
+
 /// Arguments for the registry command.
 #[derive(Args)]
-pub struct RegistryArgs {
+pub struct ConfigsRegistryArgs {
     #[command(subcommand)]
-    pub action: RegistryActions,
+    pub action: ConfigsRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Registry management actions.
 #[derive(Subcommand)]
-pub enum RegistryActions {
+pub enum ConfigsRegistryActions {
     /// List all registry entries
     #[command(about = "List all entries in the registry")]
     List {
@@ -143,6 +332,13 @@ pub enum RegistryActions {
 pub struct PackageRegistryArgs {
     #[command(subcommand)]
     pub action: PackageRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Package registry management actions.
@@ -221,12 +417,12 @@ pub enum PackageRegistryActions {
 pub enum Commands {
     /// Create a backup of important system configurations and user data
     #[command(about = "Backup system configurations and user data to a safe location")]
-    Backup,
+    Backup(BackupArgs),
 
     /// Configure biometric authentication for sudo operations (macOS only)
     #[cfg(target_os = "macos")]
     #[command(about = "Enable Touch ID or Face ID authentication for sudo commands")]
-    BiometricSudo,
+    BiometricSudo(BiometricSudoArgs),
 
     /// Clean temporary files, caches, and unnecessary data from the system
     #[command(about = "Remove temporary files, caches, logs, and other unnecessary data")]
@@ -243,7 +439,7 @@ pub enum Commands {
 
     /// Create symbolic links for configurations and dotfiles
     #[command(about = "Create and manage symbolic links for dotfiles and configurations")]
-    Link,
+    Link(LinkArgs),
 
     /// Thoroughly remove files and reset configurations to defaults
     #[command(about = "Completely remove files and reset system configurations")]
@@ -251,13 +447,29 @@ pub enum Commands {
 
     /// Restore system configurations and data from a previous backup
     #[command(about = "Restore system state from a previously created backup")]
-    Restore,
+    Restore(RestoreArgs),
 
     /// Manage the registry of files and folders to backup and link
     #[command(about = "Manage the registry of files and folders for backup and linking")]
-    Registry(RegistryArgs),
+    Registry(ConfigsRegistryArgs),
 
     /// Manage the package manager registry for backup
     #[command(about = "Manage the package manager registry for backup operations")]
     PackageRegistry(PackageRegistryArgs),
+
+    /// Synchronize configurations with a git repository
+    #[command(about = "Sync configurations with a git repository (pull/push/both)")]
+    Sync(SyncArgs),
+
+    /// Validate configuration files and symlinks
+    #[command(about = "Validate JSON configs, symlinks, and registry files")]
+    Validate(ValidateArgs),
+
+    /// Migrate legacy backup files to the layered structure
+    #[command(about = "Migrate legacy backup files to common/machine/environment layers")]
+    Migrate(MigrateArgs),
+
+    /// Interactive setup wizard for new users
+    #[command(about = "Interactive wizard to configure mntn for your system")]
+    Setup,
 }

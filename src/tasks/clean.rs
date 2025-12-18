@@ -1,59 +1,143 @@
 use glob::glob;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use crate::cli::CleanArgs;
-use crate::logger::log;
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::filesystem::calculate_dir_size;
 use crate::utils::format::bytes_to_human_readable;
 use crate::utils::paths::get_base_dirs;
 use crate::utils::system::run_cmd;
 
-/// Performs a system junk cleanup by deleting cache, logs, trash, and other temporary files.
-///
-/// The cleanup is divided into two categories:
-/// - User-level cleanup: Files owned by the current user (default behavior)
-/// - System-level cleanup: System-wide files requiring sudo (with --system flag)
-///
-/// The function is cross-platform aware and only applies platform-specific
-/// cleanup operations when running on the appropriate OS.
-pub fn run(args: CleanArgs) {
-    log(&format!("Starting clean (system: {})", args.system));
+/// Clean task that removes cache, logs, trash, and other temporary files
+pub struct CleanTask {
+    pub system: bool,
+}
 
-    if args.dry_run {
-        println!("🔍 Running in dry-run mode - no files will be deleted");
+impl CleanTask {
+    pub fn new(system: bool) -> Self {
+        Self { system }
+    }
+}
+
+impl Task for CleanTask {
+    fn name(&self) -> &str {
+        "Clean"
     }
 
-    println!("🧹 Cleaning system junk...");
+    fn execute(&mut self) {
+        println!("🧹 Cleaning system junk...");
 
-    let mut total_space_saved: u64 = 0;
+        let args = CleanArgs {
+            system: self.system,
+            dry_run: false,
+        };
 
-    // Always clean user-level directories
-    total_space_saved += clean_user_directories(&args);
+        let mut total_space_saved: u64 = 0;
 
-    // Clean system-level directories only if requested
-    if args.system {
-        println!("⚠️  Cleaning system-wide files (requires sudo)...");
-        total_space_saved += clean_system_directories(&args);
+        total_space_saved += clean_user_directories(&args);
+
+        if self.system {
+            println!("⚠️  Cleaning system-wide files (requires sudo)...");
+            total_space_saved += clean_system_directories(&args);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            clean_macos_specific(&args);
+        }
+
+        total_space_saved += clean_package_managers(&args);
+        total_space_saved += clean_trash(&args);
+
+        let space_saved_str = bytes_to_human_readable(total_space_saved);
+        println!("✅ System cleaned. Freed {}.", space_saved_str);
     }
 
-    // Platform-specific cleanup
-    #[cfg(target_os = "macos")]
-    {
-        clean_macos_specific(&args);
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let base_dirs = get_base_dirs();
+        let cache_dir = base_dirs.cache_dir();
+
+        #[cfg(target_os = "macos")]
+        let home_dir = base_dirs.home_dir();
+
+        // User directories
+        operations.push(PlannedOperation::with_target(
+            "Clean user cache".to_string(),
+            cache_dir.display().to_string(),
+        ));
+        operations.push(PlannedOperation::with_target(
+            "Clean temp directory".to_string(),
+            std::env::temp_dir().display().to_string(),
+        ));
+
+        #[cfg(target_os = "macos")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Clean user logs".to_string(),
+                home_dir.join("Library/Logs").display().to_string(),
+            ));
+            operations.push(PlannedOperation::with_target(
+                "Clean saved application state".to_string(),
+                home_dir
+                    .join("Library/Saved Application State")
+                    .display()
+                    .to_string(),
+            ));
+        }
+
+        if self.system {
+            #[cfg(target_os = "macos")]
+            {
+                operations.push(PlannedOperation::with_target(
+                    "Clean system caches".to_string(),
+                    "/Library/Caches".to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Clean system logs".to_string(),
+                    "/private/var/log".to_string(),
+                ));
+            }
+            #[cfg(target_os = "linux")]
+            {
+                operations.push(PlannedOperation::with_target(
+                    "Clean system logs".to_string(),
+                    "/var/log".to_string(),
+                ));
+                operations.push(PlannedOperation::with_target(
+                    "Clean system cache".to_string(),
+                    "/var/cache".to_string(),
+                ));
+            }
+        }
+
+        // Package managers
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if which::which("brew").is_ok() {
+            operations.push(PlannedOperation::new("Run brew cleanup"));
+        }
+        if which::which("npm").is_ok() {
+            operations.push(PlannedOperation::new("Clean npm cache"));
+        }
+        if which::which("pnpm").is_ok() {
+            operations.push(PlannedOperation::new("Clean pnpm cache"));
+        }
+
+        // Trash
+        operations.push(PlannedOperation::new("Empty trash"));
+
+        operations
     }
+}
 
-    // Cross-platform package manager cleanup
-    total_space_saved += clean_package_managers(&args);
-
-    // Clean trash for current user
-    // TODO: Implement cross-platform trash cleaning
-
-    let space_saved_str = bytes_to_human_readable(total_space_saved);
-    println!("✅ System cleaned. Freed {}.", space_saved_str);
-    log(&format!("Clean complete. Freed {}.", space_saved_str));
+/// Run with CLI args
+pub fn run_with_args(args: CleanArgs) {
+    let mut task = CleanTask::new(args.system);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 /// Clean user-level directories that don't require sudo
@@ -65,13 +149,15 @@ fn clean_user_directories(args: &CleanArgs) -> u64 {
 
     // Get base directories
     let base_dirs = get_base_dirs();
-    let home_dir = base_dirs.home_dir();
     let cache_dir = base_dirs.cache_dir();
+
+    #[cfg(target_os = "macos")]
+    let home_dir = base_dirs.home_dir();
 
     // Cross-platform user cache directory
     user_paths.push(cache_dir.to_path_buf());
 
-    // Cross-platform user data directory
+    // Cross-platform user temp directory
     user_paths.push(std::env::temp_dir());
 
     // Platform-specific user directories
@@ -94,7 +180,7 @@ fn clean_user_directories(args: &CleanArgs) -> u64 {
 fn clean_system_directories(args: &CleanArgs) -> u64 {
     let mut total_freed = 0u64;
 
-    let mut system_paths = Vec::new();
+    let mut system_paths: Vec<PathBuf> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {
@@ -130,7 +216,7 @@ fn clean_system_directories(args: &CleanArgs) -> u64 {
 
 /// macOS-specific cleanup operations
 #[cfg(target_os = "macos")]
-fn clean_macos_specific(args: &CleanArgs) -> () {
+fn clean_macos_specific(args: &CleanArgs) {
     // Reset Quick Look cache (user-level)
     println!("🔹 Resetting Quick Look cache...");
     if !args.dry_run {
@@ -213,10 +299,10 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
             }
 
             // Skip files modified within the last 24 hours
-            if let Ok(modified) = metadata.modified() {
-                if now.duration_since(modified).unwrap_or_default() < min_age {
-                    continue;
-                }
+            if let Ok(modified) = metadata.modified()
+                && now.duration_since(modified).unwrap_or_default() < min_age
+            {
+                continue;
             }
         }
 
@@ -262,21 +348,112 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
 fn should_skip(path: &Path) -> bool {
     let skip_patterns = [".X11-unix", "systemd-private", "asl", ".DS_Store"];
 
-    skip_patterns.iter().any(|&pattern| {
-        let pattern_bytes = pattern.as_bytes();
+    #[cfg(unix)]
+    {
+        skip_patterns.iter().any(|&pattern| {
+            let pattern_bytes = pattern.as_bytes();
 
-        path.file_name()
-            .map(|name| {
-                name.as_bytes()
-                    .windows(pattern_bytes.len())
-                    .any(|window| window == pattern_bytes)
-            })
-            .unwrap_or(false)
-            || path.components().any(|comp| {
-                comp.as_os_str()
-                    .as_bytes()
-                    .windows(pattern_bytes.len())
-                    .any(|window| window == pattern_bytes)
-            })
-    })
+            path.file_name()
+                .map(|name| {
+                    name.as_bytes()
+                        .windows(pattern_bytes.len())
+                        .any(|window| window == pattern_bytes)
+                })
+                .unwrap_or(false)
+                || path.components().any(|comp| {
+                    comp.as_os_str()
+                        .as_bytes()
+                        .windows(pattern_bytes.len())
+                        .any(|window| window == pattern_bytes)
+                })
+        })
+    }
+
+    #[cfg(not(unix))]
+    {
+        skip_patterns.iter().any(|&pattern| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.contains(pattern))
+                .unwrap_or(false)
+                || path.components().any(|comp| {
+                    comp.as_os_str()
+                        .to_str()
+                        .is_some_and(|s| s.contains(pattern))
+                })
+        })
+    }
+}
+
+/// Clean the trash/recycle bin for the current user
+fn clean_trash(args: &CleanArgs) -> u64 {
+    let mut total_freed = 0u64;
+
+    let base_dirs = get_base_dirs();
+    let home_dir = base_dirs.home_dir();
+
+    println!("🔹 Emptying trash...");
+
+    #[cfg(target_os = "macos")]
+    {
+        // Main user trash directory
+        let trash_dir = home_dir.join(".Trash");
+        total_freed += clean_directory_contents(&trash_dir, false, args);
+
+        // External volume trash directories
+        if let Ok(entries) = glob("/Volumes/*/.Trashes/*") {
+            for entry in entries.filter_map(Result::ok) {
+                // Only clean trash for current user (use current UID)
+                if let Some(dir_name) = entry.file_name().and_then(|n| n.to_str())
+                    && let Ok(current_uid) = std::process::Command::new("id")
+                        .arg("-u")
+                        .output()
+                        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+                    && dir_name == current_uid
+                {
+                    total_freed += clean_directory_contents(&entry, false, args);
+                }
+            }
+        }
+
+        // Alternative: Use native macOS trash command if available
+        if !args.dry_run && which::which("osascript").is_ok() {
+            let script = r#"
+                tell application "Finder"
+                    empty trash
+                end tell
+            "#;
+
+            if args.dry_run {
+                println!("   [DRY RUN] Would run AppleScript to empty trash");
+            } else {
+                let _ = run_cmd("osascript", &["-e", script]);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let trash_dir = home_dir.join(".local/share/Trash/files");
+        total_freed += clean_directory_contents(&trash_dir, false, args);
+
+        // Also clean the info directory
+        let trash_info_dir = home_dir.join(".local/share/Trash/info");
+        total_freed += clean_directory_contents(&trash_info_dir, false, args);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        if !args.dry_run {
+            let _ = Command::new("powershell")
+                .args(&["-Command", "Clear-RecycleBin -Force"])
+                .status();
+        } else {
+            println!("   [DRY RUN] Would empty Recycle Bin");
+        }
+    }
+
+    total_freed
 }
