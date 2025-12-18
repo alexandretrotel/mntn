@@ -265,7 +265,7 @@ fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (Ser
     #[cfg(target_os = "macos")]
     {
         let should_include = extension == Some("plist");
-        return (ServiceType::Plist, should_include);
+        (ServiceType::Plist, should_include)
     }
 
     #[cfg(target_os = "linux")]
@@ -475,23 +475,51 @@ fn delete_file_with_sudo(path: &PathBuf, is_system_file: bool) {
 
 #[cfg(target_os = "windows")]
 fn list_windows_services() -> Vec<ServiceFile> {
-    let output = Command::new("powershell")
-        .args(&["-Command", "Get-Service | Select-Object Name, Status"])
+    let output = match Command::new("powershell")
+        .args(&[
+            "-NoProfile",
+            "-Command",
+            "Get-Service | Select-Object Name, Status | ConvertTo-Json -Compress",
+        ])
         .output()
-        .expect("Failed to run PowerShell");
+    {
+        Ok(output) => output,
+        Err(_) => return Vec::new(),
+    };
+
+    if !output.status.success() {
+        return Vec::new();
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut services = Vec::new();
 
-    for line in stdout.lines().skip(3) {
-        let name = line.split_whitespace().next();
-        if let Some(name) = name {
-            services.push(ServiceFile {
-                display_label: format!("[Windows Service] {}", name),
-                path: PathBuf::from(name),
-                is_system: false,
-                service_type: ServiceType::WindowsService,
-            });
+    // Parse JSON output - can be an array or single object
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+        let items = match &json {
+            serde_json::Value::Array(arr) => arr.as_slice(),
+            obj @ serde_json::Value::Object(_) => std::slice::from_ref(obj),
+            _ => return services,
+        };
+
+        for item in items {
+            if let Some(name) = item.get("Name").and_then(|v| v.as_str()) {
+                let status = item
+                    .get("Status")
+                    .and_then(|v| v.as_u64())
+                    .map(|s| match s {
+                        1 => "Stopped",
+                        4 => "Running",
+                        _ => "Unknown",
+                    })
+                    .unwrap_or("Unknown");
+
+                services.push(ServiceFile {
+                    display_label: format!("[Windows Service] {} ({})", name, status),
+                    path: PathBuf::from(name),
+                    is_system: false,
+                });
+            }
         }
     }
 
