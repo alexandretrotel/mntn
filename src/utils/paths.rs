@@ -284,6 +284,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_environment_trims_whitespace() {
         unsafe { std::env::set_var("MNTN_ENV", "  staging  ") };
         let env = get_environment();
@@ -295,6 +296,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_environment_empty_string_returns_default() {
         unsafe {
             std::env::set_var("MNTN_ENV", "");
