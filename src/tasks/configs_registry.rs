@@ -22,7 +22,7 @@ impl Task for ConfigsRegistryTask {
         "Configs Registry"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.args.action {
             ConfigsRegistryActions::List {
                 category,
@@ -54,6 +54,7 @@ impl Task for ConfigsRegistryTask {
                 toggle_entry(id.clone(), *enable);
             }
         }
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

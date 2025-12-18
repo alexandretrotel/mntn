@@ -1,4 +1,4 @@
-use crate::logger::{log, log_error, log_success};
+use crate::logger::{log, log_success};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -105,21 +105,18 @@ impl Task for MigrateTask {
         "Migrate"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔄 Migrating legacy backup files...");
         println!("   Target: {} ({})", self.target, self.profile);
 
         let target_dir = self.target.resolve_path(&self.profile);
-        if let Err(e) = fs::create_dir_all(&target_dir) {
-            log_error("Failed to create target directory", e);
-            return;
-        }
+        fs::create_dir_all(&target_dir)?;
 
         let legacy_files = self.find_legacy_files();
 
         if legacy_files.is_empty() {
             log_success("No legacy files found to migrate.");
-            return;
+            return Ok(());
         }
 
         println!("📋 Found {} legacy files to migrate", legacy_files.len());
@@ -166,6 +163,8 @@ impl Task for MigrateTask {
             "✅ Migration complete. Migrated: {}, Failed: {}",
             migrated, failed
         );
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

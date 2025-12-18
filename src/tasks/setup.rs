@@ -236,7 +236,7 @@ fn run_migration(machine_id: &str, environment: &str) {
     let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
 
     let mut task = crate::tasks::migrate::MigrateTask::new(profile, MigrateTarget::Common);
-    crate::tasks::core::Task::execute(&mut task);
+    let _ = crate::tasks::core::Task::execute(&mut task);
 }
 
 fn run_backup(machine_id: &str, environment: &str) {
@@ -245,7 +245,9 @@ fn run_backup(machine_id: &str, environment: &str) {
     let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
 
     let mut task = crate::tasks::backup::BackupTask::new(profile, MigrateTarget::Common);
-    crate::tasks::core::Task::execute(&mut task);
+    if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
+        println!("❌ Error during backup: {}", e);
+    }
 }
 
 fn run_link(machine_id: &str, environment: &str) {
@@ -254,12 +256,12 @@ fn run_link(machine_id: &str, environment: &str) {
     let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
 
     let mut task = crate::tasks::link::LinkTask::new(profile);
-    crate::tasks::core::Task::execute(&mut task);
+    let _ = crate::tasks::core::Task::execute(&mut task);
 }
 
 fn run_install_tasks() {
     println!("📦 Installing scheduled tasks...");
 
     let mut task = crate::tasks::install::InstallTask::new(false);
-    crate::tasks::core::Task::execute(&mut task);
+    let _ = crate::tasks::core::Task::execute(&mut task);
 }

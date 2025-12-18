@@ -1,4 +1,4 @@
-use crate::logger::{log, log_error, log_warning};
+use crate::logger::{log, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -22,18 +22,12 @@ impl Task for RestoreTask {
         "Restore"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔄 Starting restore process...");
         println!("   Profile: {}", self.profile);
 
         let registry_path = get_registry_path();
-        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
-            Ok(registry) => registry,
-            Err(e) => {
-                log_error("Failed to load registry", e);
-                return;
-            }
-        };
+        let registry = ConfigsRegistry::load_or_create(&registry_path)?;
 
         let mut restored_count = 0;
         let mut skipped_count = 0;
@@ -61,6 +55,8 @@ impl Task for RestoreTask {
             "✅ Restore complete. {} restored, {} skipped.",
             restored_count, skipped_count
         );
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

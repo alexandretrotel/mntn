@@ -1,7 +1,7 @@
 use directories_next::BaseDirs;
 use std::fs;
-use whoami;
 use std::path::PathBuf;
+use whoami;
 
 /// Relative path to the directory used for storing general backup files.
 pub const BACKUP_DIR: &str = "backup";

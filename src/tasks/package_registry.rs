@@ -20,7 +20,7 @@ impl Task for PackageRegistryTask {
         "Package Registry"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.args.action {
             PackageRegistryActions::List {
                 enabled_only,
@@ -54,6 +54,8 @@ impl Task for PackageRegistryTask {
                 toggle_entry(id.clone(), *enable);
             }
         }
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

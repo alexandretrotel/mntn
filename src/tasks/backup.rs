@@ -26,20 +26,21 @@ impl Task for BackupTask {
         "Backup"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let backup_dir = self.target.resolve_path(&self.profile);
-        fs::create_dir_all(&backup_dir).unwrap();
+        fs::create_dir_all(&backup_dir)?;
 
         println!("🔁 Backing up...");
         println!("   Target: {} ({})", self.target, self.profile);
 
         let package_dir = get_backup_root();
-        fs::create_dir_all(&package_dir).unwrap();
+        fs::create_dir_all(&package_dir)?;
         backup_package_managers(&package_dir);
 
         backup_config_files_from_registry(&backup_dir);
 
         println!("✅ Backup complete.");
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

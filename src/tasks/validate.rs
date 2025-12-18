@@ -475,7 +475,7 @@ impl Task for ValidateTask {
         "Validate"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔍 Validating configuration...");
         println!("   Profile: {}", self.profile);
         log("Starting validation");
@@ -500,6 +500,7 @@ impl Task for ValidateTask {
                 error_count, warning_count
             ));
         }
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

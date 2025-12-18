@@ -51,7 +51,7 @@ impl Task for DeleteTask {
         "Delete"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.args.permanent {
             println!("🗑 Permanently deleting application and related files...");
         } else {
@@ -85,6 +85,8 @@ impl Task for DeleteTask {
         }
 
         log("Operation complete");
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
@@ -134,7 +136,7 @@ pub fn run_with_args(args: DeleteArgs) {
         println!("      No files will actually be deleted.");
         println!();
     }
-    task.execute();
+    let _ = task.execute();
     if task.args.dry_run {
         crate::logger::log(&format!("[DRY RUN] {} complete", task.name()));
     }

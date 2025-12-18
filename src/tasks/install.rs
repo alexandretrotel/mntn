@@ -24,7 +24,7 @@ impl Task for InstallTask {
         "Install"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("📦 Installing scheduled tasks...");
 
         let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
@@ -40,12 +40,11 @@ impl Task for InstallTask {
 
         for task in tasks.into_iter() {
             if let Err(e) = task.install() {
-                println!("❌ Failed to install {}: {}", task.label(), e);
-                log(&format!("Failed to install {}: {}", task.label(), e));
+                println!("Failed to install scheduled task: {}", e);
+                log(&format!("Failed to install scheduled task: {}", e));
             }
         }
-
-        println!("✅ Scheduled tasks installed.");
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
@@ -121,9 +120,6 @@ impl ScheduledTask {
             args: args.iter().map(|s| s.to_string()).collect(),
             interval,
         }
-    }
-    fn label(&self) -> &str {
-        &self.label
     }
 
     fn install(&self) -> Result<(), Box<dyn std::error::Error>> {

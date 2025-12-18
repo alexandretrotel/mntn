@@ -37,7 +37,7 @@ impl Task for SyncTask {
         "Sync"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let args = SyncArgs {
             init: self.init,
             remote_url: self.remote_url.clone(),
@@ -51,6 +51,8 @@ impl Task for SyncTask {
         if let Err(e) = sync_with_git(args) {
             eprintln!("❌ Sync failed: {}", e);
         }
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

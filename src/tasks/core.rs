@@ -29,7 +29,7 @@ pub trait Task {
     fn name(&self) -> &str;
 
     /// Execute the task
-    fn execute(&mut self);
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Preview what the task would do (for dry-run mode)
     fn dry_run(&self) -> Vec<PlannedOperation>;
@@ -64,7 +64,11 @@ impl TaskExecutor {
             log(&format!("[DRY RUN] {} complete", name));
         } else {
             log(&format!("Starting {}", name));
-            task.execute();
+            if let Err(e) = task.execute() {
+                log(&format!("Error during {}: {}", name, e));
+                println!("❌ Error during {}: {}", name, e);
+                return;
+            }
             log(&format!("{} complete", name));
         }
     }

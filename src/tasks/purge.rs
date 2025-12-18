@@ -59,7 +59,7 @@ impl Task for PurgeTask {
         "Purge"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "macos")]
         println!("🧼 Listing all launch agents and daemons...");
         #[cfg(target_os = "linux")]
@@ -77,7 +77,7 @@ impl Task for PurgeTask {
             println!("📁 No systemd services or autostart programs found.");
             #[cfg(target_os = "windows")]
             println!("📁 No Windows services or startup programs found.");
-            return;
+            return Ok(());
         }
 
         let options: Vec<String> = service_files
@@ -100,6 +100,8 @@ impl Task for PurgeTask {
         }
 
         println!("✅ Selected items deleted.");
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

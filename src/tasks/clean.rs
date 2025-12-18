@@ -28,7 +28,7 @@ impl Task for CleanTask {
         "Clean"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🧹 Cleaning system junk...");
 
         let args = CleanArgs {
@@ -55,6 +55,8 @@ impl Task for CleanTask {
 
         let space_saved_str = bytes_to_human_readable(total_space_saved);
         println!("✅ System cleaned. Freed {}.", space_saved_str);
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {

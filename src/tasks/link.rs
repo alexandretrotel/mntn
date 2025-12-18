@@ -22,26 +22,15 @@ impl Task for LinkTask {
         "Link"
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔗 Creating symlinks...");
         println!("   Profile: {}", self.profile);
 
         let symlinks_dir = get_symlinks_path();
-        if let Err(e) = fs::create_dir_all(&symlinks_dir) {
-            println!("Failed to create symlinks directory: {e}");
-            log(&format!("Failed to create symlinks directory: {e}"));
-            return;
-        }
+        fs::create_dir_all(&symlinks_dir)?;
 
         let registry_path = get_registry_path();
-        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
-            Ok(registry) => registry,
-            Err(e) => {
-                println!("❌ Failed to load registry: {}", e);
-                log(&format!("Failed to load registry: {}", e));
-                return;
-            }
-        };
+        let registry = ConfigsRegistry::load_or_create(&registry_path)?;
 
         let mut links_processed = 0;
         let mut links_skipped = 0;
@@ -49,7 +38,7 @@ impl Task for LinkTask {
 
         if links_total == 0 {
             println!("ℹ️ No enabled entries found in registry.");
-            return;
+            return Ok(());
         }
 
         println!("📋 Found {} enabled entries in registry", links_total);
@@ -84,6 +73,8 @@ impl Task for LinkTask {
             "✅ Symlink creation complete. Processed: {}, Skipped: {}",
             links_processed, links_skipped
         );
+
+        Ok(())
     }
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
