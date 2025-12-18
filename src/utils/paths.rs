@@ -261,6 +261,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_environment_default() {
         // Clear MNTN_ENV to test default behavior
         unsafe {
@@ -271,6 +272,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_environment_from_env_var() {
         unsafe {
             std::env::set_var("MNTN_ENV", "production");
@@ -298,6 +300,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_environment_whitespace_only_returns_default() {
         unsafe {
             std::env::set_var("MNTN_ENV", "   ");
