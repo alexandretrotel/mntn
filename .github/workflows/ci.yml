@@ -127,5 +127,4 @@ jobs:
 
       - name: Verify binaries exist
         run: |
-          ls -la target/release/todo-tree
-          ls -la target/release/tt
+          ls -la target/release/mntn
