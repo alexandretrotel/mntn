@@ -174,8 +174,10 @@ mod tests {
         let registry_path = temp_dir.path().join("registry.json");
 
         // Create and save a registry
-        let mut original: Registry<TestEntry> = Registry::default();
-        original.version = "2.0.0".to_string();
+        let mut original: Registry<TestEntry> = Registry {
+            version: "2.0.0".to_string(),
+            ..Default::default()
+        };
         original.add_entry("test".to_string(), create_test_entry("Test", true, 100));
         original.save(&registry_path).unwrap();
 
@@ -263,13 +265,17 @@ mod tests {
         let registry_path = temp_dir.path().join("registry.json");
 
         // Save first version
-        let mut registry1: Registry<TestEntry> = Registry::default();
-        registry1.version = "1.0.0".to_string();
+        let registry1: Registry<TestEntry> = Registry {
+            version: "1.0.0".to_string(),
+            ..Default::default()
+        };
         registry1.save(&registry_path).unwrap();
 
         // Save second version
-        let mut registry2: Registry<TestEntry> = Registry::default();
-        registry2.version = "2.0.0".to_string();
+        let registry2: Registry<TestEntry> = Registry {
+            version: "2.0.0".to_string(),
+            ..Default::default()
+        };
         registry2.save(&registry_path).unwrap();
 
         // Load and verify
@@ -469,8 +475,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let registry_path = temp_dir.path().join("registry.json");
 
-        let mut original: Registry<TestEntry> = Registry::default();
-        original.version = "test-version".to_string();
+        let mut original: Registry<TestEntry> = Registry {
+            version: "test-version".to_string(),
+            ..Default::default()
+        };
         original.add_entry("entry1".to_string(), create_test_entry("Entry 1", true, 10));
         original.add_entry(
             "entry2".to_string(),

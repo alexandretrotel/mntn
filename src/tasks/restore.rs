@@ -273,8 +273,8 @@ mod tests {
         let result = restore_config_file(&backup_dir, &target_dir, "test-dir");
 
         // May fail without rsync, but should handle gracefully
-        // Just check it doesn't panic
-        assert!(result == true || result == false);
+        // Just check it doesn't panic - result is always a bool
+        let _ = result;
     }
 
     #[test]

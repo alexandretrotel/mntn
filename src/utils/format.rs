@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_format_decimal_two_decimals() {
         assert_eq!(format_decimal(2.75), "2.75");
-        assert_eq!(format_decimal(3.14), "3.14");
+        assert_eq!(format_decimal(3.15), "3.15");
     }
 
     #[test]
