@@ -1,4 +1,4 @@
-use crate::logger::{log, log_error, log_info};
+use crate::logger::{log, log_error, log_info, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
@@ -129,21 +129,18 @@ fn backup_package_managers(backup_dir: &Path) {
         match result {
             Ok(Ok(content)) => {
                 if let Err(e) = fs::write(backup_dir.join(&entry.output_file), content) {
-                    println!("⚠️ Failed to write {}: {}", entry.output_file, e);
-                    log(&format!("Failed to write {}: {}", entry.output_file, e));
+                    log_warning(&format!("Failed to write {}: {}", entry.output_file, e));
                 } else {
                     println!("🔁 Backed up {} ({})", entry.name, id);
                     log(&format!("Backed up {}", entry.name));
                 }
             }
             Ok(Err(e)) => {
-                println!("⚠️ Command for {} failed: {}", entry.name, e);
-                log(&format!("Command for {} failed: {}", entry.name, e));
+                log_warning(&format!("Command for {} failed: {}", entry.name, e));
                 let _ = fs::write(backup_dir.join(&entry.output_file), "");
             }
             Err(()) => {
-                println!("⚠️ Command for {} panicked", entry.name);
-                log(&format!("Command for {} panicked", entry.name));
+                log_warning(&format!("Command for {} panicked", entry.name));
                 let _ = fs::write(backup_dir.join(&entry.output_file), "");
             }
         }
@@ -180,11 +177,7 @@ fn backup_config_files(backup_dir: &Path) {
         if let Some(parent) = backup_destination.parent()
             && let Err(e) = fs::create_dir_all(parent)
         {
-            println!(
-                "⚠️ Failed to create backup directory for {}: {}",
-                entry.name, e
-            );
-            log(&format!(
+            log_warning(&format!(
                 "Failed to create backup directory for {}: {}",
                 entry.name, e
             ));
@@ -207,8 +200,7 @@ fn backup_config_files(backup_dir: &Path) {
                 ));
             }
             Err(e) => {
-                println!("⚠️ Failed to backup {}: {}", entry.name, e);
-                log(&format!("Failed to backup {}: {}", entry.name, e));
+                log_warning(&format!("Failed to backup {}: {}", entry.name, e));
             }
         }
     }
