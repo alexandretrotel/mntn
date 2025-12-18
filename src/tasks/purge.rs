@@ -260,12 +260,12 @@ fn get_service_type_name() -> &'static str {
 /// Determines the service type and whether the file should be included
 fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (ServiceType, bool) {
     let extension = service_path.extension().and_then(|s| s.to_str());
+    let _ = target;
 
     #[cfg(target_os = "macos")]
     {
-        if extension == Some("plist") {
-            return (ServiceType::Plist, true);
-        }
+        let should_include = extension == Some("plist");
+        return (ServiceType::Plist, should_include);
     }
 
     #[cfg(target_os = "linux")]
@@ -282,24 +282,12 @@ fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (Ser
         {
             return (ServiceType::AutostartDesktop, true);
         }
+        return (ServiceType::SystemdService, false);
     }
 
     #[cfg(target_os = "windows")]
     {
-        let _ = target;
         (ServiceType::WindowsService, false)
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = target;
-        (ServiceType::Plist, false)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let _ = target;
-        (ServiceType::SystemdService, false)
     }
 }
 
