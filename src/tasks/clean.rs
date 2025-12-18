@@ -376,9 +376,11 @@ fn should_skip(path: &Path) -> bool {
                 .and_then(|name| name.to_str())
                 .map(|name| name.contains(pattern))
                 .unwrap_or(false)
-                || path
-                    .components()
-                    .any(|comp| comp.as_os_str().to_str().is_some_and(|s| s.contains(pattern)))
+                || path.components().any(|comp| {
+                    comp.as_os_str()
+                        .to_str()
+                        .is_some_and(|s| s.contains(pattern))
+                })
         })
     }
 }
