@@ -110,33 +110,10 @@ impl Task for DeleteTask {
 
 /// Run with CLI args
 pub fn run_with_args(args: DeleteArgs) {
+    use crate::tasks::core::TaskExecutor;
+    let dry_run = args.dry_run;
     let mut task = DeleteTask::new(args);
-    if task.args.dry_run {
-        println!("[DRY RUN] {}", task.name());
-        crate::logger::log(&format!("[DRY RUN] Starting {}", task.name()));
-        let operations = task.dry_run();
-        if operations.is_empty() {
-            println!("  No operations to perform.");
-        } else {
-            println!("  Planned operations:");
-            for op in &operations {
-                if let Some(target) = &op.target {
-                    println!("    - {} -> {}", op.description, target);
-                } else {
-                    println!("    - {}", op.description);
-                }
-            }
-            println!("  Total: {} operation(s)", operations.len());
-        }
-        println!();
-        println!("Note: In dry-run mode, you will still be prompted to select an app.");
-        println!("      No files will actually be deleted.");
-        println!();
-    }
-    let _ = task.execute();
-    if task.args.dry_run {
-        crate::logger::log(&format!("[DRY RUN] {} complete", task.name()));
-    }
+    TaskExecutor::run(&mut task, dry_run);
 }
 
 /// Prompts the user to choose an installed application from `/Applications`.
