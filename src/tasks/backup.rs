@@ -35,8 +35,8 @@ impl Task for BackupTask {
 
         let package_dir = get_backup_root();
         fs::create_dir_all(&package_dir)?;
-        backup_package_managers(&package_dir);
 
+        backup_package_managers(&package_dir);
         backup_config_files(&backup_dir);
 
         println!("✅ Backup complete.");
