@@ -37,7 +37,7 @@ impl Task for BackupTask {
         fs::create_dir_all(&package_dir)?;
         backup_package_managers(&package_dir);
 
-        backup_config_files_from_registry(&backup_dir);
+        backup_config_files(&backup_dir);
 
         println!("✅ Backup complete.");
         Ok(())
@@ -151,7 +151,7 @@ fn backup_package_managers(backup_dir: &Path) {
 }
 
 /// Backs up configuration files based on the registry entries
-fn backup_config_files_from_registry(backup_dir: &Path) {
+fn backup_config_files(backup_dir: &Path) {
     let registry_path = get_registry_path();
     let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
