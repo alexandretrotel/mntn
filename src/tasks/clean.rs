@@ -51,7 +51,8 @@ impl Task for CleanTask {
         }
 
         total_space_saved += clean_package_managers(&args);
-        total_space_saved += clean_trash(&args);
+
+        total_space_saved += clean_trash();
 
         let space_saved_str = bytes_to_human_readable(total_space_saved);
         println!("✅ System cleaned. Freed {}.", space_saved_str);
@@ -388,74 +389,71 @@ fn should_skip(path: &Path) -> bool {
 }
 
 /// Clean the trash/recycle bin for the current user
-fn clean_trash(args: &CleanArgs) -> u64 {
+/// ⚠️ This ALWAYS executes — never a dry-run
+fn clean_trash() -> u64 {
     let mut total_freed = 0u64;
 
     let base_dirs = get_base_dirs();
     let home_dir = base_dirs.home_dir();
 
-    println!("🔹 Emptying trash...");
+    println!("🗑️  Emptying trash...");
 
     #[cfg(target_os = "macos")]
     {
-        // Main user trash directory
         let trash_dir = home_dir.join(".Trash");
-        total_freed += clean_directory_contents(&trash_dir, false, args);
+        total_freed += clean_directory_contents_force(&trash_dir);
 
         // External volume trash directories
         if let Ok(entries) = glob("/Volumes/*/.Trashes/*") {
             for entry in entries.filter_map(Result::ok) {
-                // Only clean trash for current user (use current UID)
-                if let Some(dir_name) = entry.file_name().and_then(|n| n.to_str())
-                    && let Ok(current_uid) = std::process::Command::new("id")
-                        .arg("-u")
-                        .output()
-                        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-                    && dir_name == current_uid
-                {
-                    total_freed += clean_directory_contents(&entry, false, args);
-                }
+                total_freed += clean_directory_contents_force(&entry);
             }
         }
 
-        // Alternative: Use native macOS trash command if available
-        if !args.dry_run && which::which("osascript").is_ok() {
+        if which::which("osascript").is_ok() {
             let script = r#"
                 tell application "Finder"
                     empty trash
                 end tell
             "#;
-
-            if args.dry_run {
-                println!("   [DRY RUN] Would run AppleScript to empty trash");
-            } else {
-                let _ = run_cmd("osascript", &["-e", script]);
-            }
+            let _ = run_cmd("osascript", &["-e", script]);
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        let trash_dir = home_dir.join(".local/share/Trash/files");
-        total_freed += clean_directory_contents(&trash_dir, false, args);
-
-        // Also clean the info directory
-        let trash_info_dir = home_dir.join(".local/share/Trash/info");
-        total_freed += clean_directory_contents(&trash_info_dir, false, args);
+        total_freed += clean_directory_contents_force(
+            &home_dir.join(".local/share/Trash/files"),
+        );
+        total_freed += clean_directory_contents_force(
+            &home_dir.join(".local/share/Trash/info"),
+        );
     }
 
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-
-        if !args.dry_run {
-            let _ = Command::new("powershell")
-                .args(&["-Command", "Clear-RecycleBin -Force"])
-                .status();
-        } else {
-            println!("   [DRY RUN] Would empty Recycle Bin");
-        }
+        let _ = Command::new("powershell")
+            .args(&["-Command", "Clear-RecycleBin -Force"])
+            .status();
     }
 
     total_freed
+}
+
+/// Force-delete directory contents
+fn clean_directory_contents_force(dir: &Path) -> u64 {
+    if !dir.exists() {
+        return 0;
+    }
+
+    let mut freed = 0;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            freed += calculate_dir_size(&path).unwrap_or(0);
+            let _ = fs::remove_dir_all(&path).or_else(|_| fs::remove_file(&path));
+        }
+    }
+    freed
 }
