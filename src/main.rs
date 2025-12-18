@@ -9,10 +9,12 @@ mod utils;
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 use tasks::{
-    backup, biometric_sudo, clean, configs_registry as configs_registry_task, delete, install,
-    link, migrate, package_registry as package_registry_task, purge, restore, setup, sync,
-    validate,
+    backup, clean, configs_registry as configs_registry_task, install, link, migrate,
+    package_registry as package_registry_task, purge, restore, setup, sync, validate,
 };
+
+#[cfg(target_os = "macos")]
+use tasks::{biometric_sudo, delete};
 
 fn main() {
     let cli = Cli::parse();
@@ -22,9 +24,7 @@ fn main() {
         Some(Commands::Clean(args)) => clean::run_with_args(args),
         Some(Commands::Purge(args)) => purge::run_with_args(args),
         Some(Commands::Link(args)) => link::run_with_args(args),
-        Some(Commands::Delete(args)) => delete::run_with_args(args),
         Some(Commands::Install(args)) => install::run_with_args(args),
-        Some(Commands::BiometricSudo(args)) => biometric_sudo::run_with_args(args),
         Some(Commands::Restore(args)) => restore::run_with_args(args),
         Some(Commands::Registry(args)) => configs_registry_task::run_with_args(args),
         Some(Commands::PackageRegistry(args)) => package_registry_task::run_with_args(args),
@@ -32,6 +32,10 @@ fn main() {
         Some(Commands::Validate(args)) => validate::run_with_args(args),
         Some(Commands::Migrate(args)) => migrate::run_with_args(args),
         Some(Commands::Setup) => setup::run(),
+        #[cfg(target_os = "macos")]
+        Some(Commands::Delete(args)) => delete::run_with_args(args),
+        #[cfg(target_os = "macos")]
+        Some(Commands::BiometricSudo(args)) => biometric_sudo::run_with_args(args),
         None => {
             Cli::command().print_help().expect("Failed to print help");
         }

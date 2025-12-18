@@ -3,8 +3,6 @@ use crate::logger::log;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_base_dirs;
 use std::fs;
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
 use std::process::Command;
 use which::which;
 

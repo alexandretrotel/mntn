@@ -1,5 +1,6 @@
 use glob::glob;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
@@ -59,8 +60,10 @@ impl Task for CleanTask {
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
         let base_dirs = get_base_dirs();
-        let home_dir = base_dirs.home_dir();
         let cache_dir = base_dirs.cache_dir();
+
+        #[cfg(target_os = "macos")]
+        let home_dir = base_dirs.home_dir();
 
         // User directories
         operations.push(PlannedOperation::with_target(
@@ -146,8 +149,10 @@ fn clean_user_directories(args: &CleanArgs) -> u64 {
 
     // Get base directories
     let base_dirs = get_base_dirs();
-    let home_dir = base_dirs.home_dir();
     let cache_dir = base_dirs.cache_dir();
+
+    #[cfg(target_os = "macos")]
+    let home_dir = base_dirs.home_dir();
 
     // Cross-platform user cache directory
     user_paths.push(cache_dir.to_path_buf());
@@ -343,23 +348,39 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
 fn should_skip(path: &Path) -> bool {
     let skip_patterns = [".X11-unix", "systemd-private", "asl", ".DS_Store"];
 
-    skip_patterns.iter().any(|&pattern| {
-        let pattern_bytes = pattern.as_bytes();
+    #[cfg(unix)]
+    {
+        skip_patterns.iter().any(|&pattern| {
+            let pattern_bytes = pattern.as_bytes();
 
-        path.file_name()
-            .map(|name| {
-                name.as_bytes()
-                    .windows(pattern_bytes.len())
-                    .any(|window| window == pattern_bytes)
-            })
-            .unwrap_or(false)
-            || path.components().any(|comp| {
-                comp.as_os_str()
-                    .as_bytes()
-                    .windows(pattern_bytes.len())
-                    .any(|window| window == pattern_bytes)
-            })
-    })
+            path.file_name()
+                .map(|name| {
+                    name.as_bytes()
+                        .windows(pattern_bytes.len())
+                        .any(|window| window == pattern_bytes)
+                })
+                .unwrap_or(false)
+                || path.components().any(|comp| {
+                    comp.as_os_str()
+                        .as_bytes()
+                        .windows(pattern_bytes.len())
+                        .any(|window| window == pattern_bytes)
+                })
+        })
+    }
+
+    #[cfg(not(unix))]
+    {
+        skip_patterns.iter().any(|&pattern| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.contains(pattern))
+                .unwrap_or(false)
+                || path
+                    .components()
+                    .any(|comp| comp.as_os_str().to_str().is_some_and(|s| s.contains(pattern)))
+        })
+    }
 }
 
 /// Clean the trash/recycle bin for the current user

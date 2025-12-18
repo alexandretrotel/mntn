@@ -21,6 +21,8 @@ struct ServiceFile {
     display_label: String,
     path: PathBuf,
     is_system: bool,
+    #[allow(dead_code)] // Used on Linux and Windows platforms
+    service_type: ServiceType,
 }
 
 /// Types of services that can be managed
@@ -128,6 +130,8 @@ fn get_directory_targets(include_system: bool) -> Vec<DirectoryTarget> {
     let mut targets = Vec::new();
 
     let base_dirs = get_base_dirs();
+
+    #[cfg(target_os = "macos")]
     let home_dir = base_dirs.home_dir();
     #[cfg(target_os = "linux")]
     let config_dir = base_dirs.config_dir();
@@ -214,6 +218,7 @@ fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
                         display_label,
                         path: service_path,
                         is_system: target.is_system,
+                        service_type,
                     });
                 }
             }
@@ -268,12 +273,22 @@ fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (Ser
         }
     }
 
+    #[cfg(target_os = "windows")]
     {
         let _ = target;
-        #[cfg(target_os = "windows")]
-        return (ServiceType::WindowsService, false);
-        #[cfg(not(target_os = "windows"))]
-        return (ServiceType::Plist, false);
+        (ServiceType::WindowsService, false)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = target;
+        (ServiceType::Plist, false)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = target;
+        (ServiceType::SystemdService, false)
     }
 }
 
@@ -344,7 +359,7 @@ fn get_service_display_label(
 
 #[cfg(target_os = "linux")]
 /// Gets the description from a systemd service file
-fn get_systemd_service_description(service_path: &PathBuf) -> Option<String> {
+fn get_systemd_service_description(service_path: &Path) -> Option<String> {
     let content = fs::read_to_string(service_path).ok()?;
 
     for line in content.lines() {
@@ -358,7 +373,7 @@ fn get_systemd_service_description(service_path: &PathBuf) -> Option<String> {
 
 #[cfg(target_os = "linux")]
 /// Gets the name from a desktop file
-fn get_desktop_file_name(desktop_path: &PathBuf) -> Option<String> {
+fn get_desktop_file_name(desktop_path: &Path) -> Option<String> {
     let content = fs::read_to_string(desktop_path).ok()?;
 
     for line in content.lines() {
@@ -399,7 +414,6 @@ fn delete_service_file(service_file: &ServiceFile) {
         ServiceType::AutostartDesktop => {
             delete_file_with_sudo(&service_file.path, service_file.is_system);
         }
-        _ => {}
     }
 
     #[cfg(target_os = "windows")]
@@ -425,7 +439,6 @@ fn delete_service_file(service_file: &ServiceFile) {
                 println!("🛑 Deleted Windows service: {}", service_name);
             }
         }
-        _ => {}
     }
 }
 

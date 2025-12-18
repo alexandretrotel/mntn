@@ -1,8 +1,10 @@
 pub mod backup;
+#[cfg(target_os = "macos")]
 pub mod biometric_sudo;
 pub mod clean;
 pub mod configs_registry;
 pub mod core;
+#[cfg(target_os = "macos")]
 pub mod delete;
 pub mod install;
 pub mod link;
