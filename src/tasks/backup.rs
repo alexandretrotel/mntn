@@ -112,14 +112,10 @@ fn backup_package_managers(backup_dir: &Path) {
     let results: Vec<_> = compatible_entries
         .par_iter()
         .map(|(id, entry)| {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
-                run_cmd(&entry.command, &args)
-            }));
-            let result = match result {
-                Ok(Ok(content)) => Ok(Ok(content)),
-                Ok(Err(e)) => Ok(Err(e.to_string())),
-                Err(_) => Err(()),
+            let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
+            let result = match run_cmd(&entry.command, &args) {
+                Ok(content) => Ok(content),
+                Err(e) => Err(e.to_string()),
             };
             ((*id).clone(), (*entry).clone(), result)
         })
@@ -127,7 +123,7 @@ fn backup_package_managers(backup_dir: &Path) {
 
     for (id, entry, result) in results {
         match result {
-            Ok(Ok(content)) => {
+            Ok(content) => {
                 if let Err(e) = fs::write(backup_dir.join(&entry.output_file), content) {
                     log_warning(&format!("Failed to write {}: {}", entry.output_file, e));
                 } else {
@@ -135,12 +131,8 @@ fn backup_package_managers(backup_dir: &Path) {
                     log(&format!("Backed up {}", entry.name));
                 }
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 log_warning(&format!("Command for {} failed: {}", entry.name, e));
-                let _ = fs::write(backup_dir.join(&entry.output_file), "");
-            }
-            Err(()) => {
-                log_warning(&format!("Command for {} panicked", entry.name));
                 let _ = fs::write(backup_dir.join(&entry.output_file), "");
             }
         }
