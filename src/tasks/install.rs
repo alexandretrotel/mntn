@@ -195,7 +195,7 @@ impl ScheduledTask {
             "[Unit]\nDescription=Run {} task\n\n[Service]\nType=oneshot\nExecStart={}\n",
             self.label, exec
         );
-        let timer_content = if self.interval.is_multiple_of(3600) {
+        let timer_content = if self.interval % 3600 == 0 {
             let hours = self.interval / 3600;
             if hours == 1 {
                 "[Unit]\nDescription=Hourly task\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n".to_string()
