@@ -162,6 +162,8 @@ pub struct RestoreArgs {
         help = "Show what would be restored without performing any actions"
     )]
     pub dry_run: bool,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the biometric sudo command.

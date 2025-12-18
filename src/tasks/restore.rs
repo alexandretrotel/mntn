@@ -89,7 +89,7 @@ impl Task for RestoreTask {
 
 pub fn run_with_args(args: crate::cli::RestoreArgs) {
     use crate::tasks::core::TaskExecutor;
-    let profile = ActiveProfile::from_defaults();
+    let profile = args.profile_args.resolve();
     TaskExecutor::run(&mut RestoreTask::new(profile), args.dry_run);
 }
 
