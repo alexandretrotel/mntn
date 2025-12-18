@@ -86,9 +86,18 @@ impl Task for PurgeTask {
         let service_type_name = get_service_type_name();
         let prompt_message = format!("Select {} to delete:", service_type_name);
 
-        let to_delete = MultiSelect::new(&prompt_message, options.clone())
-            .prompt()
-            .unwrap_or_default();
+        let to_delete = match MultiSelect::new(&prompt_message, options.clone()).prompt() {
+            Ok(selected) => selected,
+            Err(_) => {
+                log_info("Selection cancelled");
+                return Ok(());
+            }
+        };
+
+        if to_delete.is_empty() {
+            log_info("No items selected");
+            return Ok(());
+        }
 
         for selected in to_delete {
             if let Some(service_file) = service_files.iter().find(|f| f.display_label == selected) {
