@@ -153,10 +153,7 @@ mod tests {
         let output = result.unwrap();
         // The output should contain the temp directory path
         let temp_dir_str = temp_dir.path().to_str().unwrap();
-        assert!(
-            output.trim().contains(temp_dir_str) ||
-            temp_dir_str.contains(output.trim())
-        );
+        assert!(output.trim().contains(temp_dir_str) || temp_dir_str.contains(output.trim()));
     }
 
     #[test]
