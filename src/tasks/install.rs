@@ -131,11 +131,11 @@ impl ScheduledTask {
         }
         #[cfg(target_os = "linux")]
         {
-            return self.install_systemd_user();
+            self.install_systemd_user()
         }
         #[cfg(target_os = "windows")]
         {
-            return self.install_windows();
+            self.install_windows()
         }
     }
 
@@ -189,7 +189,7 @@ impl ScheduledTask {
         let binary_path = which(&self.binary)?.to_str().unwrap().to_string();
         let base_dirs = get_base_dirs();
         let config_dir = base_dirs.config_dir();
-        fs::create_dir_all(&config_dir)?;
+        fs::create_dir_all(config_dir)?;
         let service_name = format!("{}.service", self.label);
         let timer_name = format!("{}.timer", self.label);
         let service_path = config_dir.join(&service_name);
@@ -199,7 +199,7 @@ impl ScheduledTask {
             "[Unit]\nDescription=Run {} task\n\n[Service]\nType=oneshot\nExecStart={}\n",
             self.label, exec
         );
-        let timer_content = if self.interval % 3600 == 0 {
+        let timer_content = if self.interval.is_multiple_of(3600) {
             let hours = self.interval / 3600;
             if hours == 1 {
                 "[Unit]\nDescription=Hourly task\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n".to_string()
