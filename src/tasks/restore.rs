@@ -1,4 +1,4 @@
-use crate::logger::{log, log_warning};
+use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -45,16 +45,16 @@ impl Task for RestoreTask {
                     }
                 }
                 None => {
-                    println!("ℹ️ No backup found for {} in any layer", entry.name);
+                    log_info(&format!("No backup found for {} in any layer", entry.name));
                     skipped_count += 1;
                 }
             }
         }
 
-        println!(
-            "✅ Restore complete. {} restored, {} skipped.",
+        log_success(&format!(
+            "Restore complete. {} restored, {} skipped",
             restored_count, skipped_count
-        );
+        ));
 
         Ok(())
     }

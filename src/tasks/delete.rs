@@ -1,5 +1,5 @@
 use crate::cli::DeleteArgs;
-use crate::logger::log;
+use crate::logger::{log, log_error, log_info, log_success, log_warning};
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::get_base_dirs;
 use inquire::{MultiSelect, Select};
@@ -65,23 +65,20 @@ impl Task for DeleteTask {
         match prompt_user_to_select_app() {
             Ok(Some(app_name)) => match delete(&app_name, &self.args) {
                 Ok(true) => {
-                    println!("✅ {} and related files removed.", app_name);
-                    log(&format!("Processed {} and related files", app_name));
+                    log_success(&format!("{} and related files removed", app_name));
                 }
                 Ok(false) => {
-                    println!(
-                        "⚠️ {} was partially deleted (some errors occurred).",
+                    log_warning(&format!(
+                        "{} was partially deleted (some errors occurred)",
                         app_name
-                    );
-                    log(&format!("Partial processing for {}", app_name));
+                    ));
                 }
-                Err(e) => prompt_error(&format!("Failed to process {}", app_name), e),
+                Err(e) => log_error(&format!("Failed to process {}", app_name), e),
             },
             Ok(None) => {
-                println!("📁 No apps found or no selection made.");
-                log("No apps found or no selection made");
+                log_info("No apps found or no selection made");
             }
-            Err(e) => prompt_error("Error selecting app", e),
+            Err(e) => log_error("Error selecting app", e),
         }
 
         log("Operation complete");
@@ -410,12 +407,12 @@ fn is_homebrew_app(app_name: &str) -> bool {
         Ok(o) => match String::from_utf8(o.stdout) {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Invalid UTF-8 output from brew: {}", e);
+                log_error("Invalid UTF-8 output from brew", e);
                 return false;
             }
         },
         Err(e) => {
-            eprintln!("Failed to run brew: {}", e);
+            log_error("Failed to run brew", e);
             return false;
         }
     };
@@ -520,6 +517,5 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
 
 /// Helper function to log and display an error in a consistent format.
 fn prompt_error(context: &str, error: impl std::fmt::Debug) {
-    println!("❌ {}: {:?}", context, error);
-    log(&format!("{}: {:?}", context, error));
+    log_error(context, format!("{:?}", error));
 }

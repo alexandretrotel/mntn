@@ -1,4 +1,4 @@
-use crate::logger::log;
+use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
@@ -488,14 +488,9 @@ impl Task for ValidateTask {
         let error_count = report.error_count();
         let warning_count = report.warning_count();
         if error_count == 0 && warning_count == 0 {
-            println!("✅ All checks passed.");
-            log("Validation complete: all checks passed");
+            log_success("All checks passed");
         } else {
-            println!(
-                "⚠️  Validation complete: {} error(s), {} warning(s)",
-                error_count, warning_count
-            );
-            log(&format!(
+            log_warning(&format!(
                 "Validation complete: {} error(s), {} warning(s)",
                 error_count, warning_count
             ));
@@ -515,7 +510,7 @@ impl Task for ValidateTask {
 
 pub fn run_with_args(args: crate::cli::ValidateArgs) {
     if let Ok(true) = ProfileConfig::save_default_if_missing() {
-        println!("ℹ️  Created default profile config at ~/.mntn/profile.json");
+        log_info("Created default profile config at ~/.mntn/profile.json");
     }
 
     let profile = ActiveProfile::from_defaults();

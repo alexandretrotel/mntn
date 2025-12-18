@@ -1,4 +1,4 @@
-use crate::logger::{log, log_error, log_info, log_warning};
+use crate::logger::{log, log_error, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
@@ -39,7 +39,7 @@ impl Task for BackupTask {
         backup_package_managers(&package_dir);
         backup_config_files(&backup_dir);
 
-        println!("✅ Backup complete.");
+        log_success("Backup complete");
         Ok(())
     }
 

@@ -1,3 +1,4 @@
+use crate::logger::{log_error, log_info, log_success, log_warning};
 use crate::profile::{ActiveProfile, ProfileConfig, ProfileDefinition};
 use crate::tasks::migrate::MigrateTarget;
 use crate::utils::paths::{
@@ -14,7 +15,7 @@ pub fn run() {
     println!();
 
     if let Err(e) = fs::create_dir_all(get_mntn_dir()) {
-        println!("❌ Failed to create ~/.mntn directory: {}", e);
+        log_error("Failed to create ~/.mntn directory", e);
         return;
     }
 
@@ -67,7 +68,7 @@ pub fn run() {
         .unwrap_or(false);
 
     if !proceed {
-        println!("Setup cancelled.");
+        log_info("Setup cancelled");
         return;
     }
 
@@ -90,7 +91,7 @@ pub fn run() {
     }
 
     println!();
-    println!("✅ Setup complete!");
+    log_success("Setup complete!");
     println!();
     println!("📖 Quick reference:");
     println!("   mntn backup          - Backup your configurations");
@@ -130,7 +131,7 @@ fn setup_machine_id() -> String {
             .unwrap_or_else(|_| current.clone());
 
         if let Err(e) = fs::write(&machine_id_path, &custom_id) {
-            println!("⚠️  Failed to save machine ID: {}", e);
+            log_warning(&format!("Failed to save machine ID: {}", e));
         } else {
             println!("   ✓ Saved machine ID: {}", custom_id);
         }
@@ -191,7 +192,7 @@ fn save_profile_config(machine_id: &str, environment: &str) {
     }
 
     if let Err(e) = config.save(&path) {
-        println!("⚠️  Failed to save profile config: {}", e);
+        log_warning(&format!("Failed to save profile config: {}", e));
     }
 }
 
@@ -246,7 +247,7 @@ fn run_backup(machine_id: &str, environment: &str) {
 
     let mut task = crate::tasks::backup::BackupTask::new(profile, MigrateTarget::Common);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
-        println!("❌ Error during backup: {}", e);
+        log_error("Error during backup", e);
     }
 }
 

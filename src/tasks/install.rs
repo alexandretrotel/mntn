@@ -1,5 +1,5 @@
 use crate::cli::InstallArgs;
-use crate::logger::log;
+use crate::logger::{log_error, log_warning};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use crate::utils::paths::get_base_dirs;
@@ -31,8 +31,7 @@ impl Task for InstallTask {
         if which("topgrade").is_ok() {
             tasks.push(ScheduledTask::topgrade_daily());
         } else {
-            println!("⚠️ topgrade not found, skipping daily topgrade task.");
-            log("topgrade not found, skipping daily topgrade task");
+            log_warning("topgrade not found, skipping daily topgrade task");
         }
         if self.with_clean {
             tasks.push(ScheduledTask::clean_daily());
@@ -40,8 +39,7 @@ impl Task for InstallTask {
 
         for task in tasks.into_iter() {
             if let Err(e) = task.install() {
-                println!("Failed to install scheduled task: {}", e);
-                log(&format!("Failed to install scheduled task: {}", e));
+                log_error("Failed to install scheduled task", e);
             }
         }
         Ok(())

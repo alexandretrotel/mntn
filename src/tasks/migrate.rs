@@ -1,4 +1,4 @@
-use crate::logger::{log, log_success};
+use crate::logger::{log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -130,9 +130,8 @@ impl Task for MigrateTask {
             if let Some(parent) = new_path.parent()
                 && let Err(e) = fs::create_dir_all(parent)
             {
-                println!("⚠️  Failed to create parent dir for {}: {}", source_path, e);
-                log(&format!(
-                    "Failed to create parent directory for {}: {}",
+                log_warning(&format!(
+                    "Failed to create parent dir for {}: {}",
                     source_path, e
                 ));
                 failed += 1;
@@ -141,28 +140,23 @@ impl Task for MigrateTask {
 
             match move_path(&legacy_path, &new_path) {
                 Ok(()) => {
-                    println!(
-                        "✅ Migrated: {} -> {}/{}",
+                    log_success(&format!(
+                        "Migrated: {} -> {}/{}",
                         source_path, self.target, source_path
-                    );
-                    log(&format!(
-                        "Migrated {} from legacy to {}",
-                        source_path, self.target
                     ));
                     migrated += 1;
                 }
                 Err(e) => {
-                    println!("⚠️  Failed to migrate {}: {}", source_path, e);
-                    log(&format!("Failed to migrate {}: {}", source_path, e));
+                    log_warning(&format!("Failed to migrate {}: {}", source_path, e));
                     failed += 1;
                 }
             }
         }
 
-        println!(
-            "✅ Migration complete. Migrated: {}, Failed: {}",
+        log_success(&format!(
+            "Migration complete. Migrated: {}, Failed: {}",
             migrated, failed
-        );
+        ));
 
         Ok(())
     }

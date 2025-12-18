@@ -1,5 +1,5 @@
 use crate::cli::PurgeArgs;
-use crate::logger::log;
+use crate::logger::{log, log_error, log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_base_dirs;
 #[cfg(not(windows))]
@@ -72,11 +72,11 @@ impl Task for PurgeTask {
 
         if service_files.is_empty() {
             #[cfg(target_os = "macos")]
-            println!("📁 No .plist files found.");
+            log_info("No .plist files found");
             #[cfg(target_os = "linux")]
-            println!("📁 No systemd services or autostart programs found.");
+            log_info("No systemd services or autostart programs found");
             #[cfg(target_os = "windows")]
-            println!("📁 No Windows services or startup programs found.");
+            log_info("No Windows services or startup programs found");
             return Ok(());
         }
 
@@ -99,7 +99,7 @@ impl Task for PurgeTask {
             }
         }
 
-        println!("✅ Selected items deleted.");
+        log_success("Selected items deleted");
 
         Ok(())
     }
@@ -412,7 +412,7 @@ fn delete_service_file(service_file: &ServiceFile) {
                 } else {
                     run_cmd("systemctl", &["--user", "disable", service_name])
                 };
-                println!("🚫 Stopped and disabled service: {}", service_name);
+                log_info(&format!("Stopped and disabled service: {}", service_name));
             }
             delete_file_with_sudo(&service_file.path, service_file.is_system);
         }
@@ -425,23 +425,25 @@ fn delete_service_file(service_file: &ServiceFile) {
     match service_file.service_type {
         ServiceType::StartupProgram => {
             if let Err(e) = fs::remove_file(&service_file.path) {
-                println!(
-                    "❌ Failed to delete startup program: {} ({})",
-                    service_file.path.display(),
-                    e
+                log_error(
+                    &format!(
+                        "Failed to delete startup program: {}",
+                        service_file.path.display()
+                    ),
+                    e,
                 );
             } else {
-                println!(
-                    "🗑️  Deleted startup program: {}",
+                log_success(&format!(
+                    "Deleted startup program: {}",
                     service_file.path.display()
-                );
+                ));
             }
         }
         ServiceType::WindowsService => {
             if let Some(service_name) = service_file.path.file_name().and_then(|f| f.to_str()) {
                 let _ = Command::new("sc").args(&["stop", service_name]).status();
                 let _ = Command::new("sc").args(&["delete", service_name]).status();
-                println!("🛑 Deleted Windows service: {}", service_name);
+                log_success(&format!("Deleted Windows service: {}", service_name));
             }
         }
     }
@@ -451,11 +453,11 @@ fn delete_service_file(service_file: &ServiceFile) {
 fn delete_file_with_sudo(path: &PathBuf, is_system_file: bool) {
     match fs::remove_file(path) {
         Ok(_) => {
-            println!("🗑️  Deleted: {}", path.display());
+            log_success(&format!("Deleted: {}", path.display()));
         }
         Err(_) => {
             if is_system_file {
-                println!("🔐 Requires elevated privileges, using sudo...");
+                log_info("Requires elevated privileges, using sudo...");
                 let result = std::process::Command::new("sudo")
                     .arg("rm")
                     .arg("-f")
@@ -464,16 +466,14 @@ fn delete_file_with_sudo(path: &PathBuf, is_system_file: bool) {
 
                 match result {
                     Ok(status) if status.success() => {
-                        println!("🗑️  Deleted with sudo: {}", path.display());
+                        log_success(&format!("Deleted with sudo: {}", path.display()));
                     }
                     _ => {
-                        println!("❌ Failed to delete: {}", path.display());
-                        log(&format!("Failed to delete: {}", path.display()));
+                        log_error("Failed to delete", path.display());
                     }
                 }
             } else {
-                println!("❌ Failed to delete: {}", path.display());
-                log(&format!("Failed to delete: {}", path.display()));
+                log_error("Failed to delete", path.display());
             }
         }
     }

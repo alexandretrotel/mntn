@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use crate::cli::CleanArgs;
+use crate::logger::{log_success, log_warning};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::filesystem::calculate_dir_size;
 use crate::utils::format::bytes_to_human_readable;
@@ -55,7 +56,7 @@ impl Task for CleanTask {
         total_space_saved += clean_trash();
 
         let space_saved_str = bytes_to_human_readable(total_space_saved);
-        println!("✅ System cleaned. Freed {}.", space_saved_str);
+        log_success(&format!("System cleaned. Freed {}", space_saved_str));
 
         Ok(())
     }
@@ -336,7 +337,7 @@ fn clean_directory_contents(dir_path: &Path, use_sudo: bool, args: &CleanArgs) -
                 if let Some(path_str) = entry.to_str() {
                     let _ = run_cmd("sudo", &["rm", "-rf", path_str]);
                 } else {
-                    println!("⚠️ Skipping non-UTF8 path: {:?}", entry);
+                    log_warning(&format!("Skipping non-UTF8 path: {:?}", entry));
                 }
             }
         } else {
@@ -422,12 +423,8 @@ fn clean_trash() -> u64 {
 
     #[cfg(target_os = "linux")]
     {
-        total_freed += clean_directory_contents_force(
-            &home_dir.join(".local/share/Trash/files"),
-        );
-        total_freed += clean_directory_contents_force(
-            &home_dir.join(".local/share/Trash/info"),
-        );
+        total_freed += clean_directory_contents_force(&home_dir.join(".local/share/Trash/files"));
+        total_freed += clean_directory_contents_force(&home_dir.join(".local/share/Trash/info"));
     }
 
     #[cfg(target_os = "windows")]

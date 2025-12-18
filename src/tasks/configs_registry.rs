@@ -202,16 +202,16 @@ fn add_entry(
     };
 
     if registry.get_entry(&id).is_some() {
-        println!("❌ Entry with ID '{}' already exists", id);
+        log_error("Entry already exists", &id);
         return;
     }
 
     let parsed_category = match Category::from_str(&category) {
         Ok(cat) => cat,
         Err(_) => {
-            println!(
-                "❌ Invalid category '{}'. Valid categories are: shell, editor, terminal, system, development, application",
-                category
+            log_error(
+                "Invalid category. Valid categories are: shell, editor, terminal, system, development, application",
+                &category,
             );
             return;
         }
@@ -263,7 +263,7 @@ fn remove_entry(id: String) {
             log(&format!("Removed registry entry: {} ({})", entry.name, id));
         }
         None => {
-            println!("❌ Entry with ID '{}' not found", id);
+            log_error("Entry not found", &id);
         }
     }
 }
@@ -295,7 +295,7 @@ fn toggle_entry(id: String, enable: bool) {
             ));
         }
         Err(e) => {
-            println!("❌ {}", e);
+            log_error("Failed to toggle entry", e);
         }
     }
 }

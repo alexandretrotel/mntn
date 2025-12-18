@@ -1,6 +1,6 @@
 use tempfile::NamedTempFile;
 
-use crate::logger::{log, log_error};
+use crate::logger::{log, log_error, log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use std::ffi::OsString;
 use std::fs;
@@ -25,13 +25,11 @@ impl Task for BiometricSudoTask {
 
         match configure_biometric_sudo() {
             Ok(_) => {
-                println!("✅ Touch ID sudo configuration complete.");
-                log("Touch ID sudo configuration complete");
+                log_success("Touch ID sudo configuration complete");
                 Ok(())
             }
             Err(e) => {
-                println!("❌ Failed to configure Touch ID for sudo: {}", e);
-                log_error(&format!("Failed to configure Touch ID for sudo: {}", e), &e);
+                log_error("Failed to configure Touch ID for sudo", &e);
                 Err(Box::new(e))
             }
         }
@@ -84,7 +82,7 @@ fn configure_biometric_sudo() -> io::Result<()> {
         .lines()
         .any(|line| line.trim() == TOUCH_ID_LINE.trim())
     {
-        println!("ℹ️ Touch ID authentication is already configured");
+        log_info("Touch ID authentication is already configured");
         return Ok(());
     }
 

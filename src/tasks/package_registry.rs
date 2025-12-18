@@ -206,7 +206,7 @@ fn add_entry(
     };
 
     if registry.get_entry(&id).is_some() {
-        println!("❌ Entry '{}' already exists in the package registry", id);
+        log_error("Entry already exists in the package registry", &id);
         return;
     }
 
@@ -271,7 +271,7 @@ fn remove_entry(id: String) {
             }
         },
         None => {
-            println!("❌ Entry '{}' not found in package registry", id);
+            log_error("Entry not found in package registry", &id);
         }
     }
 }
@@ -299,7 +299,7 @@ fn toggle_entry(id: String, enable: bool) {
             }
         },
         Err(e) => {
-            println!("❌ {}", e);
+            log_error("Failed to toggle entry", e);
         }
     }
 }

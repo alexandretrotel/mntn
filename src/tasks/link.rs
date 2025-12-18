@@ -1,4 +1,4 @@
-use crate::logger::log;
+use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -37,7 +37,7 @@ impl Task for LinkTask {
         let links_total = registry.get_enabled_entries().count();
 
         if links_total == 0 {
-            println!("ℹ️ No enabled entries found in registry.");
+            log_info("No enabled entries found in registry");
             return Ok(());
         }
 
@@ -56,10 +56,10 @@ impl Task for LinkTask {
                     links_processed += 1;
                 }
                 None => {
-                    println!(
-                        "⚠️  Skipping: {} ({}) - no source found in any layer",
+                    log_warning(&format!(
+                        "Skipping: {} ({}) - no source found in any layer",
                         entry.name, id
-                    );
+                    ));
                     log(&format!(
                         "No source found for {} in any layer (checked: environment/{}, machines/{}, common, legacy)",
                         entry.source_path, self.profile.environment, self.profile.machine_id
@@ -69,10 +69,10 @@ impl Task for LinkTask {
             }
         }
 
-        println!(
-            "✅ Symlink creation complete. Processed: {}, Skipped: {}",
+        log_success(&format!(
+            "Symlink creation complete. Processed: {}, Skipped: {}",
             links_processed, links_skipped
-        );
+        ));
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use crate::cli::SyncArgs;
+use crate::logger::{log_error, log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd_in_dir;
@@ -49,7 +50,7 @@ impl Task for SyncTask {
         };
 
         if let Err(e) = sync_with_git(args) {
-            eprintln!("❌ Sync failed: {}", e);
+            log_error("Sync failed", e);
         }
 
         Ok(())
@@ -118,7 +119,7 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     if args.pull || args.sync {
         println!("🔄 Pulling latest changes...");
         run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
-        println!("✅ Successfully pulled latest changes");
+        log_success("Successfully pulled latest changes");
 
         if args.auto_link {
             println!("🔗 Auto-linking configurations...");
@@ -141,9 +142,9 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         if !status.trim().is_empty() {
             run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &mntn_dir)?;
             run_cmd_in_dir("git", &["push"], &mntn_dir)?;
-            println!("✅ Changes pushed to remote repository");
+            log_success("Changes pushed to remote repository");
         } else {
-            println!("ℹ️  No changes to commit");
+            log_info("No changes to commit");
         }
     }
 
@@ -160,7 +161,10 @@ fn initialize_git_repo(
     run_cmd_in_dir("git", &["remote", "add", "origin", remote_url], mntn_dir)?;
     run_cmd_in_dir("git", &["branch", "-M", "main"], mntn_dir)?;
 
-    println!("✅ Git repository initialized with remote: {}", remote_url);
+    log_success(&format!(
+        "Git repository initialized with remote: {}",
+        remote_url
+    ));
     Ok(())
 }
 
@@ -188,7 +192,7 @@ Thumbs.db
 # symlinks/
 ";
         fs::write(&gitignore_path, default_gitignore)?;
-        println!("✅ Created default .gitignore with mntn.log excluded");
+        log_success("Created default .gitignore with mntn.log excluded");
     }
     Ok(())
 }
@@ -202,7 +206,7 @@ fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Er
         if !content.contains("mntn.log") && !content.contains("*.log") {
             let mut file = fs::OpenOptions::new().append(true).open(&gitignore_path)?;
             writeln!(file, "\n# mntn log files\nmntn.log")?;
-            println!("✅ Added mntn.log to existing .gitignore");
+            log_success("Added mntn.log to existing .gitignore");
         }
     }
     Ok(())

@@ -1,4 +1,4 @@
-use crate::logger::log;
+use crate::logger::{log, log_error};
 
 /// Represents a planned operation that a task would perform
 #[derive(Debug, Clone)]
@@ -65,8 +65,7 @@ impl TaskExecutor {
         } else {
             log(&format!("Starting {}", name));
             if let Err(e) = task.execute() {
-                log(&format!("Error during {}: {}", name, e));
-                println!("❌ Error during {}: {}", name, e);
+                log_error(&format!("Error during {}", name), e);
                 return;
             }
             log(&format!("{} complete", name));
