@@ -175,7 +175,7 @@ fn list_entries(enabled_only: bool, platform_only: bool) {
         if let Some(description) = &entry.description {
             println!("   Description: {}", description);
         }
-        println!("   Platforms:{}", platform_info);
+        println!("   Platforms: {}", platform_info);
         println!();
     }
 
