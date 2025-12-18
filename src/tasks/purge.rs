@@ -2,10 +2,13 @@ use crate::cli::PurgeArgs;
 use crate::logger::log;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_base_dirs;
+#[cfg(not(windows))]
 use crate::utils::system::run_cmd;
 use inquire::MultiSelect;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::process::Command;
 
 /// Represents a directory target for scanning service files
 #[derive(Debug, Clone)]

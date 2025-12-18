@@ -201,7 +201,17 @@ fn backup_if_needed(dst: &Path, symlinks_dir: &Path) -> Result<(), ()> {
 
 /// Creates a symlink from src to dst
 fn create_symlink(src: &Path, dst: &Path) {
-    match std::os::unix::fs::symlink(src, dst) {
+    #[cfg(unix)]
+    let result = std::os::unix::fs::symlink(src, dst);
+
+    #[cfg(windows)]
+    let result = if src.is_dir() {
+        std::os::windows::fs::symlink_dir(src, dst)
+    } else {
+        std::os::windows::fs::symlink_file(src, dst)
+    };
+
+    match result {
         Ok(()) => log(&format!("Linked {} → {}", src.display(), dst.display())),
         Err(e) => log(&format!(
             "Failed to link {} → {}: {}",

@@ -180,7 +180,7 @@ fn clean_user_directories(args: &CleanArgs) -> u64 {
 fn clean_system_directories(args: &CleanArgs) -> u64 {
     let mut total_freed = 0u64;
 
-    let mut system_paths = Vec::new();
+    let mut system_paths: Vec<PathBuf> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {

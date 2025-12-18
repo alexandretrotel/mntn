@@ -1,7 +1,9 @@
 use crate::cli::InstallArgs;
 use crate::logger::log;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use crate::utils::paths::get_base_dirs;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::fs;
 use std::process::Command;
 use which::which;
