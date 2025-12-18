@@ -16,14 +16,9 @@ pub struct RegistryEntry {
     pub description: Option<String>,
 }
 
-impl RegistryEntryLike for RegistryEntry {
-    fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-    fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-    }
-}
+use crate::impl_registry_entry_like;
+
+impl_registry_entry_like!(RegistryEntry);
 
 /// Categories for organizing registry entries
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -7,6 +7,21 @@ pub trait RegistryEntryLike {
     fn set_enabled(&mut self, enabled: bool);
 }
 
+/// Macro to implement RegistryEntryLike for types with an `enabled` field
+#[macro_export]
+macro_rules! impl_registry_entry_like {
+    ($t:ty) => {
+        impl RegistryEntryLike for $t {
+            fn is_enabled(&self) -> bool {
+                self.enabled
+            }
+            fn set_enabled(&mut self, enabled: bool) {
+                self.enabled = enabled;
+            }
+        }
+    };
+}
+
 /// Generic registry type shared by all registries
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Registry<T> {

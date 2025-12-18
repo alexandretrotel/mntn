@@ -14,14 +14,9 @@ pub struct PackageManagerEntry {
     pub platforms: Option<Vec<String>>,
 }
 
-impl RegistryEntryLike for PackageManagerEntry {
-    fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-    fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-    }
-}
+use crate::impl_registry_entry_like;
+
+impl_registry_entry_like!(PackageManagerEntry);
 
 pub type PackageRegistry = Registry<PackageManagerEntry>;
 
