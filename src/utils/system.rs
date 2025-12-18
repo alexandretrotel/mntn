@@ -144,14 +144,18 @@ mod tests {
     #[test]
     fn test_run_cmd_in_dir_executes_in_directory() {
         let temp_dir = TempDir::new().unwrap();
+        #[cfg(windows)]
+        let result = run_cmd_in_dir("cmd", &["/C", "cd"], temp_dir.path());
+        #[cfg(not(windows))]
         let result = run_cmd_in_dir("pwd", &[], temp_dir.path());
 
         assert!(result.is_ok());
         let output = result.unwrap();
         // The output should contain the temp directory path
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
         assert!(
-            output.trim().contains(temp_dir.path().to_str().unwrap())
-                || temp_dir.path().to_str().unwrap().contains(output.trim())
+            output.trim().contains(temp_dir_str) ||
+            temp_dir_str.contains(output.trim())
         );
     }
 
