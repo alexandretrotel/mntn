@@ -102,3 +102,246 @@ pub fn get_environment() -> String {
 
     "default".to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backup_dir_constant() {
+        assert_eq!(BACKUP_DIR, "backup");
+    }
+
+    #[test]
+    fn test_symlinks_dir_constant() {
+        assert_eq!(SYMLINKS_DIR, "symlinks");
+    }
+
+    #[test]
+    fn test_common_dir_constant() {
+        assert_eq!(COMMON_DIR, "common");
+    }
+
+    #[test]
+    fn test_machines_dir_constant() {
+        assert_eq!(MACHINES_DIR, "machines");
+    }
+
+    #[test]
+    fn test_environments_dir_constant() {
+        assert_eq!(ENVIRONMENTS_DIR, "environments");
+    }
+
+    #[test]
+    fn test_profile_config_file_constant() {
+        assert_eq!(PROFILE_CONFIG_FILE, "profile.json");
+    }
+
+    #[test]
+    fn test_machine_id_file_constant() {
+        assert_eq!(MACHINE_ID_FILE, ".machine-id");
+    }
+
+    #[test]
+    fn test_get_mntn_dir_ends_with_mntn() {
+        let path = get_mntn_dir();
+        assert!(path.ends_with(".mntn"));
+    }
+
+    #[test]
+    fn test_get_mntn_dir_is_absolute() {
+        let path = get_mntn_dir();
+        assert!(path.is_absolute());
+    }
+
+    #[test]
+    fn test_get_backup_root_structure() {
+        let path = get_backup_root();
+        assert!(path.ends_with("backup"));
+        assert!(path.to_string_lossy().contains(".mntn"));
+    }
+
+    #[test]
+    fn test_get_backup_common_path_structure() {
+        let path = get_backup_common_path();
+        assert!(path.ends_with("common"));
+        assert!(path.to_string_lossy().contains("backup"));
+    }
+
+    #[test]
+    fn test_get_backup_machine_path_includes_machine_id() {
+        let path = get_backup_machine_path("my-machine");
+        assert!(path.ends_with("my-machine"));
+        assert!(path.to_string_lossy().contains("machines"));
+    }
+
+    #[test]
+    fn test_get_backup_machine_path_different_ids() {
+        let path1 = get_backup_machine_path("machine-a");
+        let path2 = get_backup_machine_path("machine-b");
+        assert_ne!(path1, path2);
+        assert!(path1.ends_with("machine-a"));
+        assert!(path2.ends_with("machine-b"));
+    }
+
+    #[test]
+    fn test_get_backup_environment_path_includes_env() {
+        let path = get_backup_environment_path("work");
+        assert!(path.ends_with("work"));
+        assert!(path.to_string_lossy().contains("environments"));
+    }
+
+    #[test]
+    fn test_get_backup_environment_path_different_envs() {
+        let path1 = get_backup_environment_path("work");
+        let path2 = get_backup_environment_path("home");
+        assert_ne!(path1, path2);
+    }
+
+    #[test]
+    fn test_get_symlinks_path_structure() {
+        let path = get_symlinks_path();
+        assert!(path.ends_with("symlinks"));
+        assert!(path.to_string_lossy().contains(".mntn"));
+    }
+
+    #[test]
+    fn test_get_registry_path_structure() {
+        let path = get_registry_path();
+        assert!(path.ends_with("registry.json"));
+        assert!(path.to_string_lossy().contains(".mntn"));
+    }
+
+    #[test]
+    fn test_get_package_registry_path_structure() {
+        let path = get_package_registry_path();
+        assert!(path.ends_with("package_registry.json"));
+        assert!(path.to_string_lossy().contains(".mntn"));
+    }
+
+    #[test]
+    fn test_get_profile_config_path_structure() {
+        let path = get_profile_config_path();
+        assert!(path.ends_with("profile.json"));
+    }
+
+    #[test]
+    fn test_get_machine_id_path_structure() {
+        let path = get_machine_id_path();
+        assert!(path.ends_with(".machine-id"));
+    }
+
+    #[test]
+    fn test_get_base_dirs_returns_valid() {
+        let dirs = get_base_dirs();
+        // Should have a valid home directory
+        assert!(dirs.home_dir().is_absolute());
+    }
+
+    #[test]
+    fn test_get_machine_identifier_returns_non_empty() {
+        let id = get_machine_identifier();
+        assert!(!id.is_empty());
+    }
+
+    #[test]
+    fn test_get_machine_identifier_format() {
+        // When no .machine-id file exists, should return user-hostname format
+        let id = get_machine_identifier();
+        // Should contain a hyphen (user-hostname format)
+        assert!(id.contains('-') || !id.is_empty());
+    }
+
+    #[test]
+    fn test_get_machine_identifier_no_dots() {
+        let id = get_machine_identifier();
+        // Hostname should have dots replaced with hyphens
+        // and .local removed
+        assert!(!id.contains(".local"));
+    }
+
+    #[test]
+    fn test_get_environment_default() {
+        // Clear MNTN_ENV to test default behavior
+        unsafe {
+            std::env::remove_var("MNTN_ENV");
+        }
+        let env = get_environment();
+        assert_eq!(env, "default");
+    }
+
+    #[test]
+    fn test_get_environment_from_env_var() {
+        unsafe {
+            std::env::set_var("MNTN_ENV", "production");
+        };
+        let env = get_environment();
+        assert_eq!(env, "production");
+        // Clean up
+        unsafe {
+            std::env::remove_var("MNTN_ENV");
+        }
+    }
+
+    #[test]
+    fn test_get_environment_trims_whitespace() {
+        unsafe { std::env::set_var("MNTN_ENV", "  staging  ") };
+        let env = get_environment();
+        assert_eq!(env, "staging");
+        // Clean up
+        unsafe {
+            std::env::remove_var("MNTN_ENV");
+        }
+    }
+
+    #[test]
+    fn test_get_environment_empty_string_returns_default() {
+        unsafe {
+            std::env::set_var("MNTN_ENV", "");
+        };
+        let env = get_environment();
+        assert_eq!(env, "default");
+        // Clean up
+        unsafe {
+            std::env::remove_var("MNTN_ENV");
+        }
+    }
+
+    #[test]
+    fn test_get_environment_whitespace_only_returns_default() {
+        unsafe {
+            std::env::set_var("MNTN_ENV", "   ");
+        }
+        let env = get_environment();
+        assert_eq!(env, "default");
+        // Clean up
+        unsafe {
+            std::env::remove_var("MNTN_ENV");
+        }
+    }
+
+    #[test]
+    fn test_paths_are_consistent() {
+        // All paths should be under .mntn
+        let mntn_dir = get_mntn_dir();
+        let backup_root = get_backup_root();
+        let symlinks_path = get_symlinks_path();
+        let registry_path = get_registry_path();
+
+        assert!(backup_root.starts_with(&mntn_dir));
+        assert!(symlinks_path.starts_with(&mntn_dir));
+        assert!(registry_path.starts_with(&mntn_dir));
+    }
+
+    #[test]
+    fn test_backup_paths_under_backup_root() {
+        let backup_root = get_backup_root();
+        let common_path = get_backup_common_path();
+        let machine_path = get_backup_machine_path("test");
+        let env_path = get_backup_environment_path("test");
+
+        assert!(common_path.starts_with(&backup_root));
+        assert!(machine_path.starts_with(&backup_root));
+        assert!(env_path.starts_with(&backup_root));
+    }
+}

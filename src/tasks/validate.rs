@@ -520,3 +520,309 @@ pub fn run_with_args(args: crate::cli::ValidateArgs) {
     let profile = ActiveProfile::from_defaults();
     TaskExecutor::run(&mut ValidateTask::new(profile), args.dry_run);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_severity_display() {
+        assert_eq!(Severity::Error.to_string(), "ERROR");
+        assert_eq!(Severity::Warning.to_string(), "WARNING");
+        assert_eq!(Severity::Info.to_string(), "INFO");
+    }
+
+    #[test]
+    fn test_severity_equality() {
+        assert_eq!(Severity::Error, Severity::Error);
+        assert_ne!(Severity::Error, Severity::Warning);
+        assert_ne!(Severity::Warning, Severity::Info);
+    }
+
+    #[test]
+    fn test_severity_clone() {
+        let severity = Severity::Warning;
+        let cloned = severity;
+        assert_eq!(severity, cloned);
+    }
+
+    #[test]
+    fn test_validation_error_error() {
+        let err = ValidationError::error("Test error message");
+        assert_eq!(err.severity, Severity::Error);
+        assert_eq!(err.message, "Test error message");
+        assert!(err.fix_suggestion.is_none());
+    }
+
+    #[test]
+    fn test_validation_error_warning() {
+        let err = ValidationError::warning("Test warning");
+        assert_eq!(err.severity, Severity::Warning);
+        assert_eq!(err.message, "Test warning");
+        assert!(err.fix_suggestion.is_none());
+    }
+
+    #[test]
+    fn test_validation_error_info() {
+        let err = ValidationError::info("Test info");
+        assert_eq!(err.severity, Severity::Info);
+        assert_eq!(err.message, "Test info");
+        assert!(err.fix_suggestion.is_none());
+    }
+
+    #[test]
+    fn test_validation_error_with_fix() {
+        let err = ValidationError::error("Error").with_fix("Run this command");
+        assert_eq!(err.fix_suggestion, Some("Run this command".to_string()));
+    }
+
+    #[test]
+    fn test_validation_error_with_fix_chaining() {
+        let err = ValidationError::warning("Warning message").with_fix("Fix suggestion");
+        assert_eq!(err.severity, Severity::Warning);
+        assert_eq!(err.message, "Warning message");
+        assert_eq!(err.fix_suggestion, Some("Fix suggestion".to_string()));
+    }
+
+    #[test]
+    fn test_validation_error_clone() {
+        let err = ValidationError::error("Cloneable").with_fix("Fix");
+        let cloned = err.clone();
+        assert_eq!(cloned.severity, err.severity);
+        assert_eq!(cloned.message, err.message);
+        assert_eq!(cloned.fix_suggestion, err.fix_suggestion);
+    }
+
+    #[test]
+    fn test_validation_error_debug() {
+        let err = ValidationError::info("Debug test");
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("ValidationError"));
+        assert!(debug_str.contains("Debug test"));
+    }
+
+    #[test]
+    fn test_validate_json_file_nonexistent() {
+        let errors = validate_json_file(Path::new("/nonexistent/file.json"), "Test file");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_json_file_valid() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("valid.json");
+        fs::write(&file_path, r#"{"key": "value", "number": 42}"#).unwrap();
+
+        let errors = validate_json_file(&file_path, "Valid JSON");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_json_file_invalid() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("invalid.json");
+        fs::write(&file_path, "{ invalid json }").unwrap();
+
+        let errors = validate_json_file(&file_path, "Invalid JSON");
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].severity, Severity::Error);
+        assert!(errors[0].message.contains("Invalid JSON"));
+    }
+
+    #[test]
+    fn test_validate_json_file_empty_object() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("empty.json");
+        fs::write(&file_path, "{}").unwrap();
+
+        let errors = validate_json_file(&file_path, "Empty object");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_json_file_array() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("array.json");
+        fs::write(&file_path, r#"[1, 2, 3, "four"]"#).unwrap();
+
+        let errors = validate_json_file(&file_path, "Array");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validation_report_new() {
+        let report = ValidationReport::new();
+        assert_eq!(report.error_count(), 0);
+        assert_eq!(report.warning_count(), 0);
+    }
+
+    #[test]
+    fn test_validation_report_default() {
+        let report = ValidationReport::default();
+        assert_eq!(report.error_count(), 0);
+        assert_eq!(report.warning_count(), 0);
+    }
+
+    #[test]
+    fn test_validation_report_add_result_empty() {
+        let mut report = ValidationReport::new();
+        report.add_result("Test Validator", vec![]);
+        assert_eq!(report.error_count(), 0);
+    }
+
+    #[test]
+    fn test_validation_report_add_result_with_errors() {
+        let mut report = ValidationReport::new();
+        report.add_result(
+            "Test Validator",
+            vec![
+                ValidationError::error("Error 1"),
+                ValidationError::error("Error 2"),
+            ],
+        );
+        assert_eq!(report.error_count(), 2);
+    }
+
+    #[test]
+    fn test_validation_report_add_result_with_warnings() {
+        let mut report = ValidationReport::new();
+        report.add_result(
+            "Test Validator",
+            vec![
+                ValidationError::warning("Warning 1"),
+                ValidationError::warning("Warning 2"),
+                ValidationError::warning("Warning 3"),
+            ],
+        );
+        assert_eq!(report.warning_count(), 3);
+    }
+
+    #[test]
+    fn test_validation_report_mixed_severities() {
+        let mut report = ValidationReport::new();
+        report.add_result(
+            "Validator 1",
+            vec![
+                ValidationError::error("Error"),
+                ValidationError::warning("Warning"),
+                ValidationError::info("Info"),
+            ],
+        );
+        report.add_result("Validator 2", vec![ValidationError::error("Another error")]);
+
+        assert_eq!(report.error_count(), 2);
+        assert_eq!(report.warning_count(), 1);
+    }
+
+    #[test]
+    fn test_validation_report_print_does_not_panic() {
+        let mut report = ValidationReport::new();
+        report.add_result("Empty Validator", vec![]);
+        report.add_result(
+            "Error Validator",
+            vec![ValidationError::error("Test error").with_fix("Fix it")],
+        );
+        report.add_result(
+            "Warning Validator",
+            vec![ValidationError::warning("Test warning")],
+        );
+        report.add_result("Info Validator", vec![ValidationError::info("Test info")]);
+
+        // This should not panic
+        report.print();
+    }
+
+    #[test]
+    fn test_validate_task_name() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let task = ValidateTask::new(profile);
+        assert_eq!(task.name(), "Validate");
+    }
+
+    #[test]
+    fn test_validate_task_dry_run() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let task = ValidateTask::new(profile);
+        let ops = task.dry_run();
+
+        assert_eq!(ops.len(), 4);
+        assert!(ops.iter().any(|op| op.description.contains("registry")));
+        assert!(ops.iter().any(|op| op.description.contains("layer")));
+        assert!(ops.iter().any(|op| op.description.contains("JSON")));
+        assert!(ops.iter().any(|op| op.description.contains("symlink")));
+    }
+
+    #[test]
+    fn test_config_validator_new() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let validator = ConfigValidator::new(profile);
+        // Should have 4 validators
+        assert_eq!(validator.validators.len(), 4);
+    }
+
+    #[test]
+    fn test_config_validator_run_all() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test-nonexistent".to_string(),
+            environment: "test-nonexistent".to_string(),
+        };
+        let validator = ConfigValidator::new(profile);
+        let report = validator.run_all();
+
+        // Should not panic, may have errors depending on environment
+        report.print();
+    }
+
+    #[test]
+    fn test_json_config_validator_name() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let validator = JsonConfigValidator::new(profile);
+        assert_eq!(validator.name(), "JSON Configuration Files");
+    }
+
+    #[test]
+    fn test_symlink_validator_name() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let validator = SymlinkValidator::new(profile);
+        assert_eq!(validator.name(), "Symlink Configuration");
+    }
+
+    #[test]
+    fn test_layer_validator_name() {
+        let profile = ActiveProfile {
+            name: None,
+            machine_id: "test".to_string(),
+            environment: "test".to_string(),
+        };
+        let validator = LayerValidator::new(profile);
+        assert_eq!(validator.name(), "Layer Resolution");
+    }
+
+    #[test]
+    fn test_registry_validator_name() {
+        let validator = RegistryValidator;
+        assert_eq!(validator.name(), "Registry Files");
+    }
+}

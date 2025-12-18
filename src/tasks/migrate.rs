@@ -212,3 +212,275 @@ pub fn run_with_args(args: crate::cli::MigrateArgs) {
 
     TaskExecutor::run(&mut MigrateTask::new(profile, target), args.dry_run);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::profile::ActiveProfile;
+    use tempfile::TempDir;
+
+    fn create_test_profile() -> ActiveProfile {
+        ActiveProfile {
+            name: None,
+            machine_id: "test-machine".to_string(),
+            environment: "test-env".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_migrate_target_display() {
+        assert_eq!(MigrateTarget::Common.to_string(), "common");
+        assert_eq!(MigrateTarget::Machine.to_string(), "machine");
+        assert_eq!(MigrateTarget::Environment.to_string(), "environment");
+    }
+
+    #[test]
+    fn test_migrate_target_equality() {
+        assert_eq!(MigrateTarget::Common, MigrateTarget::Common);
+        assert_ne!(MigrateTarget::Common, MigrateTarget::Machine);
+        assert_ne!(MigrateTarget::Machine, MigrateTarget::Environment);
+    }
+
+    #[test]
+    fn test_migrate_target_clone() {
+        let target = MigrateTarget::Machine;
+        let cloned = target;
+        assert_eq!(target, cloned);
+    }
+
+    #[test]
+    fn test_migrate_target_resolve_path_common() {
+        let profile = create_test_profile();
+        let path = MigrateTarget::Common.resolve_path(&profile);
+        assert!(path.to_string_lossy().contains("common"));
+    }
+
+    #[test]
+    fn test_migrate_target_resolve_path_machine() {
+        let profile = create_test_profile();
+        let path = MigrateTarget::Machine.resolve_path(&profile);
+        assert!(path.to_string_lossy().contains("machines"));
+        assert!(path.to_string_lossy().contains("test-machine"));
+    }
+
+    #[test]
+    fn test_migrate_target_resolve_path_environment() {
+        let profile = create_test_profile();
+        let path = MigrateTarget::Environment.resolve_path(&profile);
+        assert!(path.to_string_lossy().contains("environments"));
+        assert!(path.to_string_lossy().contains("test-env"));
+    }
+
+    #[test]
+    fn test_migrate_target_resolve_path_different_profiles() {
+        let profile1 = ActiveProfile {
+            name: None,
+            machine_id: "machine-1".to_string(),
+            environment: "env-1".to_string(),
+        };
+        let profile2 = ActiveProfile {
+            name: None,
+            machine_id: "machine-2".to_string(),
+            environment: "env-2".to_string(),
+        };
+
+        let path1 = MigrateTarget::Machine.resolve_path(&profile1);
+        let path2 = MigrateTarget::Machine.resolve_path(&profile2);
+        assert_ne!(path1, path2);
+
+        let path1 = MigrateTarget::Environment.resolve_path(&profile1);
+        let path2 = MigrateTarget::Environment.resolve_path(&profile2);
+        assert_ne!(path1, path2);
+    }
+
+    #[test]
+    fn test_migrate_task_name() {
+        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Common);
+        assert_eq!(task.name(), "Migrate");
+    }
+
+    #[test]
+    fn test_migrate_task_new() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile.clone(), MigrateTarget::Machine);
+        assert_eq!(task.profile.machine_id, profile.machine_id);
+        assert_eq!(task.target, MigrateTarget::Machine);
+    }
+
+    #[test]
+    fn test_migrate_task_dry_run() {
+        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Common);
+        // Should not panic
+        let ops = task.dry_run();
+        // Should return at least one operation (even if just "no migration needed")
+        assert!(!ops.is_empty());
+    }
+
+    #[test]
+    fn test_migrate_task_dry_run_has_target() {
+        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Environment);
+        let ops = task.dry_run();
+
+        // All operations should have targets
+        for op in &ops {
+            assert!(op.target.is_some());
+        }
+    }
+
+    #[test]
+    fn test_move_path_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let from = temp_dir.path().join("source.txt");
+        let to = temp_dir.path().join("dest.txt");
+
+        fs::write(&from, "content").unwrap();
+
+        let result = move_path(&from, &to);
+        assert!(result.is_ok());
+
+        // Source should be gone
+        assert!(!from.exists());
+        // Destination should exist with content
+        assert!(to.exists());
+        assert_eq!(fs::read_to_string(&to).unwrap(), "content");
+    }
+
+    #[test]
+    fn test_move_path_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let from = temp_dir.path().join("source_dir");
+        let to = temp_dir.path().join("dest_dir");
+
+        fs::create_dir(&from).unwrap();
+        fs::write(from.join("file.txt"), "dir content").unwrap();
+
+        let result = move_path(&from, &to);
+        assert!(result.is_ok());
+
+        // Source should be gone
+        assert!(!from.exists());
+        // Destination should exist with content
+        assert!(to.exists());
+        assert!(to.is_dir());
+        assert_eq!(
+            fs::read_to_string(to.join("file.txt")).unwrap(),
+            "dir content"
+        );
+    }
+
+    #[test]
+    fn test_move_path_nested_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let from = temp_dir.path().join("source_dir");
+        let to = temp_dir.path().join("dest_dir");
+
+        // Create nested structure
+        fs::create_dir_all(from.join("sub").join("deep")).unwrap();
+        fs::write(
+            from.join("sub").join("deep").join("file.txt"),
+            "deep content",
+        )
+        .unwrap();
+
+        let result = move_path(&from, &to);
+        assert!(result.is_ok());
+
+        assert!(!from.exists());
+        assert!(to.join("sub").join("deep").join("file.txt").exists());
+    }
+
+    #[test]
+    fn test_move_path_source_not_exists() {
+        let temp_dir = TempDir::new().unwrap();
+        let from = temp_dir.path().join("nonexistent.txt");
+        let to = temp_dir.path().join("dest.txt");
+
+        let result = move_path(&from, &to);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_in_layered_subdir_common() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        let backup_root = get_backup_root();
+        let common_path = backup_root.join("common").join("some_file.txt");
+
+        assert!(task.is_in_layered_subdir(&common_path));
+    }
+
+    #[test]
+    fn test_is_in_layered_subdir_machines() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        let backup_root = get_backup_root();
+        let machine_path = backup_root
+            .join("machines")
+            .join("my-machine")
+            .join("file.txt");
+
+        assert!(task.is_in_layered_subdir(&machine_path));
+    }
+
+    #[test]
+    fn test_is_in_layered_subdir_environments() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        let backup_root = get_backup_root();
+        let env_path = backup_root
+            .join("environments")
+            .join("prod")
+            .join("file.txt");
+
+        assert!(task.is_in_layered_subdir(&env_path));
+    }
+
+    #[test]
+    fn test_is_in_layered_subdir_legacy() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        let backup_root = get_backup_root();
+        let legacy_path = backup_root.join("some_legacy_file.txt");
+
+        assert!(!task.is_in_layered_subdir(&legacy_path));
+    }
+
+    #[test]
+    fn test_is_in_layered_subdir_outside_backup() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        let outside_path = PathBuf::from("/tmp/some_file.txt");
+
+        assert!(!task.is_in_layered_subdir(&outside_path));
+    }
+
+    #[test]
+    fn test_find_legacy_files_empty() {
+        let profile = create_test_profile();
+        let task = MigrateTask::new(profile, MigrateTarget::Common);
+
+        // Should not panic - just verify it returns successfully
+        let _legacy = task.find_legacy_files();
+    }
+
+    #[test]
+    fn test_migrate_task_all_targets() {
+        let profile = create_test_profile();
+
+        for target in [
+            MigrateTarget::Common,
+            MigrateTarget::Machine,
+            MigrateTarget::Environment,
+        ] {
+            let task = MigrateTask::new(profile.clone(), target);
+            assert_eq!(task.name(), "Migrate");
+            let ops = task.dry_run();
+            assert!(!ops.is_empty());
+        }
+    }
+}

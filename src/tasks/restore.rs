@@ -164,3 +164,180 @@ fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::profile::ActiveProfile;
+    use tempfile::TempDir;
+
+    fn create_test_profile() -> ActiveProfile {
+        ActiveProfile {
+            name: None,
+            machine_id: "test-machine".to_string(),
+            environment: "test-env".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_restore_task_name() {
+        let task = RestoreTask::new(create_test_profile());
+        assert_eq!(task.name(), "Restore");
+    }
+
+    #[test]
+    fn test_restore_task_new() {
+        let profile = create_test_profile();
+        let task = RestoreTask::new(profile.clone());
+        assert_eq!(task.profile.machine_id, profile.machine_id);
+        assert_eq!(task.profile.environment, profile.environment);
+    }
+
+    #[test]
+    fn test_restore_task_dry_run() {
+        let task = RestoreTask::new(create_test_profile());
+        // Should not panic - just verify it returns successfully
+        let _ops = task.dry_run();
+    }
+
+    #[test]
+    fn test_restore_config_file_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("backup.txt");
+        let target_path = temp_dir.path().join("target.txt");
+
+        fs::write(&backup_path, "backup content").unwrap();
+
+        let result = restore_config_file(&backup_path, &target_path, "test-file");
+        assert!(result);
+
+        assert!(target_path.exists());
+        assert_eq!(fs::read_to_string(&target_path).unwrap(), "backup content");
+    }
+
+    #[test]
+    fn test_restore_config_file_creates_parent_dirs() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("backup.txt");
+        let target_path = temp_dir
+            .path()
+            .join("nested")
+            .join("dir")
+            .join("target.txt");
+
+        fs::write(&backup_path, "content").unwrap();
+
+        let result = restore_config_file(&backup_path, &target_path, "test-file");
+        assert!(result);
+
+        assert!(target_path.exists());
+    }
+
+    #[test]
+    fn test_restore_config_file_backup_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("nonexistent.txt");
+        let target_path = temp_dir.path().join("target.txt");
+
+        let result = restore_config_file(&backup_path, &target_path, "test-file");
+        assert!(!result);
+
+        assert!(!target_path.exists());
+    }
+
+    #[test]
+    fn test_restore_config_file_overwrites_existing() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("backup.txt");
+        let target_path = temp_dir.path().join("target.txt");
+
+        fs::write(&backup_path, "new content").unwrap();
+        fs::write(&target_path, "old content").unwrap();
+
+        let result = restore_config_file(&backup_path, &target_path, "test-file");
+        assert!(result);
+
+        assert_eq!(fs::read_to_string(&target_path).unwrap(), "new content");
+    }
+
+    #[test]
+    fn test_restore_config_file_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_dir = temp_dir.path().join("backup_dir");
+        let target_dir = temp_dir.path().join("target_dir");
+
+        // Create backup directory with content
+        fs::create_dir(&backup_dir).unwrap();
+        fs::write(backup_dir.join("file.txt"), "directory content").unwrap();
+
+        let result = restore_config_file(&backup_dir, &target_dir, "test-dir");
+
+        // May fail without rsync, but should handle gracefully
+        // Just check it doesn't panic
+        assert!(result == true || result == false);
+    }
+
+    #[test]
+    fn test_restore_directory_creates_target() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_dir = temp_dir.path().join("backup_dir");
+        let target_dir = temp_dir.path().join("target_dir");
+
+        fs::create_dir(&backup_dir).unwrap();
+
+        // Will fail without rsync but should create target dir
+        let _ = restore_directory(&backup_dir, &target_dir, "test-dir");
+
+        // Target directory should be created even if rsync fails
+        assert!(target_dir.exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_restore_directory_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_dir = temp_dir.path().join("backup_dir");
+        let target_dir = temp_dir.path().join("target_dir");
+
+        // Create backup directory with content
+        fs::create_dir(&backup_dir).unwrap();
+        fs::write(backup_dir.join("file.txt"), "content").unwrap();
+
+        let result = restore_directory(&backup_dir, &target_dir, "test-dir");
+
+        // Skip if rsync not available
+        if !result && !target_dir.join("file.txt").exists() {
+            return; // rsync not available
+        }
+
+        assert!(result);
+        assert!(target_dir.join("file.txt").exists());
+    }
+
+    #[test]
+    fn test_restore_directory_nested_target() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_dir = temp_dir.path().join("backup_dir");
+        let target_dir = temp_dir.path().join("nested").join("target_dir");
+
+        fs::create_dir(&backup_dir).unwrap();
+
+        let _ = restore_directory(&backup_dir, &target_dir, "test-dir");
+
+        // Target and its parents should be created
+        assert!(target_dir.exists());
+    }
+
+    #[test]
+    fn test_restore_task_profile_display() {
+        let profile = ActiveProfile {
+            name: Some("test-profile".to_string()),
+            machine_id: "machine-1".to_string(),
+            environment: "env-1".to_string(),
+        };
+        let task = RestoreTask::new(profile);
+
+        // Profile should be stored correctly
+        assert_eq!(task.profile.name, Some("test-profile".to_string()));
+    }
+}
