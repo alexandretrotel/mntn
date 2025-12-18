@@ -1,5 +1,6 @@
 use directories_next::BaseDirs;
 use std::fs;
+use whoami;
 use std::path::PathBuf;
 
 /// Relative path to the directory used for storing general backup files.
@@ -82,7 +83,7 @@ pub fn get_machine_identifier() -> String {
         }
     }
 
-    let user = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
+    let user = whoami::username();
     let hostname = gethostname::gethostname()
         .to_string_lossy()
         .to_lowercase()

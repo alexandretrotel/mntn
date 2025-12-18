@@ -25,6 +25,7 @@ shellexpand = "3.1.1"
 tempfile = "3.13.0"
 trash = "5.2.2"
 which = "8.0.0"
+whoami = "1.5.0"
 
 [dev-dependencies]
 serial_test = "2"
