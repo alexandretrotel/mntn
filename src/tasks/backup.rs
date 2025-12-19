@@ -198,7 +198,9 @@ fn backup_config_files(backup_dir: &Path) {
     }
 }
 
-/// Backs up a single file
+/// Backs up a single file.
+/// If the source is a symlink pointing to our backup location (legacy behavior),
+/// converts it to a real file first to support migration from symlink-based system.
 fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
     if !source.exists() {
         return Err(std::io::Error::new(
@@ -207,20 +209,26 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
         ));
     }
 
+    // Handle symlink migration: if source is a symlink pointing to our backup,
+    // read content from backup and replace symlink with real file
     if source.is_symlink()
-        && let Ok(target) = fs::read_link(source)
+        && let Ok(link_target) = fs::read_link(source)
     {
-        let canonical_target = target.canonicalize().unwrap_or(target);
+        let canonical_target = link_target.canonicalize().unwrap_or(link_target.clone());
         let canonical_dest = destination
             .canonicalize()
             .unwrap_or_else(|_| destination.clone());
 
         if canonical_target == canonical_dest {
+            // Source is symlink to backup - read from backup, replace symlink with real file
+            let content = fs::read(&canonical_target)?;
+            fs::remove_file(source)?; // Remove symlink
+            fs::write(source, &content)?; // Write real file
             log(&format!(
-                "Skipping backup of {} - it's already a symlink to our backup location",
+                "Converted symlink to real file: {}",
                 source.display()
             ));
-            return Ok(());
+            // Now proceed with normal backup (copy back to destination)
         }
     }
 
@@ -228,7 +236,9 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Backs up a directory using rsync for efficiency
+/// Backs up a directory using rsync for efficiency.
+/// If the source is a symlink pointing to our backup location (legacy behavior),
+/// converts it to a real directory first to support migration from symlink-based system.
 fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
     if !source.exists() {
         return Err(std::io::Error::new(
@@ -237,10 +247,14 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
         ));
     }
 
+    // Handle symlink migration: if source is a symlink pointing to our backup,
+    // copy content from backup and replace symlink with real directory
     if source.is_symlink()
-        && let Ok(target) = fs::read_link(source)
+        && let Ok(link_target) = fs::read_link(source)
     {
-        let canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
+        let canonical_target = link_target
+            .canonicalize()
+            .unwrap_or_else(|_| link_target.clone());
         let canonical_dest = destination
             .canonicalize()
             .unwrap_or_else(|_| destination.clone());
@@ -249,12 +263,15 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
             || canonical_dest.starts_with(&canonical_target)
             || canonical_target.starts_with(&canonical_dest)
         {
+            // Source is symlink to backup - copy from backup, replace symlink with real directory
+            fs::remove_file(source)?; // Remove symlink
+            fs::create_dir_all(source)?;
+            crate::utils::filesystem::copy_dir_recursive(&canonical_target, source)?;
             log(&format!(
-                "Skipping backup of {} - it's a symlink to/from our backup location (target: {})",
-                source.display(),
-                target.display()
+                "Converted symlink to real directory: {}",
+                source.display()
             ));
-            return Ok(());
+            // Now proceed with normal backup
         }
     }
 
@@ -339,7 +356,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn test_backup_file_skips_symlink_to_backup() {
+    fn test_backup_file_converts_symlink_to_real_file() {
         use std::os::unix::fs::symlink;
 
         let temp_dir = TempDir::new().unwrap();
@@ -352,6 +369,11 @@ mod tests {
 
         let result = backup_file(&source, &destination);
         assert!(result.is_ok());
+
+        // Source should now be a real file, not a symlink
+        assert!(!source.is_symlink());
+        assert!(source.is_file());
+        assert_eq!(fs::read_to_string(&source).unwrap(), "backup content");
 
         // Destination should remain unchanged
         assert_eq!(fs::read_to_string(&destination).unwrap(), "backup content");

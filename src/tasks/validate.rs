@@ -6,7 +6,7 @@ use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::{get_backup_root, get_package_registry_path, get_registry_path};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Severity level for validation errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,18 +192,21 @@ impl Validator for JsonConfigValidator {
     }
 }
 
-/// Validates symlinks are correctly configured
-pub struct SymlinkValidator {
+/// Checks for legacy symlinks that should be converted to real files.
+/// This validator warns users who previously used symlink-based management
+/// that they should run backup or restore to convert to real files.
+pub struct LegacySymlinkValidator {
+    #[allow(dead_code)]
     profile: ActiveProfile,
 }
 
-impl SymlinkValidator {
+impl LegacySymlinkValidator {
     pub fn new(profile: ActiveProfile) -> Self {
         Self { profile }
     }
 }
 
-impl Validator for SymlinkValidator {
+impl Validator for LegacySymlinkValidator {
     fn validate(&self) -> Vec<ValidationError> {
         let mut errors = Vec::new();
         let registry_path = get_registry_path();
@@ -218,76 +221,49 @@ impl Validator for SymlinkValidator {
             }
         };
 
-        for (id, entry) in registry.get_enabled_entries() {
-            let target: PathBuf = entry.target_path.clone();
+        let backup_root = get_backup_root();
+        let mut symlink_count = 0;
 
-            let resolved = match self.profile.resolve_source(&entry.source_path) {
-                Some(r) => r,
-                None => {
+        for (id, entry) in registry.get_enabled_entries() {
+            let target_path = &entry.target_path;
+
+            // Check if target is a symlink pointing to our backup
+            if target_path.is_symlink()
+                && let Ok(link_target) = fs::read_link(target_path)
+            {
+                let canonical_target = link_target
+                    .canonicalize()
+                    .unwrap_or_else(|_| link_target.clone());
+
+                // Check if the symlink target is within our backup directory
+                if canonical_target.starts_with(&backup_root) {
                     errors.push(
                         ValidationError::warning(format!(
-                            "{} ({}): Source file missing in all layers",
+                            "{} ({}): Legacy symlink detected",
                             entry.name, id
                         ))
-                        .with_fix(format!(
-                            "Run 'mntn backup' or add {} to common/machine/environment layer",
-                            entry.source_path
-                        )),
+                        .with_fix("Run 'mntn backup' or 'mntn restore' to convert to a real file"),
                     );
-                    continue;
+                    symlink_count += 1;
                 }
-            };
-
-            if target.is_symlink() {
-                match fs::read_link(&target) {
-                    Ok(link_target) => {
-                        if link_target != resolved.path {
-                            errors.push(
-                                ValidationError::warning(format!(
-                                    "{} ({}): Symlink points to wrong location",
-                                    entry.name, id
-                                ))
-                                .with_fix(format!(
-                                    "Run 'mntn link' to fix. Expected: {} [{}], Found: {}",
-                                    resolved.path.display(),
-                                    resolved.layer,
-                                    link_target.display()
-                                )),
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        errors.push(ValidationError::error(format!(
-                            "{} ({}): Could not read symlink: {}",
-                            entry.name, id, e
-                        )));
-                    }
-                }
-            } else if target.exists() {
-                errors.push(
-                    ValidationError::info(format!(
-                        "{} ({}): Target exists but is not a symlink",
-                        entry.name, id
-                    ))
-                    .with_fix(
-                        "Run 'mntn link' to create symlink (existing file will be backed up)",
-                    ),
-                );
-            } else {
-                errors.push(
-                    ValidationError::info(format!(
-                        "{} ({}): Target does not exist",
-                        entry.name, id
-                    ))
-                    .with_fix("Run 'mntn link' to create symlink"),
-                );
             }
         }
+
+        if symlink_count > 0 {
+            errors.push(
+                ValidationError::info(format!(
+                    "Found {} legacy symlink(s) from previous mntn version",
+                    symlink_count
+                ))
+                .with_fix("Run 'mntn migrate' to convert all symlinks to real files"),
+            );
+        }
+
         errors
     }
 
     fn name(&self) -> &str {
-        "Symlink Configuration"
+        "Legacy Symlink Check"
     }
 }
 
@@ -451,7 +427,7 @@ impl ConfigValidator {
             Box::new(RegistryValidator),
             Box::new(LayerValidator::new(profile.clone())),
             Box::new(JsonConfigValidator::new(profile.clone())),
-            Box::new(SymlinkValidator::new(profile)),
+            Box::new(LegacySymlinkValidator::new(profile)),
         ];
         Self { validators }
     }
@@ -510,7 +486,7 @@ impl Task for ValidateTask {
             PlannedOperation::new("Validate registry files"),
             PlannedOperation::new("Validate layer resolution"),
             PlannedOperation::new("Validate JSON configuration files"),
-            PlannedOperation::new("Validate symlink configuration"),
+            PlannedOperation::new("Check for legacy symlinks"),
         ]
     }
 }
@@ -761,7 +737,7 @@ mod tests {
         assert!(ops.iter().any(|op| op.description.contains("registry")));
         assert!(ops.iter().any(|op| op.description.contains("layer")));
         assert!(ops.iter().any(|op| op.description.contains("JSON")));
-        assert!(ops.iter().any(|op| op.description.contains("symlink")));
+        assert!(ops.iter().any(|op| op.description.contains("legacy")));
     }
 
     #[test]
@@ -802,14 +778,14 @@ mod tests {
     }
 
     #[test]
-    fn test_symlink_validator_name() {
+    fn test_legacy_symlink_validator_name() {
         let profile = ActiveProfile {
             name: None,
             machine_id: "test".to_string(),
             environment: "test".to_string(),
         };
-        let validator = SymlinkValidator::new(profile);
-        assert_eq!(validator.name(), "Symlink Configuration");
+        let validator = LegacySymlinkValidator::new(profile);
+        assert_eq!(validator.name(), "Legacy Symlink Check");
     }
 
     #[test]

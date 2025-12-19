@@ -7,7 +7,6 @@ pub mod core;
 #[cfg(target_os = "macos")]
 pub mod delete;
 pub mod install;
-pub mod link;
 pub mod migrate;
 pub mod package_registry;
 pub mod purge;

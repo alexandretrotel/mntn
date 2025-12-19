@@ -96,6 +96,7 @@ pub fn run_with_args(args: crate::cli::RestoreArgs) {
 /// Attempts to restore a configuration file from a backup to its target location.
 ///
 /// If the backup file exists and the target path is specified, this function:
+/// - Removes any existing symlink at target (legacy migration support).
 /// - Reads the contents of the backup file.
 /// - Creates parent directories for the target path if they don't exist.
 /// - Writes the contents to the target path.
@@ -104,6 +105,21 @@ pub fn run_with_args(args: crate::cli::RestoreArgs) {
 fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: &str) -> bool {
     if backup_path.is_dir() {
         return restore_directory(backup_path, target_path, file_name);
+    }
+
+    // Handle legacy symlinks: if target is a symlink (from old system), remove it first
+    if target_path.is_symlink() {
+        if let Err(e) = fs::remove_file(target_path) {
+            log_warning(&format!(
+                "Failed to remove legacy symlink for {}: {}",
+                file_name, e
+            ));
+            return false;
+        }
+        log(&format!(
+            "Removed legacy symlink at {}",
+            target_path.display()
+        ));
     }
 
     // Use fs::read instead of fs::read_to_string to handle binary files
@@ -140,8 +156,24 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
     }
 }
 
-/// Restores a directory from backup to target location
+/// Restores a directory from backup to target location.
+/// If target is a symlink (legacy), removes it first and creates a real directory.
 fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> bool {
+    // Handle legacy symlinks: if target is a symlink (from old system), remove it first
+    if target_path.is_symlink() {
+        if let Err(e) = fs::remove_file(target_path) {
+            log_warning(&format!(
+                "Failed to remove legacy symlink for {}: {}",
+                dir_name, e
+            ));
+            return false;
+        }
+        log(&format!(
+            "Removed legacy symlink at {}",
+            target_path.display()
+        ));
+    }
+
     if let Err(e) = fs::create_dir_all(target_path) {
         log_warning(&format!(
             "Failed to create target directory for {}: {}",
@@ -353,5 +385,66 @@ mod tests {
 
         assert!(target_path.exists());
         assert_eq!(fs::read(&target_path).unwrap(), binary_content);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_restore_config_file_replaces_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("backup.txt");
+        let target_path = temp_dir.path().join("target.txt");
+        let symlink_target = temp_dir.path().join("old_target.txt");
+
+        // Create backup content
+        fs::write(&backup_path, "new content from backup").unwrap();
+
+        // Create a symlink at target location (simulating legacy setup)
+        fs::write(&symlink_target, "old symlink content").unwrap();
+        symlink(&symlink_target, &target_path).unwrap();
+        assert!(target_path.is_symlink());
+
+        let result = restore_config_file(&backup_path, &target_path, "test-file");
+        assert!(result);
+
+        // Target should now be a real file, not a symlink
+        assert!(!target_path.is_symlink());
+        assert!(target_path.is_file());
+        assert_eq!(
+            fs::read_to_string(&target_path).unwrap(),
+            "new content from backup"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_restore_directory_replaces_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = TempDir::new().unwrap();
+        let backup_dir = temp_dir.path().join("backup_dir");
+        let target_path = temp_dir.path().join("target_dir");
+        let symlink_target = temp_dir.path().join("old_target_dir");
+
+        // Create backup directory with content
+        fs::create_dir(&backup_dir).unwrap();
+        fs::write(backup_dir.join("file.txt"), "backup content").unwrap();
+
+        // Create a symlink at target location (simulating legacy setup)
+        fs::create_dir(&symlink_target).unwrap();
+        symlink(&symlink_target, &target_path).unwrap();
+        assert!(target_path.is_symlink());
+
+        let result = restore_directory(&backup_dir, &target_path, "test-dir");
+
+        // Skip if rsync not available
+        if !result {
+            return;
+        }
+
+        // Target should now be a real directory, not a symlink
+        assert!(!target_path.is_symlink());
+        assert!(target_path.is_dir());
     }
 }

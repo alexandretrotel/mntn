@@ -138,20 +138,6 @@ pub struct InstallArgs {
     pub dry_run: bool,
 }
 
-/// Arguments for the link command.
-#[derive(Args)]
-pub struct LinkArgs {
-    /// Preview what symlinks would be created without actually creating them
-    #[arg(
-        long,
-        short = 'n',
-        help = "Show what symlinks would be created without performing any actions"
-    )]
-    pub dry_run: bool,
-    #[command(flatten)]
-    pub profile_args: ProfileArgs,
-}
-
 /// Arguments for the restore command.
 #[derive(Args)]
 pub struct RestoreArgs {
@@ -256,9 +242,9 @@ pub struct SyncArgs {
         help = "Custom commit message (default: timestamp-based message)"
     )]
     pub message: Option<String>,
-    /// Automatically run 'mntn link' after pulling changes
-    #[arg(long, help = "Automatically run 'mntn link' after pulling changes")]
-    pub auto_link: bool,
+    /// Automatically run 'mntn restore' after pulling changes
+    #[arg(long, help = "Automatically run 'mntn restore' after pulling changes")]
+    pub auto_restore: bool,
     /// Preview what would be synced without performing any actions
     #[arg(
         long,
@@ -439,10 +425,6 @@ pub enum Commands {
     /// Install and configure the mntn tool on your system
     #[command(about = "Install mntn and optionally set up automated maintenance tasks")]
     Install(InstallArgs),
-
-    /// Create symbolic links for configurations and dotfiles
-    #[command(about = "Create and manage symbolic links for dotfiles and configurations")]
-    Link(LinkArgs),
 
     /// Thoroughly remove files and reset configurations to defaults
     #[command(about = "Completely remove files and reset system configurations")]

@@ -6,10 +6,6 @@ use whoami;
 /// Relative path to the directory used for storing general backup files.
 pub const BACKUP_DIR: &str = "backup";
 
-/// This directory is a subdirectory of `BACKUP_DIR` and is used when a file or folder
-/// would be replaced by a symlink, allowing safe restoration if needed.
-pub const SYMLINKS_DIR: &str = "symlinks";
-
 /// Relative path to the directory used for storing common backup files.
 pub const COMMON_DIR: &str = "common";
 
@@ -45,11 +41,6 @@ pub fn get_backup_machine_path(machine_id: &str) -> PathBuf {
 
 pub fn get_backup_environment_path(env: &str) -> PathBuf {
     get_backup_root().join(ENVIRONMENTS_DIR).join(env)
-}
-
-pub fn get_symlinks_path() -> PathBuf {
-    let mntn_dir = get_mntn_dir();
-    mntn_dir.join(SYMLINKS_DIR)
 }
 
 pub fn get_base_dirs() -> BaseDirs {
@@ -111,11 +102,6 @@ mod tests {
     #[test]
     fn test_backup_dir_constant() {
         assert_eq!(BACKUP_DIR, "backup");
-    }
-
-    #[test]
-    fn test_symlinks_dir_constant() {
-        assert_eq!(SYMLINKS_DIR, "symlinks");
     }
 
     #[test]
@@ -197,13 +183,6 @@ mod tests {
         let path1 = get_backup_environment_path("work");
         let path2 = get_backup_environment_path("home");
         assert_ne!(path1, path2);
-    }
-
-    #[test]
-    fn test_get_symlinks_path_structure() {
-        let path = get_symlinks_path();
-        assert!(path.ends_with("symlinks"));
-        assert!(path.to_string_lossy().contains(".mntn"));
     }
 
     #[test]
@@ -319,11 +298,9 @@ mod tests {
         // All paths should be under .mntn
         let mntn_dir = get_mntn_dir();
         let backup_root = get_backup_root();
-        let symlinks_path = get_symlinks_path();
         let registry_path = get_registry_path();
 
         assert!(backup_root.starts_with(&mntn_dir));
-        assert!(symlinks_path.starts_with(&mntn_dir));
         assert!(registry_path.starts_with(&mntn_dir));
     }
 

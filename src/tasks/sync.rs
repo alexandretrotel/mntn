@@ -16,7 +16,7 @@ pub struct SyncTask {
     pub push: bool,
     pub sync: bool,
     pub message: Option<String>,
-    pub auto_link: bool,
+    pub auto_restore: bool,
     pub dry_run: bool,
 }
 
@@ -29,7 +29,7 @@ impl SyncTask {
             push: args.push,
             sync: args.sync,
             message: args.message.clone(),
-            auto_link: args.auto_link,
+            auto_restore: args.auto_restore,
             dry_run: args.dry_run,
         }
     }
@@ -48,7 +48,7 @@ impl Task for SyncTask {
             push: self.push,
             sync: self.sync,
             message: self.message.clone(),
-            auto_link: self.auto_link,
+            auto_restore: self.auto_restore,
             dry_run: self.dry_run,
         };
 
@@ -78,8 +78,10 @@ impl Task for SyncTask {
 
         if self.pull || self.sync {
             operations.push(PlannedOperation::new("Pull latest changes from remote"));
-            if self.auto_link {
-                operations.push(PlannedOperation::new("Auto-link configurations after pull"));
+            if self.auto_restore {
+                operations.push(PlannedOperation::new(
+                    "Auto-restore configurations after pull",
+                ));
             }
         }
 
@@ -123,9 +125,9 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
         log_success("Successfully pulled latest changes");
 
-        if args.auto_link {
-            println!("🔗 Auto-linking configurations...");
-            crate::tasks::link::run_with_args(crate::cli::LinkArgs {
+        if args.auto_restore {
+            println!("📥 Auto-restoring configurations...");
+            crate::tasks::restore::run_with_args(crate::cli::RestoreArgs {
                 dry_run: false,
                 profile_args: crate::cli::ProfileArgs::default(),
             });

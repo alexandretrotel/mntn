@@ -1,4 +1,4 @@
-use crate::logger::{log_success, log_warning};
+use crate::logger::{log, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
@@ -98,6 +98,101 @@ impl MigrateTask {
             false
         }
     }
+
+    /// Cleans up legacy symlinks at target locations.
+    /// For each registry entry, if the target_path is a symlink pointing to our backup,
+    /// it converts it to a real file by reading from backup and writing a real file.
+    fn cleanup_legacy_symlinks(&self) -> (usize, usize) {
+        let registry_path = get_registry_path();
+        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
+            Ok(r) => r,
+            Err(_) => return (0, 0),
+        };
+
+        let backup_root = get_backup_root();
+        let mut converted = 0;
+        let mut failed = 0;
+
+        for (_id, entry) in registry.get_enabled_entries() {
+            let target_path = &entry.target_path;
+
+            // Check if target is a symlink
+            if !target_path.is_symlink() {
+                continue;
+            }
+
+            // Check if it points to our backup location
+            if let Ok(link_target) = fs::read_link(target_path) {
+                let canonical_target = link_target
+                    .canonicalize()
+                    .unwrap_or_else(|_| link_target.clone());
+
+                // Check if the symlink target is within our backup directory
+                if !canonical_target.starts_with(&backup_root) {
+                    continue;
+                }
+
+                // This is a legacy symlink - convert to real file
+                if target_path.is_dir() || canonical_target.is_dir() {
+                    // Handle directory symlink
+                    match convert_symlink_dir_to_real(target_path, &canonical_target) {
+                        Ok(()) => {
+                            log(&format!(
+                                "Converted legacy symlink directory: {}",
+                                target_path.display()
+                            ));
+                            converted += 1;
+                        }
+                        Err(e) => {
+                            log_warning(&format!(
+                                "Failed to convert symlink directory {}: {}",
+                                target_path.display(),
+                                e
+                            ));
+                            failed += 1;
+                        }
+                    }
+                } else {
+                    // Handle file symlink
+                    match convert_symlink_file_to_real(target_path, &canonical_target) {
+                        Ok(()) => {
+                            log(&format!(
+                                "Converted legacy symlink: {}",
+                                target_path.display()
+                            ));
+                            converted += 1;
+                        }
+                        Err(e) => {
+                            log_warning(&format!(
+                                "Failed to convert symlink {}: {}",
+                                target_path.display(),
+                                e
+                            ));
+                            failed += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        (converted, failed)
+    }
+}
+
+/// Converts a symlink file to a real file by reading content from the target.
+fn convert_symlink_file_to_real(symlink_path: &Path, target_path: &Path) -> std::io::Result<()> {
+    let content = fs::read(target_path)?;
+    fs::remove_file(symlink_path)?;
+    fs::write(symlink_path, content)?;
+    Ok(())
+}
+
+/// Converts a symlink directory to a real directory by copying content from the target.
+fn convert_symlink_dir_to_real(symlink_path: &Path, target_path: &Path) -> std::io::Result<()> {
+    fs::remove_file(symlink_path)?; // Remove the symlink
+    fs::create_dir_all(symlink_path)?;
+    copy_dir_recursive(target_path, symlink_path)?;
+    Ok(())
 }
 
 impl Task for MigrateTask {
@@ -109,13 +204,30 @@ impl Task for MigrateTask {
         println!("🔄 Migrating legacy backup files...");
         println!("   Target: {} ({})", self.target, self.profile);
 
+        // First, clean up any legacy symlinks at target locations
+        let (symlinks_converted, symlinks_failed) = self.cleanup_legacy_symlinks();
+        if symlinks_converted > 0 || symlinks_failed > 0 {
+            println!(
+                "🔗 Symlink cleanup: {} converted, {} failed",
+                symlinks_converted, symlinks_failed
+            );
+        }
+
         let target_dir = self.target.resolve_path(&self.profile);
         fs::create_dir_all(&target_dir)?;
 
         let legacy_files = self.find_legacy_files();
 
+        if legacy_files.is_empty() && symlinks_converted == 0 {
+            log_success("No legacy files or symlinks found to migrate.");
+            return Ok(());
+        }
+
         if legacy_files.is_empty() {
-            log_success("No legacy files found to migrate.");
+            log_success(&format!(
+                "Migration complete. Symlinks converted: {}",
+                symlinks_converted
+            ));
             return Ok(());
         }
 

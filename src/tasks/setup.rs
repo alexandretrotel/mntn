@@ -32,12 +32,6 @@ pub fn run() {
         .prompt()
         .unwrap_or(false);
 
-    let should_link = Confirm::new("Create symlinks for your configurations?")
-        .with_default(true)
-        .with_help_message("This will link your dotfiles to the backup location")
-        .prompt()
-        .unwrap_or(false);
-
     let should_install_tasks = Confirm::new("Install scheduled backup tasks?")
         .with_default(false)
         .with_help_message("This will set up automatic hourly backups")
@@ -53,9 +47,6 @@ pub fn run() {
     }
     if should_backup {
         println!("   ✓ Run initial backup");
-    }
-    if should_link {
-        println!("   ✓ Create symlinks");
     }
     if should_install_tasks {
         println!("   ✓ Install scheduled tasks");
@@ -82,10 +73,6 @@ pub fn run() {
         run_backup(&machine_id, &environment);
     }
 
-    if should_link {
-        run_link(&machine_id, &environment);
-    }
-
     if should_install_tasks {
         run_install_tasks();
     }
@@ -95,10 +82,12 @@ pub fn run() {
     println!();
     println!("📖 Quick reference:");
     println!("   mntn backup          - Backup your configurations");
-    println!("   mntn link            - Create/update symlinks");
+    println!("   mntn restore         - Restore configurations from backup");
     println!("   mntn validate        - Check configuration status");
     println!("   mntn migrate         - Move files between layers");
     println!("   mntn sync --help     - Git sync options");
+    println!();
+    println!("   Remember: Run 'mntn backup' after editing config files!");
     println!();
     println!("   Use --profile, --env, or --machine-id flags to override defaults.");
     println!();
@@ -250,17 +239,6 @@ fn run_backup(machine_id: &str, environment: &str) {
     let mut task = crate::tasks::backup::BackupTask::new(profile, MigrateTarget::Common);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
         log_error("Error during backup", e);
-    }
-}
-
-fn run_link(machine_id: &str, environment: &str) {
-    println!("🔗 Creating symlinks...");
-
-    let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
-
-    let mut task = crate::tasks::link::LinkTask::new(profile);
-    if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
-        log_error("Error during link", e);
     }
 }
 
