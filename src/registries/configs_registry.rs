@@ -80,6 +80,18 @@ impl Default for ConfigsRegistry {
         let data_dir = base_dirs.data_dir();
 
         entries.insert(
+            "bashrc".to_string(),
+            RegistryEntry {
+                name: "Bash Configuration".to_string(),
+                source_path: ".bashrc".to_string(),
+                target_path: home_dir.join(".bashrc"),
+                category: Category::Shell,
+                enabled: true,
+                description: Some("Main Bash shell configuration file".to_string()),
+            },
+        );
+
+        entries.insert(
             "zshrc".to_string(),
             RegistryEntry {
                 name: "Zsh Configuration".to_string(),
@@ -104,20 +116,6 @@ impl Default for ConfigsRegistry {
         );
 
         entries.insert(
-            "config".to_string(),
-            RegistryEntry {
-                name: "General Config Directory".to_string(),
-                source_path: "config".to_string(),
-                target_path: home_dir.join(".config"),
-                category: Category::System,
-                enabled: true,
-                description: Some(
-                    "General configuration directory for various applications".to_string(),
-                ),
-            },
-        );
-
-        entries.insert(
             "vscode_settings".to_string(),
             RegistryEntry {
                 name: "VSCode Settings".to_string(),
@@ -130,18 +128,6 @@ impl Default for ConfigsRegistry {
         );
 
         entries.insert(
-            "zed_settings".to_string(),
-            RegistryEntry {
-                name: "Zed Settings".to_string(),
-                source_path: "zed/settings.json".to_string(),
-                target_path: get_xdg_or_default_config_path("zed/settings.json"),
-                category: Category::Editor,
-                enabled: true,
-                description: Some("Zed user settings".to_string()),
-            },
-        );
-
-        entries.insert(
             "vscode_keybindings".to_string(),
             RegistryEntry {
                 name: "VSCode Keybindings".to_string(),
@@ -150,6 +136,18 @@ impl Default for ConfigsRegistry {
                 category: Category::Editor,
                 enabled: true,
                 description: Some("Visual Studio Code keybindings".to_string()),
+            },
+        );
+
+        entries.insert(
+            "zed_settings".to_string(),
+            RegistryEntry {
+                name: "Zed Settings".to_string(),
+                source_path: "zed/settings.json".to_string(),
+                target_path: get_xdg_or_default_config_path("zed/settings.json"),
+                category: Category::Editor,
+                enabled: true,
+                description: Some("Zed user settings".to_string()),
             },
         );
 

@@ -100,7 +100,11 @@ impl Default for PackageRegistry {
             PackageManagerEntry {
                 name: "Deno".to_string(),
                 command: "deno".to_string(),
-                args: vec!["install".to_string(), "--".to_string(), "--list".to_string()],
+                args: vec![
+                    "install".to_string(),
+                    "--".to_string(),
+                    "--list".to_string(),
+                ],
                 output_file: "deno.txt".to_string(),
                 enabled: true,
                 description: Some("Deno globally installed packages".to_string()),
