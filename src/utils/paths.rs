@@ -58,7 +58,7 @@ pub fn get_base_dirs() -> BaseDirs {
 
 /// Returns the path to the link registry file
 pub fn get_registry_path() -> PathBuf {
-    get_mntn_dir().join("registry.json")
+    get_mntn_dir().join("configs_registry.json")
 }
 
 /// Returns the path to the package manager registry file
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn test_get_registry_path_structure() {
         let path = get_registry_path();
-        assert!(path.ends_with("registry.json"));
+        assert!(path.ends_with("configs_registry.json"));
         assert!(path.to_string_lossy().contains(".mntn"));
     }
 

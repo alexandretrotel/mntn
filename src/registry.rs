@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn test_load_or_create_creates_new_file() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         assert!(!registry_path.exists());
 
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn test_load_or_create_loads_existing_file() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         // Create and save a registry
         let mut original: Registry<TestEntry> = Registry {
@@ -211,7 +211,7 @@ mod tests {
             .path()
             .join("nested")
             .join("dir")
-            .join("registry.json");
+            .join("configs_registry.json");
 
         let _registry: Registry<TestEntry> = Registry::load_or_create(&registry_path).unwrap();
 
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_load_or_create_invalid_json() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         fs::write(&registry_path, "{ invalid json }").unwrap();
 
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn test_save_creates_file() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         let registry: Registry<TestEntry> = Registry::default();
         registry.save(&registry_path).unwrap();
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn test_save_writes_valid_json() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         let mut registry: Registry<TestEntry> = Registry::default();
         registry.add_entry(
@@ -266,7 +266,7 @@ mod tests {
             .join("a")
             .join("b")
             .join("c")
-            .join("registry.json");
+            .join("configs_registry.json");
 
         let registry: Registry<TestEntry> = Registry::default();
         registry.save(&registry_path).unwrap();
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_save_overwrites_existing_file() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         // Save first version
         let registry1: Registry<TestEntry> = Registry {
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn test_serialization_roundtrip() {
         let temp_dir = TempDir::new().unwrap();
-        let registry_path = temp_dir.path().join("registry.json");
+        let registry_path = temp_dir.path().join("configs_registry.json");
 
         let mut original: Registry<TestEntry> = Registry {
             version: "test-version".to_string(),

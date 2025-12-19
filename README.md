@@ -160,7 +160,7 @@ mntn supports a layered approach to dotfiles management, allowing you to have:
 │   └── npm.txt
 ├── profile.json                   # Profile definitions
 ├── .machine-id                    # Current machine identifier
-├── registry.json                  # Configuration registry
+├── configs_registry.json                  # Configuration registry
 ├── package_registry.json          # Package manager registry
 └── symlinks/                      # Backup of original files
 ```
@@ -323,7 +323,7 @@ git push -u origin main
 ├── .gitignore              # Excludes mntn.log
 ├── profile.json            # Profile definitions (versioned)
 ├── .machine-id             # Machine identifier (may want to .gitignore)
-├── registry.json           # Configuration registry
+├── configs_registry.json           # Configuration registry
 ├── package_registry.json   # Package manager registry
 ├── backup/
 │   ├── common/             # Shared configs
