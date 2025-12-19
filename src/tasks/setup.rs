@@ -5,13 +5,27 @@ use crate::utils::paths::{
     get_backup_root, get_machine_id_path, get_machine_identifier, get_mntn_dir,
     get_profile_config_path,
 };
-use inquire::{Confirm, Select, Text};
+use inquire::{Confirm, Select, Text, error::InquireError};
 use signal_hook::consts::SIGINT;
 use signal_hook::flag;
 use std::fs;
 use std::process;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+
+fn prompt_or_abort<T, F: FnOnce() -> Result<T, InquireError>>(f: F) -> T {
+    match f() {
+        Ok(val) => val,
+        Err(InquireError::OperationCanceled) => {
+            println!("\nSetup aborted by user (Ctrl+C).");
+            process::exit(130);
+        }
+        Err(_) => {
+            println!("\nPrompt failed. Aborting setup.");
+            process::exit(1);
+        }
+    }
+}
 
 pub fn run() {
     // Setup SIGINT (Ctrl+C) handler
@@ -28,39 +42,26 @@ pub fn run() {
         return;
     }
 
-    // Helper to check for Ctrl+C
-    let check_abort = || {
-        if !running.load(Ordering::Relaxed) {
-            println!("\nSetup aborted by user (Ctrl+C).");
-            process::exit(130);
-        }
-    };
-
-    check_abort();
-    let machine_id = setup_machine_id();
-    check_abort();
-    let environment = setup_environment();
-    check_abort();
+    let machine_id = prompt_or_abort(setup_machine_id_prompt);
+    let environment = prompt_or_abort(setup_environment_prompt);
 
     save_profile_config(&machine_id, &environment);
-    check_abort();
 
-    let should_migrate = check_and_offer_migration();
-    check_abort();
+    let should_migrate = prompt_or_abort(check_and_offer_migration_prompt);
 
-    let should_backup = Confirm::new("Run initial backup now?")
-        .with_default(true)
-        .with_help_message("This will backup your current configurations")
-        .prompt()
-        .unwrap_or(false);
-    check_abort();
+    let should_backup = prompt_or_abort(|| {
+        Confirm::new("Run initial backup now?")
+            .with_default(true)
+            .with_help_message("This will backup your current configurations")
+            .prompt()
+    });
 
-    let should_install_tasks = Confirm::new("Install scheduled backup tasks?")
-        .with_default(false)
-        .with_help_message("This will set up automatic hourly backups")
-        .prompt()
-        .unwrap_or(false);
-    check_abort();
+    let should_install_tasks = prompt_or_abort(|| {
+        Confirm::new("Install scheduled backup tasks?")
+            .with_default(false)
+            .with_help_message("This will set up automatic hourly backups")
+            .prompt()
+    });
 
     println!();
     println!("📋 Setup Summary:");
@@ -77,11 +78,11 @@ pub fn run() {
     }
     println!();
 
-    let proceed = Confirm::new("Proceed with setup?")
-        .with_default(true)
-        .prompt()
-        .unwrap_or(false);
-    check_abort();
+    let proceed = prompt_or_abort(|| {
+        Confirm::new("Proceed with setup?")
+            .with_default(true)
+            .prompt()
+    });
 
     if !proceed {
         log_info("Setup cancelled");
@@ -92,17 +93,14 @@ pub fn run() {
 
     if should_migrate {
         run_migration(&machine_id, &environment);
-        check_abort();
     }
 
     if should_backup {
         run_backup(&machine_id, &environment);
-        check_abort();
     }
 
     if should_install_tasks {
         run_install_tasks();
-        check_abort();
     }
 
     println!();
@@ -121,7 +119,7 @@ pub fn run() {
     println!();
 }
 
-fn setup_machine_id() -> String {
+fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
     let current = get_machine_identifier();
     let machine_id_path = get_machine_id_path();
 
@@ -137,28 +135,26 @@ fn setup_machine_id() -> String {
     let use_custom = Confirm::new("Set a custom machine identifier?")
         .with_default(false)
         .with_help_message("Useful for identifying this machine in your dotfiles")
-        .prompt()
-        .unwrap_or(false);
+        .prompt()?;
 
     if use_custom {
         let custom_id = Text::new("Enter machine identifier:")
             .with_default(&current)
             .with_help_message("e.g., work-laptop, home-desktop, macbook-pro")
-            .prompt()
-            .unwrap_or_else(|_| current.clone());
+            .prompt()?;
 
         if let Err(e) = fs::write(&machine_id_path, &custom_id) {
             log_warning(&format!("Failed to save machine ID: {}", e));
         } else {
             println!("   ✓ Saved machine ID: {}", custom_id);
         }
-        return custom_id;
+        return Ok(custom_id);
     }
 
-    current
+    Ok(current)
 }
 
-fn setup_environment() -> String {
+fn setup_environment_prompt() -> Result<String, inquire::error::InquireError> {
     println!();
     println!("🌍 Environment");
 
@@ -166,20 +162,18 @@ fn setup_environment() -> String {
 
     let selection = Select::new("Select your environment:", environments)
         .with_help_message("Environment determines which config layer to use")
-        .prompt()
-        .unwrap_or("default");
+        .prompt()?;
 
     let environment = if selection == "custom..." {
         Text::new("Enter custom environment name:")
             .with_default("default")
-            .prompt()
-            .unwrap_or_else(|_| "default".to_string())
+            .prompt()?
     } else {
         selection.to_string()
     };
 
     println!("   ✓ Environment: {}", environment);
-    environment
+    Ok(environment)
 }
 
 fn save_profile_config(machine_id: &str, environment: &str) {
@@ -213,11 +207,11 @@ fn save_profile_config(machine_id: &str, environment: &str) {
     }
 }
 
-fn check_and_offer_migration() -> bool {
+fn check_and_offer_migration_prompt() -> Result<bool, inquire::error::InquireError> {
     let backup_root = get_backup_root();
 
     if !backup_root.exists() {
-        return false;
+        return Ok(false);
     }
 
     let has_legacy_files = fs::read_dir(&backup_root)
@@ -234,7 +228,7 @@ fn check_and_offer_migration() -> bool {
         .unwrap_or(false);
 
     if !has_legacy_files {
-        return false;
+        return Ok(false);
     }
 
     println!();
@@ -245,7 +239,6 @@ fn check_and_offer_migration() -> bool {
         .with_default(true)
         .with_help_message("This moves existing configs to the shared 'common' layer")
         .prompt()
-        .unwrap_or(false)
 }
 
 fn run_migration(machine_id: &str, environment: &str) {
