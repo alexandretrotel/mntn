@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::BTreeMap, collections::HashMap, path::PathBuf};
 
 /// Common interface for registry entries
 pub trait RegistryEntryLike {
@@ -49,12 +49,20 @@ where
         }
     }
 
-    /// Save registry to file
+    /// Save registry to file with entries sorted alphabetically by key
     pub fn save(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(self)?;
+
+        // Create a sorted version using BTreeMap for consistent alphabetical ordering
+        let sorted_entries: BTreeMap<&String, &T> = self.entries.iter().collect();
+        let sorted_registry = serde_json::json!({
+            "version": self.version,
+            "entries": sorted_entries
+        });
+
+        let content = serde_json::to_string_pretty(&sorted_registry)?;
         std::fs::write(path, content)?;
         Ok(())
     }
