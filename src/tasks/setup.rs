@@ -155,6 +155,9 @@ fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
 }
 
 fn setup_environment_prompt() -> Result<String, inquire::error::InquireError> {
+    use crate::logger::log_info;
+    use regex::Regex;
+
     println!();
     println!("🌍 Environment");
 
@@ -164,10 +167,55 @@ fn setup_environment_prompt() -> Result<String, inquire::error::InquireError> {
         .with_help_message("Environment determines which config layer to use")
         .prompt()?;
 
+    let allowed_re = Regex::new(r"^[A-Za-z0-9._-]+$").unwrap();
+
     let environment = if selection == "custom..." {
-        Text::new("Enter custom environment name:")
-            .with_default("default")
-            .prompt()?
+        loop {
+            let input = Text::new("Enter custom environment name:")
+                .with_default("default")
+                .prompt()?;
+
+            let trimmed = input.trim();
+
+            // Validation rules
+            let len = trimmed.chars().count();
+            let max_len = 255;
+
+            if len == 0 {
+                println!("❌ Environment name cannot be empty. Please enter a valid name.");
+                continue;
+            }
+            if len > max_len {
+                println!(
+                    "❌ Environment name must be less than {} characters.",
+                    max_len
+                );
+                continue;
+            }
+            if !allowed_re.is_match(trimmed) {
+                // Attempt sanitization
+                let sanitized: String = trimmed
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+                    .collect();
+                if sanitized.is_empty() {
+                    println!(
+                        "❌ Environment name contains only invalid characters. Please use only letters, numbers, hyphens, underscores, or dots."
+                    );
+                    continue;
+                }
+                log_info(&format!(
+                    "Sanitized environment name from '{}' to '{}'",
+                    trimmed, sanitized
+                ));
+                println!(
+                    "⚠️  Environment name contained invalid characters. Using sanitized name: '{}'",
+                    sanitized
+                );
+                break sanitized;
+            }
+            break trimmed.to_string();
+        }
     } else {
         selection.to_string()
     };
