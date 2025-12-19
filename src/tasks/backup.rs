@@ -4,7 +4,7 @@ use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::tasks::migrate::MigrateTarget;
-use crate::utils::paths::{get_backup_root, get_package_registry_path, get_registry_path};
+use crate::utils::paths::{get_package_registry_path, get_packages_dir, get_registry_path};
 use crate::utils::system::{rsync_directory, run_cmd};
 use rayon::prelude::*;
 use std::fs;
@@ -33,10 +33,10 @@ impl Task for BackupTask {
         println!("🔁 Backing up...");
         println!("   Target: {} ({})", self.target, self.profile);
 
-        let package_dir = get_backup_root();
-        fs::create_dir_all(&package_dir)?;
+        let package_managers_dir = get_packages_dir();
+        fs::create_dir_all(&package_managers_dir)?;
 
-        backup_package_managers(&package_dir);
+        backup_package_managers(&package_managers_dir);
         backup_config_files(&backup_dir);
 
         log_success("Backup complete");
@@ -46,14 +46,17 @@ impl Task for BackupTask {
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
         let backup_dir = self.target.resolve_path(&self.profile);
-        let package_dir = get_backup_root();
+        let package_managers_dir = get_packages_dir();
 
         if let Ok(registry) = PackageRegistry::load_or_create(&get_package_registry_path()) {
             let current_platform = PackageRegistry::get_current_platform();
             for (_id, entry) in registry.get_platform_compatible_entries(&current_platform) {
                 operations.push(PlannedOperation::with_target(
                     format!("Backup {} package list", entry.name),
-                    package_dir.join(&entry.output_file).display().to_string(),
+                    package_managers_dir
+                        .join(&entry.output_file)
+                        .display()
+                        .to_string(),
                 ));
             }
         }
@@ -81,7 +84,7 @@ pub fn run_with_args(args: crate::cli::BackupArgs) {
 }
 
 /// Backs up package managers based on the package registry entries
-fn backup_package_managers(backup_dir: &Path) {
+fn backup_package_managers(package_managers_dir: &Path) {
     let package_registry_path = get_package_registry_path();
     let package_registry = match PackageRegistry::load_or_create(&package_registry_path) {
         Ok(registry) => registry,
@@ -124,7 +127,7 @@ fn backup_package_managers(backup_dir: &Path) {
     for (id, entry, result) in results {
         match result {
             Ok(content) => {
-                if let Err(e) = fs::write(backup_dir.join(&entry.output_file), content) {
+                if let Err(e) = fs::write(package_managers_dir.join(&entry.output_file), content) {
                     log_warning(&format!("Failed to write {}: {}", entry.output_file, e));
                 } else {
                     println!("🔁 Backed up {} ({})", entry.name, id);
@@ -133,7 +136,7 @@ fn backup_package_managers(backup_dir: &Path) {
             }
             Err(e) => {
                 log_warning(&format!("Command for {} failed: {}", entry.name, e));
-                let _ = fs::write(backup_dir.join(&entry.output_file), "");
+                let _ = fs::write(package_managers_dir.join(&entry.output_file), "");
             }
         }
     }

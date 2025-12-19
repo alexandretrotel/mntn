@@ -52,6 +52,11 @@ pub fn get_registry_path() -> PathBuf {
     get_mntn_dir().join("configs_registry.json")
 }
 
+/// Returns the path to the packages directory
+pub fn get_packages_dir() -> PathBuf {
+    get_backup_root().join("packages")
+}
+
 /// Returns the path to the package manager registry file
 pub fn get_package_registry_path() -> PathBuf {
     get_mntn_dir().join("package_registry.json")
@@ -196,7 +201,7 @@ mod tests {
     fn test_get_package_registry_path_structure() {
         let path = get_package_registry_path();
         assert!(path.ends_with("package_registry.json"));
-        assert!(path.to_string_lossy().contains(".mntn"));
+        assert!(path.to_string_lossy().contains("backup/packages"));
     }
 
     #[test]
