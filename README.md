@@ -432,40 +432,36 @@ Validation complete: 0 error(s), 1 warning(s)
 
 ```bash
 # List all package managers
-mntn package-registry list
+mntn registry packages list
 
 # List platform-compatible entries
-mntn package-registry list --platform-only
+mntn registry packages list --platform-only
 
 # Add custom package manager
-mntn package-registry add pipx \
+mntn registry packages add pipx \
   --name "pipx Applications" \
   --command "pipx" \
   --args "list" \
   --output-file "pipx.txt"
 
 # Enable/disable entries
-mntn package-registry toggle pip --enable
+mntn registry packages toggle pip --enable
 ```
 
 ### Configuration Registry Management
 
 ```bash
 # List all entries
-mntn registry list
-
-# List by category
-mntn registry list --category editor
+mntn registry configs list
 
 # Add new entry
-mntn registry add my_config \
+mntn registry configs add my_config \
   --name "My Config" \
   --source "myapp/config.json" \
-  --target "/Users/alex/.config/myapp/config.json" \
-  --category application
+  --target "/Users/alex/.config/myapp/config.json"
 
 # Enable/disable entries
-mntn registry toggle my_config --enable
+mntn registry configs toggle my_config --enable
 ```
 
 ### Automated Maintenance Setup

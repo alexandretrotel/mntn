@@ -436,13 +436,13 @@ pub enum Commands {
     #[command(about = "Restore system state from a previously created backup")]
     Restore(RestoreArgs),
 
-    /// Manage the registry of files and folders to backup and link
-    #[command(about = "Manage the registry of files and folders for backup and linking")]
-    Registry(ConfigsRegistryArgs),
+    /// Manage the registry of configuration files and directories
+    #[command(about = "Manage the registry of configuration files and directories")]
+    RegistryConfigs(ConfigsRegistryArgs),
 
-    /// Manage the package manager registry for backup
-    #[command(about = "Manage the package manager registry for backup operations")]
-    PackageRegistry(PackageRegistryArgs),
+    /// Manage the registry of package managers for backup
+    #[command(about = "Manage the registry of package managers for backup operations")]
+    RegistryPackages(PackageRegistryArgs),
 
     /// Synchronize configurations with a git repository
     #[command(about = "Sync configurations with a git repository (pull/push/both)")]

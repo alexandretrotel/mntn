@@ -6,9 +6,18 @@ use crate::utils::paths::{
     get_profile_config_path,
 };
 use inquire::{Confirm, Select, Text};
+use signal_hook::consts::SIGINT;
+use signal_hook::flag;
 use std::fs;
+use std::process;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub fn run() {
+    // Setup SIGINT (Ctrl+C) handler
+    let running = Arc::new(AtomicBool::new(true));
+    flag::register(SIGINT, Arc::clone(&running)).expect("Failed to register SIGINT handler");
+
     println!();
     println!("🚀 Welcome to mntn interactive setup!");
     println!("   This wizard will help you configure your dotfiles management.");
@@ -19,24 +28,39 @@ pub fn run() {
         return;
     }
 
+    // Helper to check for Ctrl+C
+    let check_abort = || {
+        if !running.load(Ordering::Relaxed) {
+            println!("\nSetup aborted by user (Ctrl+C).");
+            process::exit(130);
+        }
+    };
+
+    check_abort();
     let machine_id = setup_machine_id();
+    check_abort();
     let environment = setup_environment();
+    check_abort();
 
     save_profile_config(&machine_id, &environment);
+    check_abort();
 
     let should_migrate = check_and_offer_migration();
+    check_abort();
 
     let should_backup = Confirm::new("Run initial backup now?")
         .with_default(true)
         .with_help_message("This will backup your current configurations")
         .prompt()
         .unwrap_or(false);
+    check_abort();
 
     let should_install_tasks = Confirm::new("Install scheduled backup tasks?")
         .with_default(false)
         .with_help_message("This will set up automatic hourly backups")
         .prompt()
         .unwrap_or(false);
+    check_abort();
 
     println!();
     println!("📋 Setup Summary:");
@@ -57,6 +81,7 @@ pub fn run() {
         .with_default(true)
         .prompt()
         .unwrap_or(false);
+    check_abort();
 
     if !proceed {
         log_info("Setup cancelled");
@@ -67,14 +92,17 @@ pub fn run() {
 
     if should_migrate {
         run_migration(&machine_id, &environment);
+        check_abort();
     }
 
     if should_backup {
         run_backup(&machine_id, &environment);
+        check_abort();
     }
 
     if should_install_tasks {
         run_install_tasks();
+        check_abort();
     }
 
     println!();
