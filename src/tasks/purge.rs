@@ -384,6 +384,44 @@ fn get_desktop_file_name(desktop_path: &Path) -> Option<String> {
     None
 }
 
+/// Runs an `sc` command (stop/delete) on a Windows service with appropriate logging
+#[cfg(target_os = "windows")]
+fn run_sc_command(action: &str, service_name: &str) {
+    match Command::new("sc").args(&[action, service_name]).status() {
+        Ok(status) if status.success() => {
+            let verb = if action == "stop" {
+                "Stopped"
+            } else {
+                "Deleted"
+            };
+            if action == "stop" {
+                log_info(&format!("{} Windows service: {}", verb, service_name));
+            } else {
+                log_success(&format!("{} Windows service: {}", verb, service_name));
+            }
+        }
+        Ok(_) => {
+            if action == "stop" {
+                log_info(&format!(
+                    "Could not stop Windows service (may already be stopped): {}",
+                    service_name
+                ));
+            } else {
+                log_error(
+                    "Failed to delete Windows service (may require admin)",
+                    service_name,
+                );
+            }
+        }
+        Err(e) => {
+            log_error(
+                &format!("Failed to run sc {} command for {}", action, service_name),
+                e,
+            );
+        }
+    }
+}
+
 /// Attempts to delete a service file, with platform-specific handling
 fn delete_service_file(service_file: &ServiceFile) {
     #[cfg(target_os = "macos")]
@@ -435,9 +473,8 @@ fn delete_service_file(service_file: &ServiceFile) {
         }
         ServiceType::WindowsService => {
             if let Some(service_name) = service_file.path.file_name().and_then(|f| f.to_str()) {
-                let _ = Command::new("sc").args(&["stop", service_name]).status();
-                let _ = Command::new("sc").args(&["delete", service_name]).status();
-                log_success(&format!("Deleted Windows service: {}", service_name));
+                run_sc_command("stop", service_name);
+                run_sc_command("delete", service_name);
             }
         }
     }
