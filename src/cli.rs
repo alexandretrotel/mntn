@@ -259,6 +259,13 @@ pub struct SyncArgs {
     /// Automatically run 'mntn link' after pulling changes
     #[arg(long, help = "Automatically run 'mntn link' after pulling changes")]
     pub auto_link: bool,
+    /// Preview what would be synced without performing any actions
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be synced without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Arguments for the registry command.

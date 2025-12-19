@@ -17,6 +17,7 @@ pub struct SyncTask {
     pub sync: bool,
     pub message: Option<String>,
     pub auto_link: bool,
+    pub dry_run: bool,
 }
 
 impl SyncTask {
@@ -29,6 +30,7 @@ impl SyncTask {
             sync: args.sync,
             message: args.message.clone(),
             auto_link: args.auto_link,
+            dry_run: args.dry_run,
         }
     }
 }
@@ -47,6 +49,7 @@ impl Task for SyncTask {
             sync: self.sync,
             message: self.message.clone(),
             auto_link: self.auto_link,
+            dry_run: self.dry_run,
         };
 
         if let Err(e) = sync_with_git(args) {
@@ -93,8 +96,7 @@ impl Task for SyncTask {
 /// Run with CLI args
 pub fn run_with_args(args: SyncArgs) {
     let mut task = SyncTask::from_args(&args);
-    // Sync doesn't really have a meaningful dry-run since git operations are transactional
-    TaskExecutor::run(&mut task, false);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
