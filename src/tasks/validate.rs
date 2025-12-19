@@ -177,11 +177,10 @@ impl Validator for JsonConfigValidator {
         };
 
         for (_id, entry) in registry.get_enabled_entries() {
-            if entry.source_path.ends_with(".json") {
-                if let Some(resolved) = self.profile.resolve_source(&entry.source_path) {
+            if entry.source_path.ends_with(".json")
+                && let Some(resolved) = self.profile.resolve_source(&entry.source_path) {
                     errors.extend(validate_json_file(&resolved.path, &entry.name));
                 }
-            }
         }
 
         errors
