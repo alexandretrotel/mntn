@@ -237,7 +237,9 @@ fn run_migration(machine_id: &str, environment: &str) {
     let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
 
     let mut task = crate::tasks::migrate::MigrateTask::new(profile, MigrateTarget::Common);
-    let _ = crate::tasks::core::Task::execute(&mut task);
+    if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
+        log_error("Error during migration", e);
+    }
 }
 
 fn run_backup(machine_id: &str, environment: &str) {
@@ -257,12 +259,16 @@ fn run_link(machine_id: &str, environment: &str) {
     let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
 
     let mut task = crate::tasks::link::LinkTask::new(profile);
-    let _ = crate::tasks::core::Task::execute(&mut task);
+    if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
+        log_error("Error during link", e);
+    }
 }
 
 fn run_install_tasks() {
     println!("📦 Installing scheduled tasks...");
 
     let mut task = crate::tasks::install::InstallTask::new(false);
-    let _ = crate::tasks::core::Task::execute(&mut task);
+    if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
+        log_error("Error during install", e);
+    }
 }
