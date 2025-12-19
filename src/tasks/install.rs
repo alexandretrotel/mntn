@@ -9,7 +9,7 @@ use std::process::Command;
 use which::which;
 
 #[cfg(target_os = "linux")]
-const SECONDS_PER_HOUR: u64 = 3600;
+const SECONDS_PER_HOUR: u32 = 3600;
 
 /// Install task that sets up scheduled maintenance tasks
 pub struct InstallTask {

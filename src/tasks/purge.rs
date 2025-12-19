@@ -286,7 +286,7 @@ fn determine_service_type(service_path: &Path, target: &DirectoryTarget) -> (Ser
         {
             return (ServiceType::AutostartDesktop, true);
         }
-        (ServiceType::SystemdService, false);
+        (ServiceType::SystemdService, false)
     }
 
     #[cfg(target_os = "windows")]
