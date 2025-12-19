@@ -195,14 +195,11 @@ impl Validator for JsonConfigValidator {
 /// Checks for legacy symlinks that should be converted to real files.
 /// This validator warns users who previously used symlink-based management
 /// that they should run backup or restore to convert to real files.
-pub struct LegacySymlinkValidator {
-    #[allow(dead_code)]
-    profile: ActiveProfile,
-}
+pub struct LegacySymlinkValidator {}
 
 impl LegacySymlinkValidator {
-    pub fn new(profile: ActiveProfile) -> Self {
-        Self { profile }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -427,7 +424,7 @@ impl ConfigValidator {
             Box::new(RegistryValidator),
             Box::new(LayerValidator::new(profile.clone())),
             Box::new(JsonConfigValidator::new(profile.clone())),
-            Box::new(LegacySymlinkValidator::new(profile)),
+            Box::new(LegacySymlinkValidator::new()),
         ];
         Self { validators }
     }
