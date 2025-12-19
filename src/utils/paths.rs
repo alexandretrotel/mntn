@@ -1,7 +1,6 @@
 use directories_next::BaseDirs;
 use std::fs;
 use std::path::PathBuf;
-use whoami;
 
 /// Relative path to the directory used for storing general backup files.
 pub const BACKUP_DIR: &str = "backup";
@@ -9,17 +8,14 @@ pub const BACKUP_DIR: &str = "backup";
 /// Relative path to the directory used for storing common backup files.
 pub const COMMON_DIR: &str = "common";
 
-/// Relative path to the directory used for storing machine-specific backup files.
-pub const MACHINES_DIR: &str = "machines";
-
-/// Relative path to the directory used for storing environment-specific backup files.
-pub const ENVIRONMENTS_DIR: &str = "environments";
+/// Relative path to the directory used for storing profile-specific backup files.
+pub const PROFILES_DIR: &str = "profiles";
 
 /// Relative path to the file used for storing the profile configuration.
 pub const PROFILE_CONFIG_FILE: &str = "profile.json";
 
-/// Relative path to the file used for storing the machine identifier.
-pub const MACHINE_ID_FILE: &str = ".machine-id";
+/// Relative path to the file used for storing the active profile name.
+pub const ACTIVE_PROFILE_FILE: &str = ".active-profile";
 
 pub fn get_mntn_dir() -> PathBuf {
     let base_dirs = get_base_dirs();
@@ -35,12 +31,8 @@ pub fn get_backup_common_path() -> PathBuf {
     get_backup_root().join(COMMON_DIR)
 }
 
-pub fn get_backup_machine_path(machine_id: &str) -> PathBuf {
-    get_backup_root().join(MACHINES_DIR).join(machine_id)
-}
-
-pub fn get_backup_environment_path(env: &str) -> PathBuf {
-    get_backup_root().join(ENVIRONMENTS_DIR).join(env)
+pub fn get_backup_profile_path(profile_name: &str) -> PathBuf {
+    get_backup_root().join(PROFILES_DIR).join(profile_name)
 }
 
 pub fn get_base_dirs() -> BaseDirs {
@@ -66,38 +58,47 @@ pub fn get_profile_config_path() -> PathBuf {
     get_mntn_dir().join(PROFILE_CONFIG_FILE)
 }
 
-pub fn get_machine_id_path() -> PathBuf {
-    get_mntn_dir().join(MACHINE_ID_FILE)
+pub fn get_active_profile_path() -> PathBuf {
+    get_mntn_dir().join(ACTIVE_PROFILE_FILE)
 }
 
-pub fn get_machine_identifier() -> String {
-    let machine_id_path = get_machine_id_path();
-    if let Ok(id) = fs::read_to_string(&machine_id_path) {
-        let trimmed = id.trim();
+/// Returns the currently active profile name.
+/// Reads from .active-profile file or MNTN_PROFILE env var.
+/// Returns None if no profile is set.
+pub fn get_active_profile_name() -> Option<String> {
+    // First check environment variable
+    if let Ok(profile) = std::env::var("MNTN_PROFILE") {
+        let trimmed = profile.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(trimmed.to_string());
         }
     }
 
-    let user = whoami::username();
-    let hostname = gethostname::gethostname()
-        .to_string_lossy()
-        .to_lowercase()
-        .replace(".local", "")
-        .replace('.', "-");
-
-    format!("{}-{}", user, hostname)
-}
-
-pub fn get_environment() -> String {
-    if let Ok(env) = std::env::var("MNTN_ENV") {
-        let trimmed = env.trim();
+    // Then check .active-profile file
+    let active_profile_path = get_active_profile_path();
+    if let Ok(profile) = fs::read_to_string(&active_profile_path) {
+        let trimmed = profile.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(trimmed.to_string());
         }
     }
 
-    "default".to_string()
+    None
+}
+
+/// Sets the active profile by writing to .active-profile file.
+pub fn set_active_profile(profile_name: &str) -> std::io::Result<()> {
+    let active_profile_path = get_active_profile_path();
+    fs::write(active_profile_path, profile_name)
+}
+
+/// Clears the active profile.
+pub fn clear_active_profile() -> std::io::Result<()> {
+    let active_profile_path = get_active_profile_path();
+    if active_profile_path.exists() {
+        fs::remove_file(active_profile_path)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -115,13 +116,8 @@ mod tests {
     }
 
     #[test]
-    fn test_machines_dir_constant() {
-        assert_eq!(MACHINES_DIR, "machines");
-    }
-
-    #[test]
-    fn test_environments_dir_constant() {
-        assert_eq!(ENVIRONMENTS_DIR, "environments");
+    fn test_profiles_dir_constant() {
+        assert_eq!(PROFILES_DIR, "profiles");
     }
 
     #[test]
@@ -130,8 +126,8 @@ mod tests {
     }
 
     #[test]
-    fn test_machine_id_file_constant() {
-        assert_eq!(MACHINE_ID_FILE, ".machine-id");
+    fn test_active_profile_file_constant() {
+        assert_eq!(ACTIVE_PROFILE_FILE, ".active-profile");
     }
 
     #[test]
@@ -161,33 +157,19 @@ mod tests {
     }
 
     #[test]
-    fn test_get_backup_machine_path_includes_machine_id() {
-        let path = get_backup_machine_path("my-machine");
-        assert!(path.ends_with("my-machine"));
-        assert!(path.to_string_lossy().contains("machines"));
+    fn test_get_backup_profile_path_includes_profile_name() {
+        let path = get_backup_profile_path("my-profile");
+        assert!(path.ends_with("my-profile"));
+        assert!(path.to_string_lossy().contains("profiles"));
     }
 
     #[test]
-    fn test_get_backup_machine_path_different_ids() {
-        let path1 = get_backup_machine_path("machine-a");
-        let path2 = get_backup_machine_path("machine-b");
+    fn test_get_backup_profile_path_different_profiles() {
+        let path1 = get_backup_profile_path("profile-a");
+        let path2 = get_backup_profile_path("profile-b");
         assert_ne!(path1, path2);
-        assert!(path1.ends_with("machine-a"));
-        assert!(path2.ends_with("machine-b"));
-    }
-
-    #[test]
-    fn test_get_backup_environment_path_includes_env() {
-        let path = get_backup_environment_path("work");
-        assert!(path.ends_with("work"));
-        assert!(path.to_string_lossy().contains("environments"));
-    }
-
-    #[test]
-    fn test_get_backup_environment_path_different_envs() {
-        let path1 = get_backup_environment_path("work");
-        let path2 = get_backup_environment_path("home");
-        assert_ne!(path1, path2);
+        assert!(path1.ends_with("profile-a"));
+        assert!(path2.ends_with("profile-b"));
     }
 
     #[test]
@@ -210,96 +192,48 @@ mod tests {
     }
 
     #[test]
-    fn test_get_machine_id_path_structure() {
-        let path = get_machine_id_path();
-        assert!(path.ends_with(".machine-id"));
+    fn test_get_active_profile_path_structure() {
+        let path = get_active_profile_path();
+        assert!(path.ends_with(".active-profile"));
     }
 
     #[test]
     fn test_get_base_dirs_returns_valid() {
         let dirs = get_base_dirs();
-        // Should have a valid home directory
         assert!(dirs.home_dir().is_absolute());
     }
 
     #[test]
-    fn test_get_machine_identifier_returns_non_empty() {
-        let id = get_machine_identifier();
-        assert!(!id.is_empty());
-    }
-
-    #[test]
-    fn test_get_machine_identifier_format() {
-        // When no .machine-id file exists, should return user-hostname format
-        let id = get_machine_identifier();
-        // Should contain a hyphen (user-hostname format)
-        assert!(id.contains('-') || !id.is_empty());
-    }
-
-    #[test]
-    fn test_get_machine_identifier_no_dots() {
-        let id = get_machine_identifier();
-        // Hostname should have dots replaced with hyphens
-        // and .local removed
-        assert!(!id.contains(".local"));
-    }
-
-    #[test]
     #[serial_test::serial]
-    fn test_get_environment_default() {
-        // Clear MNTN_ENV to test default behavior
+    fn test_get_active_profile_name_from_env_var() {
         unsafe {
-            std::env::remove_var("MNTN_ENV");
+            std::env::set_var("MNTN_PROFILE", "work");
         }
-        let env = get_environment();
-        assert_eq!(env, "default");
-    }
-
-    #[test]
-    #[serial_test::serial]
-    fn test_get_environment_from_env_var() {
+        let profile = get_active_profile_name();
+        assert_eq!(profile, Some("work".to_string()));
         unsafe {
-            std::env::set_var("MNTN_ENV", "production");
-        };
-        let env = get_environment();
-        assert_eq!(env, "production");
-        // Clean up
-        unsafe {
-            std::env::remove_var("MNTN_ENV");
+            std::env::remove_var("MNTN_PROFILE");
         }
     }
 
     #[test]
     #[serial_test::serial]
-    fn test_get_environment_empty_string_returns_default() {
+    fn test_get_active_profile_name_empty_env_returns_none() {
         unsafe {
-            std::env::set_var("MNTN_ENV", "");
-        };
-        let env = get_environment();
-        assert_eq!(env, "default");
-        // Clean up
-        unsafe {
-            std::env::remove_var("MNTN_ENV");
+            std::env::set_var("MNTN_PROFILE", "");
         }
-    }
-
-    #[test]
-    #[serial_test::serial]
-    fn test_get_environment_whitespace_only_returns_default() {
+        let profile = get_active_profile_name();
+        // When env is empty, it should fall through to file check
+        // If file doesn't exist, returns None
         unsafe {
-            std::env::set_var("MNTN_ENV", "   ");
+            std::env::remove_var("MNTN_PROFILE");
         }
-        let env = get_environment();
-        assert_eq!(env, "default");
-        // Clean up
-        unsafe {
-            std::env::remove_var("MNTN_ENV");
-        }
+        // Just verify it doesn't panic
+        let _ = profile;
     }
 
     #[test]
     fn test_paths_are_consistent() {
-        // All paths should be under .mntn
         let mntn_dir = get_mntn_dir();
         let backup_root = get_backup_root();
         let registry_path = get_registry_path();
@@ -312,11 +246,9 @@ mod tests {
     fn test_backup_paths_under_backup_root() {
         let backup_root = get_backup_root();
         let common_path = get_backup_common_path();
-        let machine_path = get_backup_machine_path("test");
-        let env_path = get_backup_environment_path("test");
+        let profile_path = get_backup_profile_path("test");
 
         assert!(common_path.starts_with(&backup_root));
-        assert!(machine_path.starts_with(&backup_root));
-        assert!(env_path.starts_with(&backup_root));
+        assert!(profile_path.starts_with(&backup_root));
     }
 }

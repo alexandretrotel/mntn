@@ -89,7 +89,7 @@ impl Task for RestoreTask {
 
 pub fn run_with_args(args: crate::cli::RestoreArgs) {
     use crate::tasks::core::TaskExecutor;
-    let profile = args.profile_args.resolve();
+    let profile = args.resolve_profile();
     TaskExecutor::run(&mut RestoreTask::new(profile), args.dry_run);
 }
 
@@ -201,11 +201,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_profile() -> ActiveProfile {
-        ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        }
+        ActiveProfile::with_profile("test-profile")
     }
 
     #[test]
@@ -218,8 +214,7 @@ mod tests {
     fn test_restore_task_new() {
         let profile = create_test_profile();
         let task = RestoreTask::new(profile.clone());
-        assert_eq!(task.profile.machine_id, profile.machine_id);
-        assert_eq!(task.profile.environment, profile.environment);
+        assert_eq!(task.profile.name, profile.name);
     }
 
     #[test]
@@ -359,11 +354,7 @@ mod tests {
 
     #[test]
     fn test_restore_task_profile_display() {
-        let profile = ActiveProfile {
-            name: Some("test-profile".to_string()),
-            machine_id: "machine-1".to_string(),
-            environment: "env-1".to_string(),
-        };
+        let profile = ActiveProfile::with_profile("test-profile");
         let task = RestoreTask::new(profile);
 
         // Profile should be stored correctly

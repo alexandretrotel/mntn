@@ -1,50 +1,16 @@
 use crate::logger::{log, log_success, log_warning};
-use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::filesystem::copy_dir_recursive;
-use crate::utils::paths::{
-    get_backup_common_path, get_backup_environment_path, get_backup_machine_path, get_backup_root,
-    get_registry_path,
-};
+use crate::utils::paths::{get_backup_common_path, get_backup_root, get_registry_path};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MigrateTarget {
-    Common,
-    Machine,
-    Environment,
-}
-
-impl std::fmt::Display for MigrateTarget {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MigrateTarget::Common => write!(f, "common"),
-            MigrateTarget::Machine => write!(f, "machine"),
-            MigrateTarget::Environment => write!(f, "environment"),
-        }
-    }
-}
-
-impl MigrateTarget {
-    pub fn resolve_path(&self, profile: &ActiveProfile) -> PathBuf {
-        match self {
-            MigrateTarget::Common => get_backup_common_path(),
-            MigrateTarget::Machine => get_backup_machine_path(&profile.machine_id),
-            MigrateTarget::Environment => get_backup_environment_path(&profile.environment),
-        }
-    }
-}
-
-pub struct MigrateTask {
-    profile: ActiveProfile,
-    target: MigrateTarget,
-}
+pub struct MigrateTask {}
 
 impl MigrateTask {
-    pub fn new(profile: ActiveProfile, target: MigrateTarget) -> Self {
-        Self { profile, target }
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn find_legacy_files(&self) -> Vec<(String, PathBuf)> {
@@ -62,15 +28,8 @@ impl MigrateTask {
 
             if legacy_path.exists() {
                 let common_path = get_backup_common_path().join(&entry.source_path);
-                let machine_path =
-                    get_backup_machine_path(&self.profile.machine_id).join(&entry.source_path);
-                let env_path =
-                    get_backup_environment_path(&self.profile.environment).join(&entry.source_path);
 
-                let is_in_layered = common_path.exists()
-                    || machine_path.exists()
-                    || env_path.exists()
-                    || self.is_in_layered_subdir(&legacy_path);
+                let is_in_layered = common_path.exists() || self.is_in_layered_subdir(&legacy_path);
 
                 if !is_in_layered {
                     legacy_files.push((entry.source_path.clone(), legacy_path));
@@ -92,7 +51,7 @@ impl MigrateTask {
 
             matches!(
                 first_component.as_deref(),
-                Some("common") | Some("machines") | Some("environments")
+                Some("common") | Some("profiles")
             )
         } else {
             false
@@ -179,6 +138,12 @@ impl MigrateTask {
     }
 }
 
+impl Default for MigrateTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Converts a symlink file to a real file by reading content from the target.
 fn convert_symlink_file_to_real(symlink_path: &Path, target_path: &Path) -> std::io::Result<()> {
     let content = fs::read(target_path)?;
@@ -201,8 +166,7 @@ impl Task for MigrateTask {
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🔄 Migrating legacy backup files...");
-        println!("   Target: {} ({})", self.target, self.profile);
+        println!("🔄 Migrating legacy backup files to common/...");
 
         // First, clean up any legacy symlinks at target locations
         let (symlinks_converted, symlinks_failed) = self.cleanup_legacy_symlinks();
@@ -213,7 +177,7 @@ impl Task for MigrateTask {
             );
         }
 
-        let target_dir = self.target.resolve_path(&self.profile);
+        let target_dir = get_backup_common_path();
         fs::create_dir_all(&target_dir)?;
 
         let legacy_files = self.find_legacy_files();
@@ -253,15 +217,14 @@ impl Task for MigrateTask {
             match move_path(&legacy_path, &new_path) {
                 Ok(result) => {
                     if let Some(warning) = &result.removal_warning {
-                        // Source removal failed - data is at destination but source still exists
                         log_warning(&format!(
-                            "Migrated with warning: {} -> {}/{} ({})",
-                            source_path, self.target, source_path, warning
+                            "Migrated with warning: {} -> common/{} ({})",
+                            source_path, source_path, warning
                         ));
                     } else {
                         log_success(&format!(
-                            "Migrated: {} -> {}/{}",
-                            source_path, self.target, source_path
+                            "Migrated: {} -> common/{}",
+                            source_path, source_path
                         ));
                     }
                     migrated += 1;
@@ -283,13 +246,13 @@ impl Task for MigrateTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let target_dir = self.target.resolve_path(&self.profile);
+        let target_dir = get_backup_common_path();
         let legacy_files = self.find_legacy_files();
 
         for (source_path, legacy_path) in legacy_files {
             let new_path = target_dir.join(&source_path);
             operations.push(PlannedOperation::with_target(
-                format!("Migrate to {}", self.target),
+                "Migrate to common".to_string(),
                 format!("{} -> {}", legacy_path.display(), new_path.display()),
             ));
         }
@@ -427,109 +390,23 @@ fn move_path(from: &PathBuf, to: &PathBuf) -> std::io::Result<MoveResult> {
 pub fn run_with_args(args: crate::cli::MigrateArgs) {
     use crate::tasks::core::TaskExecutor;
 
-    let profile = args.profile_args.resolve();
-    let target = args.layer.to_migrate_target();
-
-    TaskExecutor::run(&mut MigrateTask::new(profile, target), args.dry_run);
+    TaskExecutor::run(&mut MigrateTask::new(), args.dry_run);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::ActiveProfile;
     use tempfile::TempDir;
-
-    fn create_test_profile() -> ActiveProfile {
-        ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        }
-    }
-
-    #[test]
-    fn test_migrate_target_display() {
-        assert_eq!(MigrateTarget::Common.to_string(), "common");
-        assert_eq!(MigrateTarget::Machine.to_string(), "machine");
-        assert_eq!(MigrateTarget::Environment.to_string(), "environment");
-    }
-
-    #[test]
-    fn test_migrate_target_equality() {
-        assert_eq!(MigrateTarget::Common, MigrateTarget::Common);
-        assert_ne!(MigrateTarget::Common, MigrateTarget::Machine);
-        assert_ne!(MigrateTarget::Machine, MigrateTarget::Environment);
-    }
-
-    #[test]
-    fn test_migrate_target_clone() {
-        let target = MigrateTarget::Machine;
-        let cloned = target;
-        assert_eq!(target, cloned);
-    }
-
-    #[test]
-    fn test_migrate_target_resolve_path_common() {
-        let profile = create_test_profile();
-        let path = MigrateTarget::Common.resolve_path(&profile);
-        assert!(path.to_string_lossy().contains("common"));
-    }
-
-    #[test]
-    fn test_migrate_target_resolve_path_machine() {
-        let profile = create_test_profile();
-        let path = MigrateTarget::Machine.resolve_path(&profile);
-        assert!(path.to_string_lossy().contains("machines"));
-        assert!(path.to_string_lossy().contains("test-machine"));
-    }
-
-    #[test]
-    fn test_migrate_target_resolve_path_environment() {
-        let profile = create_test_profile();
-        let path = MigrateTarget::Environment.resolve_path(&profile);
-        assert!(path.to_string_lossy().contains("environments"));
-        assert!(path.to_string_lossy().contains("test-env"));
-    }
-
-    #[test]
-    fn test_migrate_target_resolve_path_different_profiles() {
-        let profile1 = ActiveProfile {
-            name: None,
-            machine_id: "machine-1".to_string(),
-            environment: "env-1".to_string(),
-        };
-        let profile2 = ActiveProfile {
-            name: None,
-            machine_id: "machine-2".to_string(),
-            environment: "env-2".to_string(),
-        };
-
-        let path1 = MigrateTarget::Machine.resolve_path(&profile1);
-        let path2 = MigrateTarget::Machine.resolve_path(&profile2);
-        assert_ne!(path1, path2);
-
-        let path1 = MigrateTarget::Environment.resolve_path(&profile1);
-        let path2 = MigrateTarget::Environment.resolve_path(&profile2);
-        assert_ne!(path1, path2);
-    }
 
     #[test]
     fn test_migrate_task_name() {
-        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Common);
+        let task = MigrateTask::new();
         assert_eq!(task.name(), "Migrate");
     }
 
     #[test]
-    fn test_migrate_task_new() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile.clone(), MigrateTarget::Machine);
-        assert_eq!(task.profile.machine_id, profile.machine_id);
-        assert_eq!(task.target, MigrateTarget::Machine);
-    }
-
-    #[test]
     fn test_migrate_task_dry_run() {
-        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Common);
+        let task = MigrateTask::new();
         // Should not panic
         let ops = task.dry_run();
         // Should return at least one operation (even if just "no migration needed")
@@ -538,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_migrate_task_dry_run_has_target() {
-        let task = MigrateTask::new(create_test_profile(), MigrateTarget::Environment);
+        let task = MigrateTask::new();
         let ops = task.dry_run();
 
         // All operations should have targets
@@ -625,8 +502,6 @@ mod tests {
 
     #[test]
     fn test_move_path_uses_rename_on_same_filesystem() {
-        // When source and destination are on the same filesystem,
-        // rename should be used (atomic operation)
         let temp_dir = TempDir::new().unwrap();
         let from = temp_dir.path().join("source.txt");
         let to = temp_dir.path().join("dest.txt");
@@ -687,8 +562,7 @@ mod tests {
 
     #[test]
     fn test_is_in_layered_subdir_common() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
+        let task = MigrateTask::new();
 
         let backup_root = get_backup_root();
         let common_path = backup_root.join("common").join("some_file.txt");
@@ -697,37 +571,21 @@ mod tests {
     }
 
     #[test]
-    fn test_is_in_layered_subdir_machines() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
+    fn test_is_in_layered_subdir_profiles() {
+        let task = MigrateTask::new();
 
         let backup_root = get_backup_root();
-        let machine_path = backup_root
-            .join("machines")
-            .join("my-machine")
+        let profile_path = backup_root
+            .join("profiles")
+            .join("my-profile")
             .join("file.txt");
 
-        assert!(task.is_in_layered_subdir(&machine_path));
-    }
-
-    #[test]
-    fn test_is_in_layered_subdir_environments() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
-
-        let backup_root = get_backup_root();
-        let env_path = backup_root
-            .join("environments")
-            .join("prod")
-            .join("file.txt");
-
-        assert!(task.is_in_layered_subdir(&env_path));
+        assert!(task.is_in_layered_subdir(&profile_path));
     }
 
     #[test]
     fn test_is_in_layered_subdir_legacy() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
+        let task = MigrateTask::new();
 
         let backup_root = get_backup_root();
         let legacy_path = backup_root.join("some_legacy_file.txt");
@@ -737,8 +595,7 @@ mod tests {
 
     #[test]
     fn test_is_in_layered_subdir_outside_backup() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
+        let task = MigrateTask::new();
 
         let outside_path = PathBuf::from("/tmp/some_file.txt");
 
@@ -747,26 +604,15 @@ mod tests {
 
     #[test]
     fn test_find_legacy_files_empty() {
-        let profile = create_test_profile();
-        let task = MigrateTask::new(profile, MigrateTarget::Common);
+        let task = MigrateTask::new();
 
         // Should not panic - just verify it returns successfully
         let _legacy = task.find_legacy_files();
     }
 
     #[test]
-    fn test_migrate_task_all_targets() {
-        let profile = create_test_profile();
-
-        for target in [
-            MigrateTarget::Common,
-            MigrateTarget::Machine,
-            MigrateTarget::Environment,
-        ] {
-            let task = MigrateTask::new(profile.clone(), target);
-            assert_eq!(task.name(), "Migrate");
-            let ops = task.dry_run();
-            assert!(!ops.is_empty());
-        }
+    fn test_migrate_task_default() {
+        let task = MigrateTask::default();
+        assert_eq!(task.name(), "Migrate");
     }
 }

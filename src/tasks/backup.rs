@@ -3,7 +3,6 @@ use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
-use crate::tasks::migrate::MigrateTarget;
 use crate::utils::paths::{get_package_registry_path, get_packages_dir, get_registry_path};
 use crate::utils::system::{rsync_directory, run_cmd};
 use rayon::prelude::*;
@@ -12,12 +11,11 @@ use std::path::{Path, PathBuf};
 
 pub struct BackupTask {
     profile: ActiveProfile,
-    target: MigrateTarget,
 }
 
 impl BackupTask {
-    pub fn new(profile: ActiveProfile, target: MigrateTarget) -> Self {
-        Self { profile, target }
+    pub fn new(profile: ActiveProfile) -> Self {
+        Self { profile }
     }
 }
 
@@ -27,11 +25,11 @@ impl Task for BackupTask {
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let backup_dir = self.target.resolve_path(&self.profile);
+        let backup_dir = self.profile.get_backup_path();
         fs::create_dir_all(&backup_dir)?;
 
         println!("🔁 Backing up...");
-        println!("   Target: {} ({})", self.target, self.profile);
+        println!("   Target: {}", self.profile);
 
         let package_managers_dir = get_packages_dir();
         fs::create_dir_all(&package_managers_dir)?;
@@ -45,7 +43,7 @@ impl Task for BackupTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let backup_dir = self.target.resolve_path(&self.profile);
+        let backup_dir = self.profile.get_backup_path();
         let package_managers_dir = get_packages_dir();
 
         if let Ok(registry) = PackageRegistry::load_or_create(&get_package_registry_path()) {
@@ -64,7 +62,7 @@ impl Task for BackupTask {
         if let Ok(registry) = ConfigsRegistry::load_or_create(&get_registry_path()) {
             for (_id, entry) in registry.get_enabled_entries() {
                 operations.push(PlannedOperation::with_target(
-                    format!("Backup {} [{}]", entry.name, self.target),
+                    format!("Backup {}", entry.name),
                     backup_dir.join(&entry.source_path).display().to_string(),
                 ));
             }
@@ -77,10 +75,8 @@ impl Task for BackupTask {
 pub fn run_with_args(args: crate::cli::BackupArgs) {
     use crate::tasks::core::TaskExecutor;
 
-    let profile = args.profile_args.resolve();
-    let target = args.layer.to_migrate_target();
-
-    TaskExecutor::run(&mut BackupTask::new(profile, target), args.dry_run);
+    let profile = args.resolve_profile();
+    TaskExecutor::run(&mut BackupTask::new(profile), args.dry_run);
 }
 
 /// Backs up package managers based on the package registry entries
@@ -289,29 +285,25 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_profile() -> ActiveProfile {
-        ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        }
+        ActiveProfile::with_profile("test-profile")
     }
 
     #[test]
     fn test_backup_task_name() {
-        let task = BackupTask::new(create_test_profile(), MigrateTarget::Common);
+        let task = BackupTask::new(create_test_profile());
         assert_eq!(task.name(), "Backup");
     }
 
     #[test]
     fn test_backup_task_new() {
         let profile = create_test_profile();
-        let task = BackupTask::new(profile.clone(), MigrateTarget::Machine);
-        assert_eq!(task.profile.machine_id, profile.machine_id);
+        let task = BackupTask::new(profile.clone());
+        assert_eq!(task.profile.name, profile.name);
     }
 
     #[test]
     fn test_backup_task_dry_run() {
-        let task = BackupTask::new(create_test_profile(), MigrateTarget::Common);
+        let task = BackupTask::new(create_test_profile());
         // Should not panic - just verify it returns successfully
         let _ops = task.dry_run();
     }
@@ -438,36 +430,16 @@ mod tests {
     }
 
     #[test]
-    fn test_backup_task_with_common_target() {
-        let task = BackupTask::new(create_test_profile(), MigrateTarget::Common);
-        let ops = task.dry_run();
-        // Common target should produce valid operations
-        for op in &ops {
-            if op.description.contains("[") {
-                assert!(op.description.contains("common"));
-            }
-        }
+    fn test_backup_task_with_profile() {
+        let task = BackupTask::new(ActiveProfile::with_profile("work"));
+        let _ops = task.dry_run();
+        // Just verify it doesn't panic
     }
 
     #[test]
-    fn test_backup_task_with_machine_target() {
-        let task = BackupTask::new(create_test_profile(), MigrateTarget::Machine);
-        let ops = task.dry_run();
-        for op in &ops {
-            if op.description.contains("[") {
-                assert!(op.description.contains("machine"));
-            }
-        }
-    }
-
-    #[test]
-    fn test_backup_task_with_environment_target() {
-        let task = BackupTask::new(create_test_profile(), MigrateTarget::Environment);
-        let ops = task.dry_run();
-        for op in &ops {
-            if op.description.contains("[") {
-                assert!(op.description.contains("environment"));
-            }
-        }
+    fn test_backup_task_common_only() {
+        let task = BackupTask::new(ActiveProfile::common_only());
+        let _ops = task.dry_run();
+        // Just verify it doesn't panic
     }
 }

@@ -12,5 +12,6 @@ pub mod package_registry;
 pub mod purge;
 pub mod restore;
 pub mod setup;
+pub mod switch;
 pub mod sync;
 pub mod validate;

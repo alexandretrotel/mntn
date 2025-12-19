@@ -1,7 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 
 use crate::profile::ActiveProfile;
-use crate::tasks::migrate::MigrateTarget;
 
 /// Command line interface for `mntn`.
 #[derive(Parser)]
@@ -16,60 +15,6 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-/// Shared arguments for profile resolution
-#[derive(Args, Clone, Default)]
-pub struct ProfileArgs {
-    /// Use a named profile from profile.json
-    #[arg(
-        long,
-        short = 'p',
-        help = "Use a named profile defined in ~/.mntn/profile.json"
-    )]
-    pub profile: Option<String>,
-    /// Override the environment
-    #[arg(long, short = 'e', help = "Override the environment")]
-    pub env: Option<String>,
-    /// Override the machine identifier
-    #[arg(long, short = 'm', help = "Override the machine identifier")]
-    pub machine_id: Option<String>,
-}
-
-impl ProfileArgs {
-    pub fn resolve(&self) -> ActiveProfile {
-        ActiveProfile::resolve(
-            self.profile.as_deref(),
-            self.machine_id.as_deref(),
-            self.env.as_deref(),
-        )
-    }
-}
-
-/// Shared arguments for layer target selection
-#[derive(Args, Clone, Default)]
-pub struct LayerTargetArgs {
-    /// Target the common layer (default)
-    #[arg(long, help = "Target the common layer (shared across all machines)")]
-    pub to_common: bool,
-    /// Target the machine-specific layer
-    #[arg(long, help = "Target the machine-specific layer")]
-    pub to_machine: bool,
-    /// Target the environment-specific layer
-    #[arg(long, help = "Target the environment-specific layer")]
-    pub to_environment: bool,
-}
-
-impl LayerTargetArgs {
-    pub fn to_migrate_target(&self) -> MigrateTarget {
-        if self.to_machine {
-            MigrateTarget::Machine
-        } else if self.to_environment {
-            MigrateTarget::Environment
-        } else {
-            MigrateTarget::Common
-        }
-    }
-}
-
 /// Arguments for the backup command.
 #[derive(Args)]
 pub struct BackupArgs {
@@ -80,10 +25,15 @@ pub struct BackupArgs {
         help = "Show what would be backed up without performing any actions"
     )]
     pub dry_run: bool,
-    #[command(flatten)]
-    pub layer: LayerTargetArgs,
-    #[command(flatten)]
-    pub profile_args: ProfileArgs,
+    /// Target a specific profile for backup (defaults to active profile, or common if none)
+    #[arg(long, short = 'p', help = "Target a specific profile for backup")]
+    pub profile: Option<String>,
+}
+
+impl BackupArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(self.profile.as_deref())
+    }
 }
 
 /// Arguments for the clean command.
@@ -148,8 +98,12 @@ pub struct RestoreArgs {
         help = "Show what would be restored without performing any actions"
     )]
     pub dry_run: bool,
-    #[command(flatten)]
-    pub profile_args: ProfileArgs,
+}
+
+impl RestoreArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(None)
+    }
 }
 
 /// Arguments for the biometric sudo command.
@@ -174,8 +128,12 @@ pub struct ValidateArgs {
         help = "Show what would be validated without performing any actions"
     )]
     pub dry_run: bool,
-    #[command(flatten)]
-    pub profile_args: ProfileArgs,
+}
+
+impl ValidateArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(None)
+    }
 }
 
 /// Arguments for the migrate command.
@@ -188,10 +146,6 @@ pub struct MigrateArgs {
         help = "Show what would be migrated without performing any actions"
     )]
     pub dry_run: bool,
-    #[command(flatten)]
-    pub layer: LayerTargetArgs,
-    #[command(flatten)]
-    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the purge command.
@@ -401,6 +355,41 @@ pub enum PackageRegistryActions {
     },
 }
 
+/// Arguments for the switch command.
+#[derive(Args)]
+pub struct SwitchArgs {
+    #[command(subcommand)]
+    pub action: Option<SwitchActions>,
+    /// Profile name to switch to (shorthand for `mntn switch <profile>`)
+    #[arg(help = "Profile name to switch to")]
+    pub profile: Option<String>,
+}
+
+/// Switch command actions.
+#[derive(Subcommand)]
+pub enum SwitchActions {
+    /// List all available profiles
+    #[command(about = "List all available profiles")]
+    List,
+    /// Create a new profile
+    #[command(about = "Create a new profile")]
+    Create {
+        /// Name for the new profile
+        #[arg(help = "Name for the new profile")]
+        name: String,
+        /// Optional description for the profile
+        #[arg(long, short = 'd', help = "Optional description for the profile")]
+        description: Option<String>,
+    },
+    /// Delete a profile
+    #[command(about = "Delete a profile")]
+    Delete {
+        /// Name of the profile to delete
+        #[arg(help = "Name of the profile to delete")]
+        name: String,
+    },
+}
+
 /// Available maintenance commands for `mntn`.
 ///
 /// Some commands are only available on macOS systems.
@@ -444,6 +433,10 @@ pub enum Commands {
     #[command(about = "Manage the registry of package managers for backup operations")]
     RegistryPackages(PackageRegistryArgs),
 
+    /// Switch between profiles or manage profiles
+    #[command(about = "Switch between profiles or manage profiles (list, create, delete)")]
+    Switch(SwitchArgs),
+
     /// Synchronize configurations with a git repository
     #[command(about = "Sync configurations with a git repository (pull/push/both)")]
     Sync(SyncArgs),
@@ -452,8 +445,8 @@ pub enum Commands {
     #[command(about = "Validate JSON configs, symlinks, and registry files")]
     Validate(ValidateArgs),
 
-    /// Migrate legacy backup files to the layered structure
-    #[command(about = "Migrate legacy backup files to common/machine/environment layers")]
+    /// Migrate legacy backup files to the new structure
+    #[command(about = "Migrate legacy backup files to common/profiles structure")]
     Migrate(MigrateArgs),
 
     /// Interactive setup wizard for new users

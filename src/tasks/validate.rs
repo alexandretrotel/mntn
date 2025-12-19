@@ -328,7 +328,7 @@ impl Validator for LayerValidator {
                     "Some configs are still in legacy location ({})",
                     legacy_path
                 ))
-                .with_fix("Run 'mntn migrate --to-common' to migrate to the layered structure"),
+                .with_fix("Run 'mntn migrate' to migrate to the layered structure"),
             );
         }
 
@@ -390,7 +390,7 @@ impl Validator for RegistryValidator {
                                 entry.name, id
                             ))
                             .with_fix(format!(
-                                "Install {} or disable this entry with 'mntn package-registry toggle {} -e false'",
+                                "Install {} or disable this entry with 'mntn registry-packages toggle {} -e false'",
                                 entry.command, id
                             )),
                         );
@@ -493,7 +493,7 @@ pub fn run_with_args(args: crate::cli::ValidateArgs) {
         log_info("Created default profile config at ~/.mntn/profile.json");
     }
 
-    let profile = args.profile_args.resolve();
+    let profile = args.resolve_profile();
     TaskExecutor::run(&mut ValidateTask::new(profile), args.dry_run);
 }
 
@@ -711,22 +711,14 @@ mod tests {
 
     #[test]
     fn test_validate_task_name() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
+        let profile = ActiveProfile::common_only();
         let task = ValidateTask::new(profile);
         assert_eq!(task.name(), "Validate");
     }
 
     #[test]
     fn test_validate_task_dry_run() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
+        let profile = ActiveProfile::common_only();
         let task = ValidateTask::new(profile);
         let ops = task.dry_run();
 
@@ -739,11 +731,7 @@ mod tests {
 
     #[test]
     fn test_config_validator_new() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
+        let profile = ActiveProfile::common_only();
         let validator = ConfigValidator::new(profile);
         // Should have 4 validators
         assert_eq!(validator.validators.len(), 4);
@@ -751,11 +739,7 @@ mod tests {
 
     #[test]
     fn test_config_validator_run_all() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test-nonexistent".to_string(),
-            environment: "test-nonexistent".to_string(),
-        };
+        let profile = ActiveProfile::with_profile("test-nonexistent");
         let validator = ConfigValidator::new(profile);
         let report = validator.run_all();
 
@@ -765,11 +749,7 @@ mod tests {
 
     #[test]
     fn test_json_config_validator_name() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
+        let profile = ActiveProfile::common_only();
         let validator = JsonConfigValidator::new(profile);
         assert_eq!(validator.name(), "JSON Configuration Files");
     }
@@ -782,11 +762,7 @@ mod tests {
 
     #[test]
     fn test_layer_validator_name() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
+        let profile = ActiveProfile::common_only();
         let validator = LayerValidator::new(profile);
         assert_eq!(validator.name(), "Layer Resolution");
     }

@@ -1,11 +1,9 @@
-use crate::logger::{log_error, log_info, log_success, log_warning};
-use crate::profile::{ActiveProfile, ProfileConfig, ProfileDefinition};
-use crate::tasks::migrate::MigrateTarget;
+use crate::logger::{log_error, log_info, log_success};
+use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::utils::paths::{
-    get_backup_root, get_machine_id_path, get_machine_identifier, get_mntn_dir,
-    get_profile_config_path,
+    get_backup_root, get_mntn_dir, get_profile_config_path, set_active_profile,
 };
-use inquire::{Confirm, Select, Text, error::InquireError};
+use inquire::{Confirm, Text, error::InquireError};
 use signal_hook::consts::SIGINT;
 use signal_hook::flag;
 use std::fs;
@@ -42,10 +40,7 @@ pub fn run() {
         return;
     }
 
-    let machine_id = prompt_or_abort(setup_machine_id_prompt);
-    let environment = prompt_or_abort(setup_environment_prompt);
-
-    save_profile_config(&machine_id, &environment);
+    let profile_name = prompt_or_abort(setup_profile_prompt);
 
     let should_migrate = prompt_or_abort(check_and_offer_migration_prompt);
 
@@ -65,8 +60,11 @@ pub fn run() {
 
     println!();
     println!("📋 Setup Summary:");
-    println!("   Machine ID: {}", machine_id);
-    println!("   Environment: {}", environment);
+    if let Some(ref name) = profile_name {
+        println!("   Profile: {}", name);
+    } else {
+        println!("   Profile: common (no active profile)");
+    }
     if should_migrate {
         println!("   ✓ Migrate legacy files to common/");
     }
@@ -91,12 +89,20 @@ pub fn run() {
 
     println!();
 
+    // Save profile if created
+    if let Some(ref name) = profile_name {
+        save_profile_config(name);
+        if let Err(e) = set_active_profile(name) {
+            log_error("Failed to set active profile", e);
+        }
+    }
+
     if should_migrate {
-        run_migration(&machine_id, &environment);
+        run_migration();
     }
 
     if should_backup {
-        run_backup(&machine_id, &environment);
+        run_backup(&profile_name);
     }
 
     if should_install_tasks {
@@ -109,137 +115,57 @@ pub fn run() {
     println!("📖 Quick reference:");
     println!("   mntn backup          - Backup your configurations");
     println!("   mntn restore         - Restore configurations from backup");
+    println!("   mntn switch <name>   - Switch to a different profile");
+    println!("   mntn switch list     - List available profiles");
     println!("   mntn validate        - Check configuration status");
-    println!("   mntn migrate         - Move files between layers");
     println!("   mntn sync --help     - Git sync options");
     println!();
     println!("   Remember: Run 'mntn backup' after editing config files!");
     println!();
-    println!("   Use --profile, --env, or --machine-id flags to override defaults.");
-    println!();
 }
 
-fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
-    let current = get_machine_identifier();
-    let machine_id_path = get_machine_id_path();
-
-    let has_custom_id = machine_id_path.exists();
-
-    println!("📍 Machine Identifier");
-    if has_custom_id {
-        println!("   Current: {} (from ~/.mntn/.machine-id)", current);
-    } else {
-        println!("   Auto-detected: {}", current);
-    }
-
-    let use_custom = Confirm::new("Set a custom machine identifier?")
-        .with_default(false)
-        .with_help_message("Useful for identifying this machine in your dotfiles")
-        .prompt()?;
-
-    if use_custom {
-        let custom_id = Text::new("Enter machine identifier:")
-            .with_default(&current)
-            .with_help_message("e.g., work-laptop, home-desktop, macbook-pro")
-            .with_validator(|input: &str| {
-                if input.is_empty() {
-                    return Ok(inquire::validator::Validation::Invalid(
-                        "Machine ID cannot be empty".into(),
-                    ));
-                }
-                if input
-                    .chars()
-                    .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
-                {
-                    return Ok(inquire::validator::Validation::Invalid(
-                        "Use only letters, numbers, hyphens, and underscores".into(),
-                    ));
-                }
-                Ok(inquire::validator::Validation::Valid)
-            })
-            .prompt()?;
-
-        if let Err(e) = fs::write(&machine_id_path, &custom_id) {
-            log_warning(&format!("Failed to save machine ID: {}", e));
-        } else {
-            println!("   ✓ Saved machine ID: {}", custom_id);
-        }
-        return Ok(custom_id);
-    }
-
-    Ok(current)
-}
-
-fn setup_environment_prompt() -> Result<String, inquire::error::InquireError> {
-    use regex::Regex;
-
+fn setup_profile_prompt() -> Result<Option<String>, inquire::error::InquireError> {
+    println!("📍 Profile Setup");
+    println!("   Profiles let you maintain different configurations for different contexts");
+    println!("   (e.g., 'work', 'personal', 'minimal', 'gaming')");
     println!();
-    println!("🌍 Environment");
 
-    let environments = vec!["default", "work", "personal", "dev", "custom..."];
-
-    let selection = Select::new("Select your environment:", environments)
-        .with_help_message("Environment determines which config layer to use")
+    let create_profile = Confirm::new("Create a profile now?")
+        .with_default(true)
+        .with_help_message("You can always create profiles later with 'mntn switch create <name>'")
         .prompt()?;
 
-    let allowed_re = Regex::new(r"^[A-Za-z0-9._-]+$").unwrap();
+    if !create_profile {
+        println!("   ✓ Using common configuration only (no profile)");
+        return Ok(None);
+    }
 
-    let environment = if selection == "custom..." {
-        loop {
-            let input = Text::new("Enter custom environment name:")
-                .with_default("default")
-                .prompt()?;
-
-            let trimmed = input.trim();
-
-            // Validation rules
-            let len = trimmed.chars().count();
-            let max_len = 255;
-
-            if len == 0 {
-                println!("❌ Environment name cannot be empty. Please enter a valid name.");
-                continue;
-            }
-            if len > max_len {
-                println!(
-                    "❌ Environment name must be less than {} characters.",
-                    max_len
-                );
-                continue;
-            }
-            if !allowed_re.is_match(trimmed) {
-                // Attempt sanitization
-                let sanitized: String = trimmed
-                    .chars()
-                    .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
-                    .collect();
-                if sanitized.is_empty() {
-                    println!(
-                        "❌ Environment name contains only invalid characters. Please use only letters, numbers, hyphens, underscores, or dots."
-                    );
-                    continue;
-                }
-                log_info(&format!(
-                    "Sanitized environment name from '{}' to '{}'",
-                    trimmed, sanitized
+    let profile_name = Text::new("Profile name:")
+        .with_default("default")
+        .with_help_message("e.g., work, personal, minimal, gaming")
+        .with_validator(|input: &str| {
+            if input.is_empty() {
+                return Ok(inquire::validator::Validation::Invalid(
+                    "Profile name cannot be empty".into(),
                 ));
-                println!(
-                    "⚠️  Environment name contained invalid characters. Using sanitized name: '{}'",
-                    sanitized
-                );
-                break sanitized;
             }
-            break trimmed.to_string();
-        }
-    } else {
-        selection.to_string()
-    };
+            if input
+                .chars()
+                .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
+            {
+                return Ok(inquire::validator::Validation::Invalid(
+                    "Use only letters, numbers, hyphens, and underscores".into(),
+                ));
+            }
+            Ok(inquire::validator::Validation::Valid)
+        })
+        .prompt()?;
 
-    println!("   ✓ Environment: {}", environment);
-    Ok(environment)
+    println!("   ✓ Profile: {}", profile_name);
+    Ok(Some(profile_name))
 }
 
-fn save_profile_config(machine_id: &str, environment: &str) {
+fn save_profile_config(profile_name: &str) {
     let path = get_profile_config_path();
 
     let mut config = ProfileConfig::load(&path).unwrap_or_default();
@@ -248,25 +174,13 @@ fn save_profile_config(machine_id: &str, environment: &str) {
         config.version = "1.0.0".to_string();
     }
 
-    let profile_name = format!("{}-{}", machine_id, environment);
-    config.profiles.insert(
-        profile_name.clone(),
-        ProfileDefinition {
-            machine_id: Some(machine_id.to_string()),
-            environment: Some(environment.to_string()),
-            description: Some(format!(
-                "Auto-generated profile for {} in {} environment",
-                machine_id, environment
-            )),
-        },
+    config.create_profile(
+        profile_name,
+        Some("Profile created during setup".to_string()),
     );
 
-    if config.default_profile.is_none() {
-        config.default_profile = Some(profile_name);
-    }
-
     if let Err(e) = config.save(&path) {
-        log_warning(&format!("Failed to save profile config: {}", e));
+        log_error("Failed to save profile config", Box::new(e));
     }
 }
 
@@ -283,8 +197,8 @@ fn check_and_offer_migration_prompt() -> Result<bool, inquire::error::InquireErr
                 let name = e.file_name();
                 let name_str = name.to_string_lossy();
                 name_str != "common"
-                    && name_str != "machines"
-                    && name_str != "environments"
+                    && name_str != "profiles"
+                    && name_str != "packages"
                     && !name_str.ends_with(".txt")
             })
         })
@@ -304,23 +218,24 @@ fn check_and_offer_migration_prompt() -> Result<bool, inquire::error::InquireErr
         .prompt()
 }
 
-fn run_migration(machine_id: &str, environment: &str) {
+fn run_migration() {
     println!("🔄 Migrating legacy files to common/...");
 
-    let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
-
-    let mut task = crate::tasks::migrate::MigrateTask::new(profile, MigrateTarget::Common);
+    let mut task = crate::tasks::migrate::MigrateTask::new();
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
         log_error("Error during migration", e);
     }
 }
 
-fn run_backup(machine_id: &str, environment: &str) {
+fn run_backup(profile_name: &Option<String>) {
     println!("🔁 Running initial backup...");
 
-    let profile = ActiveProfile::resolve(None, Some(machine_id), Some(environment));
+    let profile = match profile_name {
+        Some(name) => ActiveProfile::with_profile(name),
+        None => ActiveProfile::common_only(),
+    };
 
-    let mut task = crate::tasks::backup::BackupTask::new(profile, MigrateTarget::Common);
+    let mut task = crate::tasks::backup::BackupTask::new(profile);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
         log_error("Error during backup", e);
     }

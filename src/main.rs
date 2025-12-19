@@ -10,7 +10,7 @@ use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 use tasks::{
     backup, clean, configs_registry as configs_registry_task, install, migrate,
-    package_registry as package_registry_task, purge, restore, setup, sync, validate,
+    package_registry as package_registry_task, purge, restore, setup, switch, sync, validate,
 };
 
 #[cfg(target_os = "macos")]
@@ -27,6 +27,7 @@ fn main() {
         Some(Commands::Restore(args)) => restore::run_with_args(args),
         Some(Commands::RegistryConfigs(args)) => configs_registry_task::run_with_args(args),
         Some(Commands::RegistryPackages(args)) => package_registry_task::run_with_args(args),
+        Some(Commands::Switch(args)) => switch::run_with_args(args),
         Some(Commands::Sync(args)) => sync::run_with_args(args),
         Some(Commands::Validate(args)) => validate::run_with_args(args),
         Some(Commands::Migrate(args)) => migrate::run_with_args(args),

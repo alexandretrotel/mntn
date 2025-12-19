@@ -5,21 +5,20 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::utils::paths::{
-    get_backup_common_path, get_backup_environment_path, get_backup_machine_path, get_backup_root,
-    get_environment, get_machine_identifier, get_profile_config_path,
+    get_active_profile_name, get_backup_common_path, get_backup_profile_path, get_backup_root,
+    get_profile_config_path,
 };
 
+/// A profile definition stored in profile.json
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProfileDefinition {
-    pub machine_id: Option<String>,
-    pub environment: Option<String>,
     pub description: Option<String>,
 }
 
+/// The profile configuration file structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProfileConfig {
     pub version: String,
-    pub default_profile: Option<String>,
     pub profiles: HashMap<String, ProfileDefinition>,
 }
 
@@ -46,6 +45,25 @@ impl ProfileConfig {
         self.profiles.get(name)
     }
 
+    pub fn profile_exists(&self, name: &str) -> bool {
+        self.profiles.contains_key(name)
+    }
+
+    pub fn list_profiles(&self) -> Vec<&String> {
+        let mut names: Vec<_> = self.profiles.keys().collect();
+        names.sort();
+        names
+    }
+
+    pub fn create_profile(&mut self, name: &str, description: Option<String>) {
+        self.profiles
+            .insert(name.to_string(), ProfileDefinition { description });
+    }
+
+    pub fn delete_profile(&mut self, name: &str) -> bool {
+        self.profiles.remove(name).is_some()
+    }
+
     pub fn save_default_if_missing() -> io::Result<bool> {
         let path = get_profile_config_path();
         if path.exists() {
@@ -54,7 +72,6 @@ impl ProfileConfig {
 
         let config = ProfileConfig {
             version: "1.0.0".to_string(),
-            default_profile: None,
             profiles: HashMap::new(),
         };
         config.save(&path)?;
@@ -62,57 +79,54 @@ impl ProfileConfig {
     }
 }
 
+/// The active profile used for operations
 #[derive(Debug, Clone)]
 pub struct ActiveProfile {
+    /// The profile name (None means using common only)
     pub name: Option<String>,
-    pub machine_id: String,
-    pub environment: String,
 }
 
 impl std::fmt::Display for ActiveProfile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.name {
-            Some(name) => write!(
-                f,
-                "profile={} (machine={}, env={})",
-                name, self.machine_id, self.environment
-            ),
-            None => write!(f, "machine={}, env={}", self.machine_id, self.environment),
+            Some(name) => write!(f, "profile={}", name),
+            None => write!(f, "common (no active profile)"),
         }
     }
 }
 
 impl ActiveProfile {
-    pub fn resolve(
-        profile_name: Option<&str>,
-        cli_machine_id: Option<&str>,
-        cli_env: Option<&str>,
-    ) -> Self {
-        let config = ProfileConfig::load_or_default();
-
-        let profile_def = profile_name
-            .and_then(|name| config.get_profile(name).cloned())
-            .or_else(|| {
-                config
-                    .default_profile
-                    .as_ref()
-                    .and_then(|name| config.get_profile(name).cloned())
-            });
-
-        let machine_id = cli_machine_id
-            .map(String::from)
-            .or_else(|| profile_def.as_ref().and_then(|p| p.machine_id.clone()))
-            .unwrap_or_else(get_machine_identifier);
-
-        let environment = cli_env
-            .map(String::from)
-            .or_else(|| profile_def.as_ref().and_then(|p| p.environment.clone()))
-            .unwrap_or_else(get_environment);
-
+    /// Creates an ActiveProfile with an explicit profile name
+    pub fn with_profile(name: &str) -> Self {
         Self {
-            name: profile_name.map(String::from),
-            machine_id,
-            environment,
+            name: Some(name.to_string()),
+        }
+    }
+
+    /// Creates an ActiveProfile without a specific profile (common only)
+    pub fn common_only() -> Self {
+        Self { name: None }
+    }
+
+    /// Resolves the active profile from CLI args or system state
+    /// Priority: CLI arg > MNTN_PROFILE env > .active-profile file
+    pub fn resolve(cli_profile: Option<&str>) -> Self {
+        if let Some(profile) = cli_profile {
+            return Self::with_profile(profile);
+        }
+
+        if let Some(profile) = get_active_profile_name() {
+            return Self::with_profile(&profile);
+        }
+
+        Self::common_only()
+    }
+
+    /// Returns the backup directory for this profile
+    pub fn get_backup_path(&self) -> PathBuf {
+        match &self.name {
+            Some(name) => get_backup_profile_path(name),
+            None => get_backup_common_path(),
         }
     }
 }
@@ -120,8 +134,7 @@ impl ActiveProfile {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceLayer {
     Common,
-    Machine,
-    Environment,
+    Profile,
     Legacy,
 }
 
@@ -129,8 +142,7 @@ impl std::fmt::Display for SourceLayer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SourceLayer::Common => write!(f, "common"),
-            SourceLayer::Machine => write!(f, "machine"),
-            SourceLayer::Environment => write!(f, "environment"),
+            SourceLayer::Profile => write!(f, "profile"),
             SourceLayer::Legacy => write!(f, "legacy"),
         }
     }
@@ -143,6 +155,8 @@ pub struct ResolvedSource {
 }
 
 impl ActiveProfile {
+    /// Resolves the source file from the layered backup structure.
+    /// Priority: profile > common > legacy
     pub fn resolve_source(&self, source_path: &str) -> Option<ResolvedSource> {
         let candidates = self.get_candidate_sources(source_path);
 
@@ -155,24 +169,31 @@ impl ActiveProfile {
         None
     }
 
+    /// Gets all candidate source paths in priority order
     pub fn get_candidate_sources(&self, source_path: &str) -> Vec<(PathBuf, SourceLayer)> {
-        vec![
-            (
-                get_backup_environment_path(&self.environment).join(source_path),
-                SourceLayer::Environment,
-            ),
-            (
-                get_backup_machine_path(&self.machine_id).join(source_path),
-                SourceLayer::Machine,
-            ),
-            (
-                get_backup_common_path().join(source_path),
-                SourceLayer::Common,
-            ),
-            (get_backup_root().join(source_path), SourceLayer::Legacy),
-        ]
+        let mut candidates = Vec::new();
+
+        // Profile layer (highest priority if set)
+        if let Some(profile_name) = &self.name {
+            candidates.push((
+                get_backup_profile_path(profile_name).join(source_path),
+                SourceLayer::Profile,
+            ));
+        }
+
+        // Common layer
+        candidates.push((
+            get_backup_common_path().join(source_path),
+            SourceLayer::Common,
+        ));
+
+        // Legacy layer (lowest priority)
+        candidates.push((get_backup_root().join(source_path), SourceLayer::Legacy));
+
+        candidates
     }
 
+    /// Gets all existing sources for a path
     pub fn get_all_resolved_sources(&self, source_path: &str) -> Vec<ResolvedSource> {
         self.get_candidate_sources(source_path)
             .into_iter()
@@ -190,20 +211,14 @@ mod tests {
     #[test]
     fn test_profile_definition_default() {
         let def = ProfileDefinition::default();
-        assert!(def.machine_id.is_none());
-        assert!(def.environment.is_none());
         assert!(def.description.is_none());
     }
 
     #[test]
-    fn test_profile_definition_with_values() {
+    fn test_profile_definition_with_description() {
         let def = ProfileDefinition {
-            machine_id: Some("my-machine".to_string()),
-            environment: Some("work".to_string()),
             description: Some("Work laptop".to_string()),
         };
-        assert_eq!(def.machine_id.unwrap(), "my-machine");
-        assert_eq!(def.environment.unwrap(), "work");
         assert_eq!(def.description.unwrap(), "Work laptop");
     }
 
@@ -211,7 +226,6 @@ mod tests {
     fn test_profile_config_default() {
         let config = ProfileConfig::default();
         assert_eq!(config.version, "");
-        assert!(config.default_profile.is_none());
         assert!(config.profiles.is_empty());
     }
 
@@ -222,13 +236,10 @@ mod tests {
 
         let config = ProfileConfig {
             version: "1.0.0".to_string(),
-            default_profile: Some("work".to_string()),
             profiles: HashMap::from([(
                 "work".to_string(),
                 ProfileDefinition {
-                    machine_id: Some("work-machine".to_string()),
-                    environment: Some("work".to_string()),
-                    description: None,
+                    description: Some("Work profile".to_string()),
                 },
             )]),
         };
@@ -237,7 +248,6 @@ mod tests {
 
         let loaded = ProfileConfig::load(&config_path).unwrap();
         assert_eq!(loaded.version, "1.0.0");
-        assert_eq!(loaded.default_profile, Some("work".to_string()));
         assert!(loaded.profiles.contains_key("work"));
     }
 
@@ -269,7 +279,6 @@ mod tests {
 
         let config = ProfileConfig {
             version: "1.0.0".to_string(),
-            default_profile: None,
             profiles: HashMap::new(),
         };
 
@@ -278,220 +287,117 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_config_save_writes_valid_json() {
-        let temp_dir = TempDir::new().unwrap();
-        let config_path = temp_dir.path().join("profile.json");
-
-        let config = ProfileConfig {
-            version: "2.0.0".to_string(),
-            default_profile: Some("test".to_string()),
-            profiles: HashMap::new(),
-        };
-
-        config.save(&config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        assert!(content.contains("\"version\""));
-        assert!(content.contains("2.0.0"));
-    }
-
-    #[test]
-    fn test_profile_config_get_profile_exists() {
+    fn test_profile_config_create_and_delete_profile() {
         let mut config = ProfileConfig::default();
-        config.profiles.insert(
-            "dev".to_string(),
-            ProfileDefinition {
-                machine_id: Some("dev-machine".to_string()),
-                environment: None,
-                description: None,
-            },
-        );
 
-        let profile = config.get_profile("dev");
-        assert!(profile.is_some());
-        assert_eq!(profile.unwrap().machine_id, Some("dev-machine".to_string()));
+        config.create_profile("work", Some("Work profile".to_string()));
+        assert!(config.profile_exists("work"));
+        assert_eq!(config.list_profiles().len(), 1);
+
+        let deleted = config.delete_profile("work");
+        assert!(deleted);
+        assert!(!config.profile_exists("work"));
     }
 
     #[test]
-    fn test_profile_config_get_profile_not_exists() {
-        let config = ProfileConfig::default();
-        assert!(config.get_profile("nonexistent").is_none());
+    fn test_profile_config_list_profiles_sorted() {
+        let mut config = ProfileConfig::default();
+        config.create_profile("zebra", None);
+        config.create_profile("alpha", None);
+        config.create_profile("middle", None);
+
+        let profiles = config.list_profiles();
+        assert_eq!(profiles, vec!["alpha", "middle", "zebra"]);
     }
 
     #[test]
-    fn test_active_profile_resolution_priority() {
-        let profile = ActiveProfile::resolve(None, Some("test-machine"), Some("work"));
-
-        assert_eq!(profile.machine_id, "test-machine");
-        assert_eq!(profile.environment, "work");
+    fn test_active_profile_with_profile() {
+        let profile = ActiveProfile::with_profile("work");
+        assert_eq!(profile.name, Some("work".to_string()));
     }
 
     #[test]
-    fn test_active_profile_resolve_with_cli_overrides() {
-        let profile = ActiveProfile::resolve(None, Some("cli-machine"), Some("cli-env"));
-
-        assert_eq!(profile.machine_id, "cli-machine");
-        assert_eq!(profile.environment, "cli-env");
+    fn test_active_profile_common_only() {
+        let profile = ActiveProfile::common_only();
         assert!(profile.name.is_none());
     }
 
     #[test]
-    fn test_active_profile_resolve_with_profile_name() {
-        let profile = ActiveProfile::resolve(Some("my-profile"), Some("machine"), Some("env"));
-
-        assert_eq!(profile.name, Some("my-profile".to_string()));
-    }
-
-    #[test]
     fn test_active_profile_display_with_name() {
-        let profile = ActiveProfile {
-            name: Some("work".to_string()),
-            machine_id: "my-machine".to_string(),
-            environment: "production".to_string(),
-        };
-
+        let profile = ActiveProfile::with_profile("work");
         let display = format!("{}", profile);
         assert!(display.contains("profile=work"));
-        assert!(display.contains("machine=my-machine"));
-        assert!(display.contains("env=production"));
     }
 
     #[test]
     fn test_active_profile_display_without_name() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "my-machine".to_string(),
-            environment: "production".to_string(),
-        };
-
+        let profile = ActiveProfile::common_only();
         let display = format!("{}", profile);
-        assert!(!display.contains("profile="));
-        assert!(display.contains("machine=my-machine"));
-        assert!(display.contains("env=production"));
+        assert!(display.contains("common"));
+    }
+
+    #[test]
+    fn test_active_profile_resolve_with_cli_arg() {
+        let profile = ActiveProfile::resolve(Some("cli-profile"));
+        assert_eq!(profile.name, Some("cli-profile".to_string()));
     }
 
     #[test]
     fn test_source_layer_display() {
         assert_eq!(SourceLayer::Common.to_string(), "common");
-        assert_eq!(SourceLayer::Machine.to_string(), "machine");
-        assert_eq!(SourceLayer::Environment.to_string(), "environment");
+        assert_eq!(SourceLayer::Profile.to_string(), "profile");
         assert_eq!(SourceLayer::Legacy.to_string(), "legacy");
     }
 
     #[test]
     fn test_source_layer_equality() {
         assert_eq!(SourceLayer::Common, SourceLayer::Common);
-        assert_ne!(SourceLayer::Common, SourceLayer::Machine);
-        assert_ne!(SourceLayer::Environment, SourceLayer::Legacy);
+        assert_ne!(SourceLayer::Common, SourceLayer::Profile);
+        assert_ne!(SourceLayer::Profile, SourceLayer::Legacy);
     }
 
     #[test]
-    fn test_source_layer_clone() {
-        let layer = SourceLayer::Machine;
-        let cloned = layer;
-        assert_eq!(layer, cloned);
-    }
-
-    #[test]
-    fn test_get_candidate_sources_returns_four_layers() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        };
-
-        let candidates = profile.get_candidate_sources("config.txt");
-        assert_eq!(candidates.len(), 4);
-    }
-
-    #[test]
-    fn test_get_candidate_sources_priority_order() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        };
-
+    fn test_get_candidate_sources_with_profile() {
+        let profile = ActiveProfile::with_profile("test-profile");
         let candidates = profile.get_candidate_sources("config.txt");
 
-        // First should be environment (highest priority)
-        assert_eq!(candidates[0].1, SourceLayer::Environment);
-        // Second should be machine
-        assert_eq!(candidates[1].1, SourceLayer::Machine);
-        // Third should be common
-        assert_eq!(candidates[2].1, SourceLayer::Common);
-        // Fourth should be legacy (lowest priority)
-        assert_eq!(candidates[3].1, SourceLayer::Legacy);
+        // Should have 3 candidates: profile, common, legacy
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].1, SourceLayer::Profile);
+        assert_eq!(candidates[1].1, SourceLayer::Common);
+        assert_eq!(candidates[2].1, SourceLayer::Legacy);
     }
 
     #[test]
-    fn test_get_candidate_sources_includes_source_path() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "test-env".to_string(),
-        };
-
-        let candidates = profile.get_candidate_sources("my/config/file.txt");
-
-        for (path, _) in &candidates {
-            assert!(
-                path.to_string_lossy().contains("my/config/file.txt")
-                    || path.ends_with("my/config/file.txt")
-            );
-        }
-    }
-
-    #[test]
-    fn test_get_candidate_sources_machine_id_in_path() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "unique-machine-id".to_string(),
-            environment: "test-env".to_string(),
-        };
-
+    fn test_get_candidate_sources_without_profile() {
+        let profile = ActiveProfile::common_only();
         let candidates = profile.get_candidate_sources("config.txt");
 
-        // Machine layer path should contain the machine_id
-        let machine_path = &candidates[1].0;
-        assert!(machine_path.to_string_lossy().contains("unique-machine-id"));
+        // Should have 2 candidates: common, legacy (no profile layer)
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].1, SourceLayer::Common);
+        assert_eq!(candidates[1].1, SourceLayer::Legacy);
     }
 
     #[test]
-    fn test_get_candidate_sources_environment_in_path() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test-machine".to_string(),
-            environment: "unique-environment".to_string(),
-        };
-
+    fn test_get_candidate_sources_profile_in_path() {
+        let profile = ActiveProfile::with_profile("unique-profile");
         let candidates = profile.get_candidate_sources("config.txt");
 
-        // Environment layer path should contain the environment
-        let env_path = &candidates[0].0;
-        assert!(env_path.to_string_lossy().contains("unique-environment"));
+        let profile_path = &candidates[0].0;
+        assert!(profile_path.to_string_lossy().contains("unique-profile"));
     }
 
     #[test]
     fn test_resolve_source_returns_none_when_no_files_exist() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "nonexistent-machine".to_string(),
-            environment: "nonexistent-env".to_string(),
-        };
-
+        let profile = ActiveProfile::with_profile("nonexistent-profile");
         let result = profile.resolve_source("definitely_nonexistent_file_12345.txt");
         assert!(result.is_none());
     }
 
     #[test]
     fn test_get_all_resolved_sources_empty_when_no_files() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "nonexistent-machine".to_string(),
-            environment: "nonexistent-env".to_string(),
-        };
-
+        let profile = ActiveProfile::with_profile("nonexistent-profile");
         let sources = profile.get_all_resolved_sources("definitely_nonexistent_12345.txt");
         assert!(sources.is_empty());
     }
@@ -512,24 +418,14 @@ mod tests {
     fn test_profile_config_serialization_roundtrip() {
         let original = ProfileConfig {
             version: "1.0.0".to_string(),
-            default_profile: Some("test".to_string()),
             profiles: HashMap::from([
                 (
                     "test".to_string(),
                     ProfileDefinition {
-                        machine_id: Some("machine-1".to_string()),
-                        environment: Some("env-1".to_string()),
                         description: Some("Test profile".to_string()),
                     },
                 ),
-                (
-                    "empty".to_string(),
-                    ProfileDefinition {
-                        machine_id: None,
-                        environment: None,
-                        description: None,
-                    },
-                ),
+                ("empty".to_string(), ProfileDefinition { description: None }),
             ]),
         };
 
@@ -537,7 +433,21 @@ mod tests {
         let deserialized: ProfileConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.version, original.version);
-        assert_eq!(deserialized.default_profile, original.default_profile);
         assert_eq!(deserialized.profiles.len(), original.profiles.len());
+    }
+
+    #[test]
+    fn test_get_backup_path_with_profile() {
+        let profile = ActiveProfile::with_profile("work");
+        let path = profile.get_backup_path();
+        assert!(path.to_string_lossy().contains("profiles"));
+        assert!(path.to_string_lossy().contains("work"));
+    }
+
+    #[test]
+    fn test_get_backup_path_common_only() {
+        let profile = ActiveProfile::common_only();
+        let path = profile.get_backup_path();
+        assert!(path.to_string_lossy().contains("common"));
     }
 }
