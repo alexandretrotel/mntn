@@ -24,6 +24,8 @@ struct ServiceFile {
     display_label: String,
     path: PathBuf,
     is_system: bool,
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    service_type: ServiceType,
 }
 
 /// Types of services that can be managed
@@ -230,6 +232,8 @@ fn scan_service_files(targets: &[DirectoryTarget]) -> Vec<ServiceFile> {
                         display_label,
                         path: service_path,
                         is_system: target.is_system,
+                        #[cfg(target_os = "linux")]
+                        service_type,
                     });
                 }
             }
@@ -555,6 +559,7 @@ fn list_windows_services() -> Vec<ServiceFile> {
                     display_label: format!("[Windows Service] {} ({})", name, status),
                     path: PathBuf::from(name),
                     is_system: false,
+                    service_type: ServiceType::WindowsService,
                 });
             }
         }
