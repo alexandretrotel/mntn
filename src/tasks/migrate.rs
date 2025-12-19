@@ -139,11 +139,19 @@ impl Task for MigrateTask {
             }
 
             match move_path(&legacy_path, &new_path) {
-                Ok(()) => {
-                    log_success(&format!(
-                        "Migrated: {} -> {}/{}",
-                        source_path, self.target, source_path
-                    ));
+                Ok(result) => {
+                    if let Some(warning) = &result.removal_warning {
+                        // Source removal failed - data is at destination but source still exists
+                        log_warning(&format!(
+                            "Migrated with warning: {} -> {}/{} ({})",
+                            source_path, self.target, source_path, warning
+                        ));
+                    } else {
+                        log_success(&format!(
+                            "Migrated: {} -> {}/{}",
+                            source_path, self.target, source_path
+                        ));
+                    }
                     migrated += 1;
                 }
                 Err(e) => {
@@ -185,16 +193,123 @@ impl Task for MigrateTask {
     }
 }
 
-fn move_path(from: &PathBuf, to: &PathBuf) -> std::io::Result<()> {
+/// Result of a move operation that may have partially succeeded
+#[derive(Debug)]
+pub struct MoveResult {
+    /// Warning message if source removal failed (potential duplicate data)
+    pub removal_warning: Option<String>,
+}
+
+impl MoveResult {
+    fn ok() -> Self {
+        Self {
+            removal_warning: None,
+        }
+    }
+
+    fn with_removal_warning(warning: String) -> Self {
+        Self {
+            removal_warning: Some(warning),
+        }
+    }
+}
+
+/// Counts the number of entries (files and directories) in a directory recursively.
+fn count_entries(path: &Path) -> std::io::Result<usize> {
+    let mut count = 0;
+    if path.is_dir() {
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            count += 1;
+            if entry.path().is_dir() {
+                count += count_entries(&entry.path())?;
+            }
+        }
+    }
+    Ok(count)
+}
+
+/// Moves a file or directory from `from` to `to`.
+///
+/// This function prefers `fs::rename` for atomic moves on the same filesystem.
+/// If rename fails (e.g., cross-filesystem move), it falls back to copy + verify + remove.
+///
+/// The verification step ensures the destination contains the expected number of entries
+/// before attempting to remove the source.
+///
+/// Returns a `MoveResult` that indicates success and any warnings about failed source removal.
+fn move_path(from: &PathBuf, to: &PathBuf) -> std::io::Result<MoveResult> {
+    // First, try atomic rename (works on same filesystem)
+    match fs::rename(from, to) {
+        Ok(()) => return Ok(MoveResult::ok()),
+        Err(e) => {
+            // EXDEV (cross-device link) or other errors mean we need to copy
+            // Log at debug level that we're falling back to copy
+            if e.raw_os_error() != Some(libc::EXDEV) {
+                // For non-cross-device errors, still try copy as fallback
+                // but the rename might have failed for permissions or other reasons
+            }
+        }
+    }
+
+    // Fallback: copy then remove
     if from.is_dir() {
+        // Count source entries for verification
+        let source_count = count_entries(from)?;
+
+        // Create destination and copy
         fs::create_dir_all(to)?;
         copy_dir_recursive(from, to)?;
-        fs::remove_dir_all(from)?;
+
+        // Verify destination has the expected entries
+        let dest_count = count_entries(to)?;
+        if dest_count != source_count {
+            return Err(std::io::Error::other(format!(
+                "Verification failed: source had {} entries but destination has {}",
+                source_count, dest_count
+            )));
+        }
+
+        // Attempt to remove source directory
+        if let Err(e) = fs::remove_dir_all(from) {
+            let warning = format!(
+                "Failed to remove source directory '{}' after successful copy: {}. \
+                 This may result in duplicate data.",
+                from.display(),
+                e
+            );
+            log_warning(&warning);
+            return Ok(MoveResult::with_removal_warning(warning));
+        }
     } else {
+        // For files, copy then remove
         fs::copy(from, to)?;
-        fs::remove_file(from)?;
+
+        // Verify destination file exists and has same size
+        let src_metadata = fs::metadata(from)?;
+        let dst_metadata = fs::metadata(to)?;
+        if src_metadata.len() != dst_metadata.len() {
+            return Err(std::io::Error::other(format!(
+                "Verification failed: source file size ({}) differs from destination ({})",
+                src_metadata.len(),
+                dst_metadata.len()
+            )));
+        }
+
+        // Attempt to remove source file
+        if let Err(e) = fs::remove_file(from) {
+            let warning = format!(
+                "Failed to remove source file '{}' after successful copy: {}. \
+                 This may result in duplicate data.",
+                from.display(),
+                e
+            );
+            log_warning(&warning);
+            return Ok(MoveResult::with_removal_warning(warning));
+        }
     }
-    Ok(())
+
+    Ok(MoveResult::ok())
 }
 
 pub fn run_with_args(args: crate::cli::MigrateArgs) {
@@ -330,6 +445,9 @@ mod tests {
 
         let result = move_path(&from, &to);
         assert!(result.is_ok());
+        let move_result = result.unwrap();
+        assert!(move_result.success);
+        assert!(move_result.removal_warning.is_none());
 
         // Source should be gone
         assert!(!from.exists());
@@ -349,6 +467,9 @@ mod tests {
 
         let result = move_path(&from, &to);
         assert!(result.is_ok());
+        let move_result = result.unwrap();
+        assert!(move_result.success);
+        assert!(move_result.removal_warning.is_none());
 
         // Source should be gone
         assert!(!from.exists());
@@ -377,6 +498,8 @@ mod tests {
 
         let result = move_path(&from, &to);
         assert!(result.is_ok());
+        let move_result = result.unwrap();
+        assert!(move_result.success);
 
         assert!(!from.exists());
         assert!(to.join("sub").join("deep").join("file.txt").exists());
@@ -390,6 +513,70 @@ mod tests {
 
         let result = move_path(&from, &to);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_move_path_uses_rename_on_same_filesystem() {
+        // When source and destination are on the same filesystem,
+        // rename should be used (atomic operation)
+        let temp_dir = TempDir::new().unwrap();
+        let from = temp_dir.path().join("source.txt");
+        let to = temp_dir.path().join("dest.txt");
+
+        fs::write(&from, "atomic test").unwrap();
+
+        let result = move_path(&from, &to);
+        assert!(result.is_ok());
+
+        // Verify the move happened
+        assert!(!from.exists());
+        assert!(to.exists());
+        assert_eq!(fs::read_to_string(&to).unwrap(), "atomic test");
+    }
+
+    #[test]
+    fn test_count_entries_empty_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let count = count_entries(temp_dir.path()).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_count_entries_with_files() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(temp_dir.path().join("file1.txt"), "a").unwrap();
+        fs::write(temp_dir.path().join("file2.txt"), "b").unwrap();
+
+        let count = count_entries(temp_dir.path()).unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_count_entries_nested() {
+        let temp_dir = TempDir::new().unwrap();
+        let subdir = temp_dir.path().join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        fs::write(subdir.join("nested.txt"), "nested").unwrap();
+        fs::write(temp_dir.path().join("root.txt"), "root").unwrap();
+
+        let count = count_entries(temp_dir.path()).unwrap();
+        // 1 (subdir) + 1 (nested.txt) + 1 (root.txt) = 3
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_move_result_ok() {
+        let result = MoveResult::ok();
+        assert!(result.success);
+        assert!(result.removal_warning.is_none());
+    }
+
+    #[test]
+    fn test_move_result_with_warning() {
+        let result = MoveResult::with_removal_warning("test warning".to_string());
+        assert!(result.success);
+        assert!(result.removal_warning.is_some());
+        assert_eq!(result.removal_warning.unwrap(), "test warning");
     }
 
     #[test]

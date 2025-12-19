@@ -650,6 +650,7 @@ dependencies = [
  "gethostname",
  "glob",
  "inquire",
+ "libc",
  "plist",
  "rayon",
  "regex",
