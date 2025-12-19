@@ -1,8 +1,6 @@
-use std::str::FromStr;
-
 use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
 use crate::logger::{log, log_error, log_success};
-use crate::registries::configs_registry::{Category, ConfigsRegistry, RegistryEntry};
+use crate::registries::configs_registry::{ConfigsRegistry, RegistryEntry};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_registry_path;
 
@@ -24,18 +22,14 @@ impl Task for ConfigsRegistryTask {
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.args.action {
-            ConfigsRegistryActions::List {
-                category,
-                enabled_only,
-            } => {
-                list_entries(category.clone(), *enabled_only);
+            ConfigsRegistryActions::List { enabled_only } => {
+                list_entries(*enabled_only);
             }
             ConfigsRegistryActions::Add {
                 id,
                 name,
                 source,
                 target,
-                category,
                 description,
             } => {
                 add_entry(
@@ -43,7 +37,6 @@ impl Task for ConfigsRegistryTask {
                     name.clone(),
                     source.clone(),
                     target.clone(),
-                    category.clone(),
                     description.clone(),
                 );
             }
@@ -116,7 +109,7 @@ pub fn run_with_args(args: ConfigsRegistryArgs) {
 }
 
 /// List registry entries
-fn list_entries(filter_category: Option<String>, enabled_only: bool) {
+fn list_entries(enabled_only: bool) {
     let registry_path = get_registry_path();
     let registry = match ConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
@@ -126,52 +119,26 @@ fn list_entries(filter_category: Option<String>, enabled_only: bool) {
         }
     };
 
-    println!("📋 Registry Entries");
-    println!("==================");
+    println!("Registry Entries");
+    println!("================\n");
 
-    let entries_by_category = registry.list_by_category();
-    let mut sorted_categories: Vec<_> = entries_by_category.keys().collect();
-    sorted_categories.sort();
+    let mut entries: Vec<_> = registry.entries.iter().collect();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
 
-    for category in sorted_categories {
-        if let Some(ref filter) = filter_category
-            && format!("{:?}", category).to_lowercase() != *filter
-        {
+    for (id, entry) in entries {
+        if enabled_only && !entry.enabled {
             continue;
         }
 
-        let entries = &entries_by_category[category];
-        let mut has_entries = false;
+        let status = if entry.enabled { "[x]" } else { "[ ]" };
+        println!("{} {} ({})", status, entry.name, id);
+        println!("    Source: {}", entry.source_path);
+        println!("    Target: {}", entry.target_path.display());
 
-        for (id, entry) in entries {
-            if enabled_only && !entry.enabled {
-                continue;
-            }
-
-            if !has_entries {
-                let category_str = format!("{:?}", category).to_uppercase();
-                println!("\n🏷️  {}", category_str);
-                println!("{}", "─".repeat(category_str.len() + 4));
-                has_entries = true;
-            }
-
-            let status = if entry.enabled { "✅" } else { "❌" };
-            println!("  {} {} ({})", status, entry.name, id);
-            println!("     📁 Source: {}", entry.source_path);
-            println!("     🔗 Target: {}", entry.target_path.display());
-
-            if let Some(ref desc) = entry.description {
-                println!("     💬 {}", desc);
-            }
-            println!();
+        if let Some(ref desc) = entry.description {
+            println!("    {}", desc);
         }
-
-        if !has_entries && filter_category.is_some() {
-            println!(
-                "\nNo entries found in category '{}'",
-                format!("{:?}", category).to_lowercase()
-            );
-        }
+        println!();
     }
 
     let total_entries = registry.entries.len();
@@ -189,7 +156,6 @@ fn add_entry(
     name: String,
     source: String,
     target: String,
-    category: String,
     description: Option<String>,
 ) {
     let registry_path = get_registry_path();
@@ -206,24 +172,12 @@ fn add_entry(
         return;
     }
 
-    let parsed_category = match Category::from_str(&category) {
-        Ok(cat) => cat,
-        Err(_) => {
-            log_error(
-                "Invalid category. Valid categories are: shell, editor, terminal, system, development, application",
-                &category,
-            );
-            return;
-        }
-    };
-
     let target_path = std::path::PathBuf::from(target);
 
     let entry = RegistryEntry {
         name: name.clone(),
         source_path: source,
         target_path,
-        category: parsed_category,
         enabled: true,
         description,
     };
@@ -237,7 +191,6 @@ fn add_entry(
 
     log_success(&format!("Added entry '{}' to registry", name));
     println!("   ID: {}", id);
-    println!("   Category: {}", category);
     log(&format!("Added registry entry: {} ({})", name, id));
 }
 

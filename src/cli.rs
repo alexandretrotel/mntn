@@ -288,9 +288,6 @@ pub enum ConfigsRegistryActions {
     /// List all registry entries
     #[command(about = "List all entries in the registry")]
     List {
-        /// Filter by category
-        #[arg(long, short = 'c', help = "Filter entries by category")]
-        category: Option<String>,
         /// Show only enabled entries
         #[arg(long, short = 'e', help = "Show only enabled entries")]
         enabled_only: bool,
@@ -310,9 +307,6 @@ pub enum ConfigsRegistryActions {
         /// Target path where file should be linked
         #[arg(long, short = 't', help = "Target path where file should be linked")]
         target: String,
-        /// Category for organization
-        #[arg(long, short = 'c', help = "Category for organization")]
-        category: String,
         /// Optional description
         #[arg(long, short = 'd', help = "Optional description")]
         description: Option<String>,
