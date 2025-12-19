@@ -106,7 +106,8 @@ fn restore_config_file(backup_path: &PathBuf, target_path: &PathBuf, file_name: 
         return restore_directory(backup_path, target_path, file_name);
     }
 
-    let contents = match fs::read_to_string(backup_path) {
+    // Use fs::read instead of fs::read_to_string to handle binary files
+    let contents = match fs::read(backup_path) {
         Ok(c) => c,
         Err(e) => {
             log_warning(&format!(
@@ -335,5 +336,22 @@ mod tests {
 
         // Profile should be stored correctly
         assert_eq!(task.profile.name, Some("test-profile".to_string()));
+    }
+
+    #[test]
+    fn test_restore_config_file_binary() {
+        let temp_dir = TempDir::new().unwrap();
+        let backup_path = temp_dir.path().join("backup.bin");
+        let target_path = temp_dir.path().join("target.bin");
+
+        // Binary content with non-UTF-8 bytes
+        let binary_content: Vec<u8> = vec![0x00, 0x01, 0xFF, 0xFE, 0x89, 0x50, 0x4E, 0x47];
+        fs::write(&backup_path, &binary_content).unwrap();
+
+        let result = restore_config_file(&backup_path, &target_path, "test-binary");
+        assert!(result);
+
+        assert!(target_path.exists());
+        assert_eq!(fs::read(&target_path).unwrap(), binary_content);
     }
 }
