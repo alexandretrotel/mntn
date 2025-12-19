@@ -141,6 +141,15 @@ fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
         let custom_id = Text::new("Enter machine identifier:")
             .with_default(&current)
             .with_help_message("e.g., work-laptop, home-desktop, macbook-pro")
+            .with_validator(|input: &str| {
+                if input.is_empty() {
+                    return Ok(inquire::validator::Validation::Invalid("Machine ID cannot be empty".into()));
+                }
+                if input.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_') {
+                    return Ok(inquire::validator::Validation::Invalid("Use only letters, numbers, hyphens, and underscores".into()));
+                }
+                Ok(inquire::validator::Validation::Valid)
+            })
             .prompt()?;
 
         if let Err(e) = fs::write(&machine_id_path, &custom_id) {
