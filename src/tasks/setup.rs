@@ -143,10 +143,17 @@ fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
             .with_help_message("e.g., work-laptop, home-desktop, macbook-pro")
             .with_validator(|input: &str| {
                 if input.is_empty() {
-                    return Ok(inquire::validator::Validation::Invalid("Machine ID cannot be empty".into()));
+                    return Ok(inquire::validator::Validation::Invalid(
+                        "Machine ID cannot be empty".into(),
+                    ));
                 }
-                if input.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_') {
-                    return Ok(inquire::validator::Validation::Invalid("Use only letters, numbers, hyphens, and underscores".into()));
+                if input
+                    .chars()
+                    .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
+                {
+                    return Ok(inquire::validator::Validation::Invalid(
+                        "Use only letters, numbers, hyphens, and underscores".into(),
+                    ));
                 }
                 Ok(inquire::validator::Validation::Valid)
             })
@@ -164,7 +171,6 @@ fn setup_machine_id_prompt() -> Result<String, inquire::error::InquireError> {
 }
 
 fn setup_environment_prompt() -> Result<String, inquire::error::InquireError> {
-    use crate::logger::log_info;
     use regex::Regex;
 
     println!();
