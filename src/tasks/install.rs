@@ -8,6 +8,9 @@ use std::fs;
 use std::process::Command;
 use which::which;
 
+#[cfg(target_os = "linux")]
+const SECONDS_PER_HOUR: u64 = 3600;
+
 /// Install task that sets up scheduled maintenance tasks
 pub struct InstallTask {
     pub with_clean: bool,
@@ -195,8 +198,8 @@ impl ScheduledTask {
             "[Unit]\nDescription=Run {} task\n\n[Service]\nType=oneshot\nExecStart={}\n",
             self.label, exec
         );
-        let timer_content = if self.interval % 3600 == 0 {
-            let hours = self.interval / 3600;
+        let timer_content = if self.interval.is_multiple_of(SECONDS_PER_HOUR) {
+            let hours = self.interval / SECONDS_PER_HOUR;
             if hours == 1 {
                 "[Unit]\nDescription=Hourly task\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n".to_string()
             } else if hours == 24 {
