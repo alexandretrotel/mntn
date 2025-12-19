@@ -118,7 +118,7 @@ impl Task for PurgeTask {
 
         for service_file in service_files {
             operations.push(PlannedOperation::with_target(
-                format!("Would scan: {}", service_file.display_label),
+                format!("Would delete: {}", service_file.display_label),
                 service_file.path.display().to_string(),
             ));
         }
