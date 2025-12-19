@@ -162,22 +162,29 @@ impl JsonConfigValidator {
 
 impl Validator for JsonConfigValidator {
     fn validate(&self) -> Vec<ValidationError> {
-        let json_files = [
-            ("vscode/settings.json", "VS Code settings"),
-            ("vscode/keybindings.json", "VS Code keybindings"),
-            ("zed/settings.json", "Zed settings"),
-        ];
+        let mut errors = Vec::new();
 
-        json_files
-            .iter()
-            .flat_map(|&(file_path, description)| {
-                if let Some(resolved) = self.profile.resolve_source(file_path) {
-                    validate_json_file(&resolved.path, description)
-                } else {
-                    vec![]
+        let registry_path = get_registry_path();
+        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
+            Ok(r) => r,
+            Err(e) => {
+                errors.push(ValidationError::error(format!(
+                    "Could not load configs registry: {}",
+                    e
+                )));
+                return errors;
+            }
+        };
+
+        for (_id, entry) in registry.get_enabled_entries() {
+            if entry.source_path.ends_with(".json") {
+                if let Some(resolved) = self.profile.resolve_source(&entry.source_path) {
+                    errors.extend(validate_json_file(&resolved.path, &entry.name));
                 }
-            })
-            .collect()
+            }
+        }
+
+        errors
     }
 
     fn name(&self) -> &str {
