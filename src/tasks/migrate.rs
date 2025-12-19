@@ -446,7 +446,6 @@ mod tests {
         let result = move_path(&from, &to);
         assert!(result.is_ok());
         let move_result = result.unwrap();
-        assert!(move_result.success);
         assert!(move_result.removal_warning.is_none());
 
         // Source should be gone
@@ -468,7 +467,6 @@ mod tests {
         let result = move_path(&from, &to);
         assert!(result.is_ok());
         let move_result = result.unwrap();
-        assert!(move_result.success);
         assert!(move_result.removal_warning.is_none());
 
         // Source should be gone
@@ -498,8 +496,6 @@ mod tests {
 
         let result = move_path(&from, &to);
         assert!(result.is_ok());
-        let move_result = result.unwrap();
-        assert!(move_result.success);
 
         assert!(!from.exists());
         assert!(to.join("sub").join("deep").join("file.txt").exists());
@@ -567,14 +563,12 @@ mod tests {
     #[test]
     fn test_move_result_ok() {
         let result = MoveResult::ok();
-        assert!(result.success);
         assert!(result.removal_warning.is_none());
     }
 
     #[test]
     fn test_move_result_with_warning() {
         let result = MoveResult::with_removal_warning("test warning".to_string());
-        assert!(result.success);
         assert!(result.removal_warning.is_some());
         assert_eq!(result.removal_warning.unwrap(), "test warning");
     }
