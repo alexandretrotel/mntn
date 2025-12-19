@@ -174,6 +174,8 @@ pub struct ValidateArgs {
         help = "Show what would be validated without performing any actions"
     )]
     pub dry_run: bool,
+    #[command(flatten)]
+    pub profile_args: ProfileArgs,
 }
 
 /// Arguments for the migrate command.

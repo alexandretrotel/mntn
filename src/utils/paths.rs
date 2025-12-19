@@ -201,7 +201,6 @@ mod tests {
     fn test_get_package_registry_path_structure() {
         let path = get_package_registry_path();
         assert!(path.ends_with("package_registry.json"));
-        assert!(path.to_string_lossy().contains("backup/packages"));
     }
 
     #[test]

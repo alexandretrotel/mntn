@@ -493,7 +493,7 @@ pub fn run_with_args(args: crate::cli::ValidateArgs) {
         log_info("Created default profile config at ~/.mntn/profile.json");
     }
 
-    let profile = ActiveProfile::from_defaults();
+    let profile = args.profile_args.resolve();
     TaskExecutor::run(&mut ValidateTask::new(profile), args.dry_run);
 }
 
@@ -776,12 +776,7 @@ mod tests {
 
     #[test]
     fn test_legacy_symlink_validator_name() {
-        let profile = ActiveProfile {
-            name: None,
-            machine_id: "test".to_string(),
-            environment: "test".to_string(),
-        };
-        let validator = LegacySymlinkValidator::new(profile);
+        let validator = LegacySymlinkValidator::new();
         assert_eq!(validator.name(), "Legacy Symlink Check");
     }
 

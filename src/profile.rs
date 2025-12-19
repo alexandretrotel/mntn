@@ -115,10 +115,6 @@ impl ActiveProfile {
             environment,
         }
     }
-
-    pub fn from_defaults() -> Self {
-        Self::resolve(None, None, None)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -344,16 +340,6 @@ mod tests {
         let profile = ActiveProfile::resolve(Some("my-profile"), Some("machine"), Some("env"));
 
         assert_eq!(profile.name, Some("my-profile".to_string()));
-    }
-
-    #[test]
-    fn test_active_profile_from_defaults() {
-        let profile = ActiveProfile::from_defaults();
-
-        // Should have non-empty machine_id and environment
-        assert!(!profile.machine_id.is_empty());
-        assert!(!profile.environment.is_empty());
-        assert!(profile.name.is_none());
     }
 
     #[test]
