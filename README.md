@@ -102,7 +102,7 @@ mntn setup
 4. **Scheduled Tasks**: Optionally install automated backups
 
 **Example output:**
-```
+```text
 Welcome to mntn interactive setup!
    This wizard will help you configure your dotfiles management.
 
