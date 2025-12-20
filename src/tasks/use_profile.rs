@@ -37,10 +37,7 @@ impl Task for UseProfileTask {
         if !config.profile_exists(&self.profile_name) {
             log_warning(&format!("Profile '{}' does not exist", self.profile_name));
             println!();
-            println!(
-                "Create it with: mntn profile create {}",
-                self.profile_name
-            );
+            println!("Create it with: mntn profile create {}", self.profile_name);
             println!("   Or list available profiles: mntn profile list");
             return Ok(());
         }
