@@ -390,7 +390,7 @@ fn should_skip(path: &Path) -> bool {
 }
 
 /// Clean the trash/recycle bin for the current user
-/// This ALWAYS executes — never a dry-run
+/// Assumes it is called only in non-dry-run execution context (via `execute()`)
 fn clean_trash() -> u64 {
     let mut total_freed = 0u64;
 
