@@ -1,25 +1,19 @@
-use crate::cli::{SwitchActions, SwitchArgs};
-use crate::logger::{log_error, log_info, log_success, log_warning};
+use crate::cli::{ProfileActions, ProfileArgs};
+use crate::logger::{log_error, log_success, log_warning};
 use crate::profile::ProfileConfig;
 use crate::utils::paths::{
-    clear_active_profile, get_active_profile_name, get_backup_profile_path,
-    get_profile_config_path, set_active_profile,
+    get_active_profile_name, get_backup_profile_path, get_profile_config_path,
 };
 use std::fs;
 
-pub fn run_with_args(args: SwitchArgs) {
+pub fn run_with_args(args: ProfileArgs) {
     match args.action {
-        Some(SwitchActions::List) => list_profiles(),
-        Some(SwitchActions::Create { name, description }) => create_profile(&name, description),
-        Some(SwitchActions::Delete { name }) => delete_profile(&name),
+        Some(ProfileActions::List) => list_profiles(),
+        Some(ProfileActions::Create { name, description }) => create_profile(&name, description),
+        Some(ProfileActions::Delete { name }) => delete_profile(&name),
         None => {
-            // Direct profile switch: mntn switch <profile>
-            if let Some(profile_name) = args.profile {
-                switch_to_profile(&profile_name);
-            } else {
-                // No action and no profile - show current and list
-                show_current_profile();
-            }
+            // No action - show current and list
+            show_current_profile();
         }
     }
 }
@@ -33,7 +27,7 @@ fn show_current_profile() {
     println!();
     list_profiles();
     println!();
-    println!("💡 Use 'mntn switch <profile>' to switch profiles");
+    println!("💡 Use 'mntn use <profile>' to switch profiles");
 }
 
 fn list_profiles() {
@@ -44,7 +38,7 @@ fn list_profiles() {
     if profiles.is_empty() {
         println!("📋 No profiles configured");
         println!();
-        println!("💡 Create a profile with: mntn switch create <name>");
+        println!("💡 Create a profile with: mntn profile create <name>");
         return;
     }
 
@@ -113,7 +107,7 @@ fn create_profile(name: &str, description: Option<String>) {
         println!("   Description: {}", desc);
     }
     println!();
-    println!("💡 Switch to this profile with: mntn switch {}", name);
+    println!("💡 Switch to this profile with: mntn use {}", name);
 }
 
 fn delete_profile(name: &str) {
@@ -153,41 +147,6 @@ fn delete_profile(name: &str) {
     }
 
     log_success(&format!("Deleted profile '{}'", name));
-}
-
-fn switch_to_profile(name: &str) {
-    let config = ProfileConfig::load_or_default();
-
-    // Allow switching to "common" to clear active profile
-    if name == "common" || name == "none" {
-        if let Err(e) = clear_active_profile() {
-            log_error("Failed to clear active profile", e);
-            return;
-        }
-        log_success("Switched to common (no active profile)");
-        return;
-    }
-
-    // Check if profile exists
-    if !config.profile_exists(name) {
-        log_warning(&format!("Profile '{}' does not exist", name));
-        println!();
-        println!("💡 Create it with: mntn switch create {}", name);
-        println!("   Or list available profiles: mntn switch list");
-        return;
-    }
-
-    // Set as active profile
-    if let Err(e) = set_active_profile(name) {
-        log_error("Failed to set active profile", e);
-        return;
-    }
-
-    log_success(&format!("Switched to profile '{}'", name));
-
-    // Ask if user wants to restore
-    println!();
-    log_info("Run 'mntn restore' to apply this profile's configurations");
 }
 
 #[cfg(test)]

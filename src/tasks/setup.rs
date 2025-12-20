@@ -115,8 +115,8 @@ pub fn run() {
     println!("📖 Quick reference:");
     println!("   mntn backup          - Backup your configurations");
     println!("   mntn restore         - Restore configurations from backup");
-    println!("   mntn switch <name>   - Switch to a different profile");
-    println!("   mntn switch list     - List available profiles");
+    println!("   mntn use <name>      - Switch to a different profile");
+    println!("   mntn profile         - List and manage profiles");
     println!("   mntn validate        - Check configuration status");
     println!("   mntn sync --help     - Git sync options");
     println!();
@@ -132,7 +132,7 @@ fn setup_profile_prompt() -> Result<Option<String>, inquire::error::InquireError
 
     let create_profile = Confirm::new("Create a profile now?")
         .with_default(true)
-        .with_help_message("You can always create profiles later with 'mntn switch create <name>'")
+        .with_help_message("You can always create profiles later with 'mntn profile create <name>'")
         .prompt()?;
 
     if !create_profile {

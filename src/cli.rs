@@ -355,19 +355,24 @@ pub enum PackageRegistryActions {
     },
 }
 
-/// Arguments for the switch command.
+/// Arguments for the use command.
 #[derive(Args)]
-pub struct SwitchArgs {
-    #[command(subcommand)]
-    pub action: Option<SwitchActions>,
-    /// Profile name to switch to (shorthand for `mntn switch <profile>`)
+pub struct UseArgs {
+    /// Profile name to switch to (use 'common' or 'none' to clear active profile)
     #[arg(help = "Profile name to switch to")]
-    pub profile: Option<String>,
+    pub profile: String,
 }
 
-/// Switch command actions.
+/// Arguments for the profile command.
+#[derive(Args)]
+pub struct ProfileArgs {
+    #[command(subcommand)]
+    pub action: Option<ProfileActions>,
+}
+
+/// Profile command actions.
 #[derive(Subcommand)]
-pub enum SwitchActions {
+pub enum ProfileActions {
     /// List all available profiles
     #[command(about = "List all available profiles")]
     List,
@@ -433,9 +438,13 @@ pub enum Commands {
     #[command(about = "Manage the registry of package managers for backup operations")]
     RegistryPackages(PackageRegistryArgs),
 
-    /// Switch between profiles or manage profiles
-    #[command(about = "Switch between profiles or manage profiles (list, create, delete)")]
-    Switch(SwitchArgs),
+    /// Switch to a different profile
+    #[command(about = "Switch to a different profile")]
+    Use(UseArgs),
+
+    /// Manage profiles (list, create, delete)
+    #[command(about = "Manage profiles (list, create, delete)")]
+    Profile(ProfileArgs),
 
     /// Synchronize configurations with a git repository
     #[command(about = "Sync configurations with a git repository (pull/push/both)")]

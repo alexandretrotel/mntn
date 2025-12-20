@@ -35,7 +35,8 @@ A Rust-based CLI tool for system maintenance and dotfiles management with a prof
 - **Profile-Based Dotfiles**: Flexible profile system for different contexts (work, personal, gaming, etc.).
 - **Backup**: Copies configuration files and package lists to layered backup directories.
 - **Restore**: Restores configuration files from backups using profile-aware resolution.
-- **Switch**: Easily switch between different profiles for different workflows or machines.
+- **Use**: Quickly switch between different profiles for different workflows or machines.
+- **Profile**: Manage profiles (list, create, delete).
 - **Biometric Sudo [macOS only]**: Configures Touch ID authentication for sudo commands.
 - **Clean**: Removes system junk (caches, logs, etc) and runs package manager cleanup.
 - **Delete [macOS only]**: Removes applications and their related files with interactive selection.
@@ -129,8 +130,8 @@ Setup complete!
 Quick reference:
    mntn backup          - Backup your configurations
    mntn restore         - Restore configurations from backup
-   mntn switch <name>   - Switch to a different profile
-   mntn switch list     - List available profiles
+   mntn use <name>      - Switch to a different profile
+   mntn profile         - List and manage profiles
    mntn validate        - Check configuration status
 
    Remember: Run 'mntn backup' after editing config files!
@@ -183,14 +184,17 @@ With profile `work` active, the work version is used. Without an active profile,
 #### Creating and Managing Profiles
 
 ```bash
+# List all profiles and show current
+mntn profile
+
 # Create a new profile
-mntn switch create work --description "Work laptop configuration"
+mntn profile create work --description "Work laptop configuration"
 
 # List all profiles
-mntn switch list
+mntn profile list
 
 # Delete a profile
-mntn switch delete old-profile
+mntn profile delete old-profile
 ```
 
 **Profile Examples:**
@@ -204,13 +208,13 @@ mntn switch delete old-profile
 
 ```bash
 # Switch to a profile
-mntn switch work
+mntn use work
 
 # View current profile and available profiles
-mntn switch
+mntn profile
 
 # Switch back to common only (no profile)
-mntn switch common
+mntn use common
 ```
 
 **Note:** After switching profiles, run `mntn restore` to apply the profile's configurations.
@@ -497,9 +501,9 @@ Enables Touch ID authentication for sudo commands.
 - **Merge conflicts**: Resolve in `~/.mntn` using standard git commands
 
 ### Profile Issues
-- **Can't switch profiles**: Ensure profile exists with `mntn switch list`
-- **Profile not found**: Create it with `mntn switch create <name>`
-- **Can't delete active profile**: Switch to another profile first
+- **Can't switch profiles**: Ensure profile exists with `mntn profile list`
+- **Profile not found**: Create it with `mntn profile create <name>`
+- **Can't delete active profile**: Switch to another profile first with `mntn use <other-profile>`
 
 ### Validation Issues
 - **Legacy files warning**: Run `mntn migrate` to update structure
