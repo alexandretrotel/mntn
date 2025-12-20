@@ -271,7 +271,8 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
                 "Converted symlink to real directory: {}",
                 source.display()
             ));
-            // Now proceed with normal backup
+            // Skip the redundant rsync since the directory is already restored from backup
+            return Ok(());
         }
     }
 
