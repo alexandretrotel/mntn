@@ -153,7 +153,8 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         let status = run_cmd_in_dir("git", &["status", "--porcelain"], &mntn_dir)?;
         if !status.trim().is_empty() {
             run_cmd_in_dir("git", &["commit", "-m", &commit_msg], &mntn_dir)?;
-            run_cmd_in_dir("git", &["push"], &mntn_dir)?;
+            let branch = crate::utils::system::get_current_git_branch(&mntn_dir)?;
+            run_cmd_in_dir("git", &["push", "-u", "origin", &branch], &mntn_dir)?;
             log_success("Changes pushed to remote repository");
         } else {
             log_info("No changes to commit");
