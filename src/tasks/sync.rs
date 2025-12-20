@@ -18,6 +18,7 @@ pub struct SyncTask {
     pub message: Option<String>,
     pub auto_restore: bool,
     pub dry_run: bool,
+    pub status: bool,
 }
 
 impl SyncTask {
@@ -31,6 +32,7 @@ impl SyncTask {
             message: args.message.clone(),
             auto_restore: args.auto_restore,
             dry_run: args.dry_run,
+            status: args.status,
         }
     }
 }
@@ -50,7 +52,13 @@ impl Task for SyncTask {
             message: self.message.clone(),
             auto_restore: self.auto_restore,
             dry_run: self.dry_run,
+            status: self.status,
         };
+
+        if args.status {
+            show_git_status()?;
+            return Ok(());
+        }
 
         sync_with_git(args)?;
 
@@ -198,6 +206,13 @@ Thumbs.db
         fs::write(&gitignore_path, default_gitignore)?;
         log_success("Created default .gitignore with mntn.log excluded");
     }
+    Ok(())
+}
+
+fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
+    let mntn_dir = get_mntn_dir();
+    let output = run_cmd_in_dir("git", &["status", "--short", "--branch"], &mntn_dir)?;
+    println!("{}", output);
     Ok(())
 }
 

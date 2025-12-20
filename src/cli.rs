@@ -208,6 +208,9 @@ pub struct SyncArgs {
         help = "Show what would be synced without performing any actions"
     )]
     pub dry_run: bool,
+    /// Show git status for the repository
+    #[arg(long, help = "Show git status for the repository")]
+    pub status: bool,
 }
 
 /// Arguments for the registry command.
