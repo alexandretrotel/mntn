@@ -7,6 +7,7 @@ use crate::utils::paths::{get_package_registry_path, get_packages_dir, get_regis
 use crate::utils::system::{rsync_directory, run_cmd};
 use rayon::prelude::*;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub struct BackupTask {
@@ -123,16 +124,36 @@ fn backup_package_managers(package_managers_dir: &Path) {
     for (id, entry, result) in results {
         match result {
             Ok(content) => {
-                if let Err(e) = fs::write(package_managers_dir.join(&entry.output_file), content) {
-                    log_warning(&format!("Failed to write {}: {}", entry.output_file, e));
-                } else {
-                    println!("🔁 Backed up {} ({})", entry.name, id);
-                    log(&format!("Backed up {}", entry.name));
+                let output_path = package_managers_dir.join(&entry.output_file);
+                let tmp_path = output_path.with_extension("tmp");
+
+                // Write to a temporary file first
+                match fs::File::create(&tmp_path).and_then(|mut f| f.write_all(content.as_bytes()))
+                {
+                    Ok(_) => {
+                        // Atomically rename the temp file to the final destination
+                        if let Err(e) = fs::rename(&tmp_path, &output_path) {
+                            log_warning(&format!(
+                                "Failed to atomically move {}: {}",
+                                entry.output_file, e
+                            ));
+                        } else {
+                            println!("🔁 Backed up {} ({})", entry.name, id);
+                            log(&format!("Backed up {}", entry.name));
+                        }
+                    }
+                    Err(e) => {
+                        log_warning(&format!(
+                            "Failed to write temp file for {}: {}",
+                            entry.output_file, e
+                        ));
+                        // Clean up temp file if it exists
+                        let _ = fs::remove_file(&tmp_path);
+                    }
                 }
             }
             Err(e) => {
                 log_warning(&format!("Command for {} failed: {}", entry.name, e));
-                let _ = fs::write(package_managers_dir.join(&entry.output_file), "");
             }
         }
     }
