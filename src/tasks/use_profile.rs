@@ -46,6 +46,13 @@ impl Task for UseProfileTask {
             )));
         }
 
+        // Check if already on this profile
+        let current = get_active_profile_name();
+        if current.as_deref() == Some(&self.profile_name) {
+            log_info(&format!("Already using profile '{}'", self.profile_name));
+            return Ok(());
+        }
+
         // Set as active profile
         set_active_profile(&self.profile_name)?;
 
