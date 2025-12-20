@@ -480,7 +480,7 @@ Enables Touch ID authentication for sudo commands.
 - **Can't create profile**: Check profile name contains only letters, numbers, hyphens, and underscores
 
 ### Backup Issues
-- **Wrong profile used**: Check active profile with `mntn use` or specify with `--profile`
+- **Wrong profile used**: Check active profile with `mntn profile`.
 - **Permission denied**: Ensure read access to config directories
 
 ### Changes Not Saved
