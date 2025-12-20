@@ -52,9 +52,7 @@ impl Task for SyncTask {
             dry_run: self.dry_run,
         };
 
-        if let Err(e) = sync_with_git(args) {
-            log_error("Sync failed", e);
-        }
+        sync_with_git(args)?;
 
         Ok(())
     }
