@@ -213,6 +213,17 @@ mod tests {
         // Initialize a git repo and create a branch
         let _ = run_cmd_in_dir("git", &["init"], temp_dir.path());
         let _ = run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path());
+        // Set user.name and user.email for CI environments before committing
+        let _ = run_cmd_in_dir(
+            "git",
+            &["config", "user.name", "Test User"],
+            temp_dir.path(),
+        );
+        let _ = run_cmd_in_dir(
+            "git",
+            &["config", "user.email", "test@example.com"],
+            temp_dir.path(),
+        );
         // Make an initial commit so HEAD points to the branch
         std::fs::write(temp_dir.path().join("file.txt"), "content").unwrap();
         let _ = run_cmd_in_dir("git", &["add", "."], temp_dir.path());
