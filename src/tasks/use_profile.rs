@@ -3,6 +3,7 @@ use crate::logger::{log_error, log_info, log_success, log_warning};
 use crate::profile::ProfileConfig;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::{clear_active_profile, get_active_profile_name, set_active_profile};
+use std::io;
 
 pub struct UseProfileTask {
     profile_name: String,
@@ -39,7 +40,10 @@ impl Task for UseProfileTask {
             println!();
             println!("Create it with: mntn profile create {}", self.profile_name);
             println!("   Or list available profiles: mntn profile list");
-            return Ok(());
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Profile '{}' does not exist", self.profile_name),
+            )));
         }
 
         // Set as active profile
