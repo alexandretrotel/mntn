@@ -227,7 +227,8 @@ fn backup_file(source: &PathBuf, destination: &PathBuf) -> std::io::Result<()> {
                 "Converted symlink to real file: {}",
                 source.display()
             ));
-            // Now proceed with normal backup (copy back to destination)
+            // Skip the redundant copy since the file is already restored from backup
+            return Ok(());
         }
     }
 
