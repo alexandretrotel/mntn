@@ -115,6 +115,9 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     } else {
+        if args.init {
+            log_info("A git repository already exists in this directory. Skipping initialization.");
+        }
         ensure_gitignore_exists(&mntn_dir)?;
     }
 
