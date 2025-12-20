@@ -143,7 +143,7 @@ mntn uses a **profile-based architecture** that simplifies configuration managem
 
 #### Directory Structure
 
-```
+```text
 ~/.mntn/
 ├── backup/
 │   ├── common/                    # Shared across all profiles
@@ -311,7 +311,7 @@ git push -u origin main
 
 #### Repository Structure
 
-```
+```text
 ~/.mntn/                    # Git repository root
 ├── .git/
 ├── .gitignore              # Excludes mntn.log
@@ -378,7 +378,7 @@ mntn validate
 - **Legacy symlinks**: Detects old symlink-based configurations
 
 **Example output:**
-```
+```text
 Validating configuration...
    Profile: profile=work
 
