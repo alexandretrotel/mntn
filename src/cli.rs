@@ -361,6 +361,13 @@ pub struct UseArgs {
     /// Profile name to switch to (use 'common' or 'none' to clear active profile)
     #[arg(help = "Profile name to switch to")]
     pub profile: String,
+    /// Preview what would be changed without actually switching
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Arguments for the profile command.
