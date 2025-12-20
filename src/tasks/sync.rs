@@ -1,5 +1,5 @@
 use crate::cli::SyncArgs;
-use crate::logger::{log_error, log_info, log_success};
+use crate::logger::{log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd_in_dir;
