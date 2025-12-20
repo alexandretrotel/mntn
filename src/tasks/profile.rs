@@ -21,13 +21,13 @@ pub fn run_with_args(args: ProfileArgs) {
 fn show_current_profile() {
     let current = get_active_profile_name();
     match current {
-        Some(name) => println!("📍 Active profile: {}", name),
-        None => println!("📍 No active profile (using common only)"),
+        Some(name) => println!("Active profile: {}", name),
+        None => println!("No active profile (using common only)"),
     }
     println!();
     list_profiles();
     println!();
-    println!("💡 Use 'mntn use <profile>' to switch profiles");
+    println!("Use 'mntn use <profile>' to switch profiles");
 }
 
 fn list_profiles() {
@@ -36,13 +36,13 @@ fn list_profiles() {
     let current = get_active_profile_name();
 
     if profiles.is_empty() {
-        println!("📋 No profiles configured");
+        println!("No profiles configured");
         println!();
-        println!("💡 Create a profile with: mntn profile create <name>");
+        println!("Create a profile with: mntn profile create <name>");
         return;
     }
 
-    println!("📋 Available profiles:");
+    println!("Available profiles:");
     for name in profiles {
         let is_current = current.as_ref() == Some(name);
         let marker = if is_current { " ← active" } else { "" };
@@ -107,7 +107,7 @@ fn create_profile(name: &str, description: Option<String>) {
         println!("   Description: {}", desc);
     }
     println!();
-    println!("💡 Switch to this profile with: mntn use {}", name);
+    println!("Switch to this profile with: mntn use {}", name);
 }
 
 fn delete_profile(name: &str) {

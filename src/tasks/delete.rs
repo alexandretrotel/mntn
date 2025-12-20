@@ -53,9 +53,9 @@ impl Task for DeleteTask {
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.args.permanent {
-            println!("🗑 Permanently deleting application and related files...");
+            println!("Permanently deleting application and related files...");
         } else {
-            println!("🗑 Moving application and related files to trash...");
+            println!("Moving application and related files to trash...");
         }
         log(&format!(
             "Starting app deletion with args: dry_run={}, permanent={}",
@@ -155,7 +155,7 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
         if args.dry_run {
             println!("[DRY RUN] Would uninstall {} via Homebrew", app_name);
         } else {
-            println!("🗑️ Uninstalling {} via Homebrew...", app_name);
+            println!("Uninstalling {} via Homebrew...", app_name);
             log(&format!("Uninstalling {} via Homebrew", app_name));
             let status = Command::new("brew")
                 .args(["uninstall", "--cask", app_name])
@@ -191,7 +191,7 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
         .collect();
 
     if options.is_empty() && !app_path.exists() {
-        println!("📁 No related files found for {}", app_name);
+        println!("No related files found for {}", app_name);
         return Ok(true);
     }
 
@@ -418,7 +418,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
 
     if args.permanent {
         if needs_sudo {
-            println!("🗑 [SUDO] Permanently deleting: {}", path.display());
+            println!("[SUDO] Permanently deleting: {}", path.display());
             log(&format!(
                 "Permanently deleting with sudo: {}",
                 path.display()
@@ -447,7 +447,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
                 }
             }
         } else {
-            println!("🗑 Permanently deleting: {}", path.display());
+            println!("Permanently deleting: {}", path.display());
             log(&format!("Permanently deleting: {}", path.display()));
 
             let result = if path.is_dir() {
@@ -473,7 +473,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
         } else {
             "Moving to trash"
         };
-        println!("🗑 {}: {}", action_desc, path.display());
+        println!("{}: {}", action_desc, path.display());
         log(&format!("{}: {}", action_desc, path.display()));
 
         match trash::delete(path) {

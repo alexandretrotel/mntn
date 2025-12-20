@@ -119,14 +119,14 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if (args.pull || args.sync) && !args.init {
-        println!("🔄 Pulling latest changes...");
+        println!("Pulling latest changes...");
         // Explicitly pull from origin/<branch> to avoid relying on tracking info
         let branch = crate::utils::system::get_current_git_branch(&mntn_dir)?;
         run_cmd_in_dir("git", &["pull", "origin", &branch], &mntn_dir)?;
         log_success("Successfully pulled latest changes");
 
         if args.auto_restore {
-            println!("📥 Auto-restoring configurations...");
+            println!("Auto-restoring configurations...");
             crate::tasks::restore::run_with_args(crate::cli::RestoreArgs { dry_run: false });
         }
     }
@@ -156,7 +156,7 @@ fn initialize_git_repo(
     mntn_dir: &Path,
     remote_url: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Initializing git repository in {}", mntn_dir.display());
+    println!("Initializing git repository in {}", mntn_dir.display());
 
     run_cmd_in_dir("git", &["init"], mntn_dir)?;
     run_cmd_in_dir("git", &["remote", "add", "origin", remote_url], mntn_dir)?;

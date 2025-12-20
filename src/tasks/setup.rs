@@ -31,7 +31,7 @@ pub fn run() {
     flag::register(SIGINT, Arc::clone(&running)).expect("Failed to register SIGINT handler");
 
     println!();
-    println!("🚀 Welcome to mntn interactive setup!");
+    println!("Welcome to mntn interactive setup!");
     println!("   This wizard will help you configure your dotfiles management.");
     println!();
 
@@ -112,7 +112,7 @@ pub fn run() {
     println!();
     log_success("Setup complete!");
     println!();
-    println!("📖 Quick reference:");
+    println!("Quick reference:");
     println!("   mntn backup          - Backup your configurations");
     println!("   mntn restore         - Restore configurations from backup");
     println!("   mntn use <name>      - Switch to a different profile");
@@ -125,7 +125,7 @@ pub fn run() {
 }
 
 fn setup_profile_prompt() -> Result<Option<String>, inquire::error::InquireError> {
-    println!("📍 Profile Setup");
+    println!("Profile Setup");
     println!("   Profiles let you maintain different configurations for different contexts");
     println!("   (e.g., 'work', 'personal', 'minimal', 'gaming')");
     println!();
@@ -209,7 +209,7 @@ fn check_and_offer_migration_prompt() -> Result<bool, inquire::error::InquireErr
     }
 
     println!();
-    println!("📁 Legacy Files Detected");
+    println!("Legacy Files Detected");
     println!("   Found files in ~/.mntn/backup/ that aren't in the layered structure.");
 
     Confirm::new("Migrate legacy files to common/ layer?")
@@ -219,7 +219,7 @@ fn check_and_offer_migration_prompt() -> Result<bool, inquire::error::InquireErr
 }
 
 fn run_migration() {
-    println!("🔄 Migrating legacy files to common/...");
+    println!("Migrating legacy files to common/...");
 
     let mut task = crate::tasks::migrate::MigrateTask::new();
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
@@ -228,7 +228,7 @@ fn run_migration() {
 }
 
 fn run_backup(profile_name: &Option<String>) {
-    println!("🔁 Running initial backup...");
+    println!("Running initial backup...");
 
     let profile = match profile_name {
         Some(name) => ActiveProfile::with_profile(name),
@@ -242,7 +242,7 @@ fn run_backup(profile_name: &Option<String>) {
 }
 
 fn run_install_tasks() {
-    println!("📦 Installing scheduled tasks...");
+    println!("Installing scheduled tasks...");
 
     let mut task = crate::tasks::install::InstallTask::new(false);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {

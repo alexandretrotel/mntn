@@ -38,7 +38,7 @@ impl Task for UseProfileTask {
             log_warning(&format!("Profile '{}' does not exist", self.profile_name));
             println!();
             println!(
-                "💡 Create it with: mntn profile create {}",
+                "Create it with: mntn profile create {}",
                 self.profile_name
             );
             println!("   Or list available profiles: mntn profile list");

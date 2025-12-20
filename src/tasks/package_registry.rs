@@ -127,7 +127,7 @@ fn list_entries(enabled_only: bool, platform_only: bool) {
         }
     };
 
-    println!("📦 Package Manager Registry");
+    println!("Package Manager Registry");
     println!("===========================");
 
     let current_platform = PackageRegistry::get_current_platform();

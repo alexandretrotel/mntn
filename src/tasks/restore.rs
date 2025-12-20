@@ -23,7 +23,7 @@ impl Task for RestoreTask {
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🔄 Starting restore process...");
+        println!("Starting restore process...");
         println!("   Profile: {}", self.profile);
 
         let registry_path = get_registry_path();
@@ -37,7 +37,7 @@ impl Task for RestoreTask {
 
             match self.profile.resolve_source(&entry.source_path) {
                 Some(resolved) => {
-                    println!("🔄 Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
+                    println!("Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
                     if restore_config_file(&resolved.path, target_path, &entry.name) {
                         restored_count += 1;
                     } else {

@@ -28,7 +28,7 @@ impl Task for InstallTask {
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("📦 Installing scheduled tasks...");
+        println!("Installing scheduled tasks...");
 
         let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
         if which("topgrade").is_ok() {

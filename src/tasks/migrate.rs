@@ -166,13 +166,13 @@ impl Task for MigrateTask {
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🔄 Migrating legacy backup files to common/...");
+        println!("Migrating legacy backup files to common/...");
 
         // First, clean up any legacy symlinks at target locations
         let (symlinks_converted, symlinks_failed) = self.cleanup_legacy_symlinks();
         if symlinks_converted > 0 || symlinks_failed > 0 {
             println!(
-                "🔗 Symlink cleanup: {} converted, {} failed",
+                "Symlink cleanup: {} converted, {} failed",
                 symlinks_converted, symlinks_failed
             );
         }
@@ -195,7 +195,7 @@ impl Task for MigrateTask {
             return Ok(());
         }
 
-        println!("📋 Found {} legacy files to migrate", legacy_files.len());
+        println!("Found {} legacy files to migrate", legacy_files.len());
 
         let mut migrated = 0;
         let mut failed = 0;
