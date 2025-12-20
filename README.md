@@ -80,7 +80,7 @@ mntn sync --sync
 
 mntn supports **macOS**, **Linux**, and **Windows** with platform-specific features:
 
-- **All platforms**: setup, backup, clean, install, migrate, purge, restore, registry management, switch, sync, validate
+- **All platforms**: setup, backup, clean, install, migrate, purge, restore, registry management, use, profile, sync, validate
 - **macOS only**: biometric-sudo, delete command, Homebrew cask support
 - **Linux/Windows**: systemd services (Linux) and Task Scheduler (Windows) for automation
 
