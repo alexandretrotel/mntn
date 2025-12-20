@@ -118,9 +118,11 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
         ensure_gitignore_exists(&mntn_dir)?;
     }
 
-    if args.pull || args.sync {
+    if (args.pull || args.sync) && !args.init {
         println!("🔄 Pulling latest changes...");
-        run_cmd_in_dir("git", &["pull"], &mntn_dir)?;
+        // Explicitly pull from origin/<branch> to avoid relying on tracking info
+        let branch = crate::utils::system::get_current_git_branch(&mntn_dir)?;
+        run_cmd_in_dir("git", &["pull", "origin", &branch], &mntn_dir)?;
         log_success("Successfully pulled latest changes");
 
         if args.auto_restore {

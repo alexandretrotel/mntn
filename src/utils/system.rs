@@ -21,6 +21,12 @@ pub fn run_cmd_in_dir(
     run_cmd_impl(cmd, args, Some(dir))
 }
 
+/// Returns the current git branch name in the given directory.
+pub fn get_current_git_branch(dir: &std::path::Path) -> Result<String, Box<dyn std::error::Error>> {
+    let branch = run_cmd_in_dir("git", &["rev-parse", "--abbrev-ref", "HEAD"], dir)?;
+    Ok(branch.trim().to_string())
+}
+
 /// Internal implementation for running commands with optional directory
 fn run_cmd_impl(
     cmd: &str,
@@ -199,6 +205,28 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let result = run_cmd_impl("pwd", &[], Some(temp_dir.path()));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_current_git_branch_returns_branch_name() {
+        let temp_dir = TempDir::new().unwrap();
+        // Initialize a git repo and create a branch
+        let _ = run_cmd_in_dir("git", &["init"], temp_dir.path());
+        let _ = run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path());
+        // Make an initial commit so HEAD points to the branch
+        std::fs::write(temp_dir.path().join("file.txt"), "content").unwrap();
+        let _ = run_cmd_in_dir("git", &["add", "."], temp_dir.path());
+        let _ = run_cmd_in_dir("git", &["commit", "-m", "initial"], temp_dir.path());
+        let branch = get_current_git_branch(temp_dir.path());
+        assert!(branch.is_ok());
+        assert_eq!(branch.unwrap(), "test-branch");
+    }
+
+    #[test]
+    fn test_get_current_git_branch_fails_outside_git_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        let branch = get_current_git_branch(temp_dir.path());
+        assert!(branch.is_err());
     }
 
     #[test]
