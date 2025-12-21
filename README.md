@@ -2,6 +2,8 @@
 
 A Rust-based CLI tool for system maintenance and dotfiles management with a profile-based architecture.
 
+![Demo Video](./assets/mntn.gif)
+
 ## Table of Contents
 
 - [Features](#features)
@@ -102,6 +104,7 @@ mntn setup
 4. **Scheduled Tasks**: Optionally install automated backups
 
 **Example output:**
+
 ```text
 Welcome to mntn interactive setup!
    This wizard will help you configure your dotfiles management.
@@ -176,6 +179,7 @@ When restoring, mntn resolves sources in this order (highest priority first):
 3. **Legacy** (root `backup/`) - Backwards compatibility
 
 **Example:** If you have:
+
 - `common/.zshrc` - Base shell config
 - `profiles/work/.zshrc` - Work-specific shell config
 
@@ -198,6 +202,7 @@ mntn profile delete old-profile
 ```
 
 **Profile Examples:**
+
 - `work` - Work-specific configurations (corporate git, work-specific tools)
 - `personal` - Personal machine configurations
 - `minimal` - Minimal setup for servers or lightweight environments
@@ -222,6 +227,7 @@ mntn use common
 ### Backup and Restore Guide
 
 mntn uses a **copy-based** approach for managing dotfiles. This means:
+
 - **Backup** copies files from your system to the backup location
 - **Restore** copies files from the backup location to your system
 - Changes to config files require running `mntn backup` to sync
@@ -240,6 +246,7 @@ mntn backup --dry-run
 ```
 
 **What gets backed up:**
+
 - **Package lists**: brew, npm, cargo, bun, uv, etc. (stored in `backup/packages/`)
 - **Configuration files**: Based on registry entries (stored in active profile or common)
 
@@ -265,6 +272,7 @@ The recommended workflow with mntn is:
 4. **Push** to remote: `git push`
 
 On another machine:
+
 1. **Pull** latest: `cd ~/.mntn && git pull` (or `mntn sync --pull`)
 2. **Restore** configs: `mntn restore`
 
@@ -281,11 +289,13 @@ mntn migrate
 ```
 
 **When to migrate:**
+
 - After upgrading from an older version of mntn
 - When you have files in `~/.mntn/backup/` that aren't in `common/` or `profiles/`
 - When you have legacy symlinks that need to be converted to real files
 
 **What it does:**
+
 - Moves files from `backup/` to `backup/common/`
 - Converts symlinks to real files
 - Preserves your data while updating the structure
@@ -372,12 +382,14 @@ mntn validate
 ```
 
 **What it validates:**
+
 - **Registry files**: JSON syntax and consistency
 - **Layer resolution**: Shows which layer each config comes from
 - **JSON configs**: Validates VS Code, Zed settings syntax
 - **Legacy symlinks**: Detects old symlink-based configurations
 
 **Example output:**
+
 ```text
 Validating configuration...
    Profile: profile=work
@@ -476,36 +488,44 @@ Enables Touch ID authentication for sudo commands.
 ## Troubleshooting
 
 ### Setup Issues
+
 - **Profile not saving**: Ensure `~/.mntn/` directory exists and is writable
 - **Can't create profile**: Check profile name contains only letters, numbers, hyphens, and underscores
 
 ### Backup Issues
+
 - **Wrong profile used**: Check active profile with `mntn profile`.
 - **Permission denied**: Ensure read access to config directories
 
 ### Changes Not Saved
+
 - **Symptom**: Edited config file but changes not in backup
 - **Solution**: Run `mntn backup` after editing config files to sync changes
 
 ### Restore Issues
+
 - **Wrong version restored**: Check active profile with `mntn use` and layer priority with `mntn validate`
 - **Permission denied**: Ensure write access to target directories
 
 ### Migration Issues
+
 - **Files not detected**: Only registry entries are migrated; add entries first with `mntn registry-configs add`
 - **Already migrated**: Files in `common/` or `profiles/` are skipped
 - **Legacy symlinks**: Run `mntn migrate` to convert symlinks to real files
 
 ### Sync Issues
+
 - **No git repository**: Run `mntn sync --init --remote-url <URL>`
 - **Merge conflicts**: Resolve in `~/.mntn` using standard git commands
 
 ### Profile Issues
+
 - **Can't switch profiles**: Ensure profile exists with `mntn profile list`
 - **Profile not found**: Create it with `mntn profile create <name>`
 - **Can't delete active profile**: Switch to another profile first with `mntn use <other-profile>`
 
 ### Validation Issues
+
 - **Legacy files warning**: Run `mntn migrate` to update structure
 - **Legacy symlinks warning**: Run `mntn backup` or `mntn migrate` to convert to real files
 - **Layer conflicts**: Multiple layers with same file is intentional for overrides
