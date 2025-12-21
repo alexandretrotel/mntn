@@ -1,44 +1,99 @@
 use crate::cli::InstallArgs;
-use crate::logger::log;
+use crate::logger::{log_error, log_warning};
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use crate::utils::paths::get_base_dirs;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::fs;
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
 use std::process::Command;
 use which::which;
 
-/// Installs macOS LaunchAgents to automate recurring maintenance tasks.
-///
-/// This function creates `.plist` files in `~/Library/LaunchAgents` for:
-/// - `com.mntn.backup` → runs `mntn backup` every hour
-/// - `com.mntn.clean` → runs `mntn clean` every day
-/// - `com.mntn.topgrade` → runs `topgrade` every day (only if installed)
-///
-/// After writing each agent's configuration, it loads the agent with `launchctl`.
-pub fn run(args: InstallArgs) {
-    println!("📦 Installing scheduled tasks...");
-    log("Starting scheduled task installation");
+#[cfg(target_os = "linux")]
+const SECONDS_PER_HOUR: u32 = 3600;
 
-    let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
-    if which("topgrade").is_ok() {
-        tasks.push(ScheduledTask::topgrade_daily());
-    } else {
-        println!("⚠️ topgrade not found, skipping daily topgrade task.");
-        log("topgrade not found, skipping daily topgrade task");
+/// Install task that sets up scheduled maintenance tasks
+pub struct InstallTask {
+    pub with_clean: bool,
+}
+
+impl InstallTask {
+    pub fn new(with_clean: bool) -> Self {
+        Self { with_clean }
     }
-    if args.with_clean {
-        tasks.push(ScheduledTask::clean_daily());
+}
+
+impl Task for InstallTask {
+    fn name(&self) -> &str {
+        "Install"
     }
 
-    for task in tasks.into_iter() {
-        if let Err(e) = task.install() {
-            println!("❌ Failed to install {}: {}", task.label(), e);
-            log(&format!("Failed to install {}: {}", task.label(), e));
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Installing scheduled tasks...");
+
+        let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
+        if which("topgrade").is_ok() {
+            tasks.push(ScheduledTask::topgrade_daily());
+        } else {
+            log_warning("topgrade not found, skipping daily topgrade task");
         }
+        if self.with_clean {
+            tasks.push(ScheduledTask::clean_daily());
+        }
+
+        for task in tasks.into_iter() {
+            if let Err(e) = task.install() {
+                log_error("Failed to install scheduled task", e);
+            }
+        }
+        Ok(())
     }
 
-    println!("✅ Scheduled tasks installed.");
-    log("Scheduled tasks installed");
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+
+        operations.push(PlannedOperation::new(
+            "Install hourly backup task (mntn backup)",
+        ));
+
+        if which("topgrade").is_ok() {
+            operations.push(PlannedOperation::new("Install daily topgrade task"));
+        }
+
+        if self.with_clean {
+            operations.push(PlannedOperation::new(
+                "Install daily clean task (mntn clean)",
+            ));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Create LaunchAgent plist files".to_string(),
+                "~/Library/LaunchAgents/".to_string(),
+            ));
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            operations.push(PlannedOperation::with_target(
+                "Create systemd user services and timers".to_string(),
+                "~/.config/systemd/user/".to_string(),
+            ));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            operations.push(PlannedOperation::new("Create Windows scheduled tasks"));
+        }
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: InstallArgs) {
+    let mut task = InstallTask::new(args.with_clean);
+    TaskExecutor::run(&mut task, args.dry_run);
 }
 
 struct ScheduledTask {
@@ -67,25 +122,20 @@ impl ScheduledTask {
             interval,
         }
     }
-    fn label(&self) -> &str {
-        &self.label
-    }
 
     fn install(&self) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "macos")]
         {
-            return self.install_launchd();
+            self.install_launchd()
         }
         #[cfg(target_os = "linux")]
         {
-            return self.install_systemd_user();
+            self.install_systemd_user()
         }
         #[cfg(target_os = "windows")]
         {
-            return self.install_windows();
+            self.install_windows()
         }
-        #[allow(unreachable_code)]
-        Err("Unsupported platform".into())
     }
 
     #[cfg(target_os = "macos")]
@@ -138,7 +188,7 @@ impl ScheduledTask {
         let binary_path = which(&self.binary)?.to_str().unwrap().to_string();
         let base_dirs = get_base_dirs();
         let config_dir = base_dirs.config_dir();
-        fs::create_dir_all(&config_dir)?;
+        fs::create_dir_all(config_dir)?;
         let service_name = format!("{}.service", self.label);
         let timer_name = format!("{}.timer", self.label);
         let service_path = config_dir.join(&service_name);
@@ -148,8 +198,8 @@ impl ScheduledTask {
             "[Unit]\nDescription=Run {} task\n\n[Service]\nType=oneshot\nExecStart={}\n",
             self.label, exec
         );
-        let timer_content = if self.interval % 3600 == 0 {
-            let hours = self.interval / 3600;
+        let timer_content = if self.interval.is_multiple_of(SECONDS_PER_HOUR) {
+            let hours = self.interval / SECONDS_PER_HOUR;
             if hours == 1 {
                 "[Unit]\nDescription=Hourly task\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n".to_string()
             } else if hours == 24 {

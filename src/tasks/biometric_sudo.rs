@@ -1,6 +1,7 @@
 use tempfile::NamedTempFile;
 
-use crate::logger::log;
+use crate::logger::{log, log_error, log_info, log_success};
+use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Write};
@@ -10,21 +11,58 @@ const TOUCH_ID_LINE: &str = "auth       sufficient     pam_tid.so\n";
 const BACKUP_SUFFIX: &str = ".bak";
 const SUDO_PAM_PATH: &str = "/etc/pam.d/sudo";
 
-/// If configuration succeeds, informs the user; if it fails, reports the error.
-pub fn run() {
-    println!("🔐 Configuring Touch ID for sudo...");
-    log("Starting Touch ID sudo configuration");
+/// Biometric sudo configuration task
+pub struct BiometricSudoTask;
 
-    match configure_biometric_sudo() {
-        Ok(_) => {
-            println!("✅ Touch ID authentication successfully configured for sudo");
-            log("Touch ID authentication configured successfully");
-        }
-        Err(e) => {
-            println!("❌ Failed to configure Touch ID authentication: {}", e);
-            log(&format!("Failed to configure Touch ID: {}", e));
+impl Task for BiometricSudoTask {
+    fn name(&self) -> &str {
+        "Biometric Sudo"
+    }
+
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("🔐 Configuring Touch ID for sudo...");
+        log("Starting Touch ID sudo configuration");
+
+        match configure_biometric_sudo() {
+            Ok(_) => {
+                log_success("Touch ID sudo configuration complete");
+                Ok(())
+            }
+            Err(e) => {
+                log_error("Failed to configure Touch ID for sudo", &e);
+                Err(Box::new(e))
+            }
         }
     }
+
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        let sudo_path = Path::new(SUDO_PAM_PATH);
+
+        if sudo_path.exists() {
+            operations.push(PlannedOperation::with_target(
+                "Check if Touch ID is already configured".to_string(),
+                SUDO_PAM_PATH.to_string(),
+            ));
+        }
+
+        operations.push(PlannedOperation::with_target(
+            "Create backup of PAM file".to_string(),
+            format!("{}{}", SUDO_PAM_PATH, BACKUP_SUFFIX),
+        ));
+
+        operations.push(PlannedOperation::with_target(
+            "Configure Touch ID authentication".to_string(),
+            SUDO_PAM_PATH.to_string(),
+        ));
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: crate::cli::BiometricSudoArgs) {
+    TaskExecutor::run(&mut BiometricSudoTask, args.dry_run);
 }
 
 /// Configures the sudo PAM file to enable Touch ID authentication.
@@ -44,7 +82,7 @@ fn configure_biometric_sudo() -> io::Result<()> {
         .lines()
         .any(|line| line.trim() == TOUCH_ID_LINE.trim())
     {
-        println!("ℹ️ Touch ID authentication is already configured");
+        log_info("Touch ID authentication is already configured");
         return Ok(());
     }
 
@@ -74,12 +112,9 @@ fn configure_biometric_sudo() -> io::Result<()> {
     temp_file.write_all(new_content.as_bytes())?;
 
     // Persist the temporary file to the target path
-    temp_file.persist(sudo_path).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Failed to persist updated PAM file: {}", e),
-        )
-    })?;
+    temp_file
+        .persist(sudo_path)
+        .map_err(|e| io::Error::other(format!("Failed to persist updated PAM file: {}", e)))?;
 
     Ok(())
 }

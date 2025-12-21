@@ -1,5 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 
+use crate::profile::ActiveProfile;
+
 /// Command line interface for `mntn`.
 #[derive(Parser)]
 #[command(
@@ -11,6 +13,27 @@ pub struct Cli {
     /// Subcommand to run
     #[command(subcommand)]
     pub command: Option<Commands>,
+}
+
+/// Arguments for the backup command.
+#[derive(Args)]
+pub struct BackupArgs {
+    /// Preview what would be backed up without actually performing the backup
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be backed up without performing any actions"
+    )]
+    pub dry_run: bool,
+    /// Target a specific profile for backup (defaults to active profile, or common if none)
+    #[arg(long, short = 'p', help = "Target a specific profile for backup")]
+    pub profile: Option<String>,
+}
+
+impl BackupArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(self.profile.as_deref())
+    }
 }
 
 /// Arguments for the clean command.
@@ -56,6 +79,73 @@ pub struct InstallArgs {
         help = "Set up automatic daily cleaning in addition to installing"
     )]
     pub with_clean: bool,
+    /// Preview what tasks would be installed without actually installing them
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be installed without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the restore command.
+#[derive(Args)]
+pub struct RestoreArgs {
+    /// Preview what would be restored without actually restoring
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be restored without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+impl RestoreArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(None)
+    }
+}
+
+/// Arguments for the biometric sudo command.
+#[derive(Args)]
+pub struct BiometricSudoArgs {
+    /// Preview what would be configured without actually performing the configuration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be configured without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the validate command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Preview what would be validated without actually performing the validation
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be validated without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+impl ValidateArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(None)
+    }
+}
+
+/// Arguments for the migrate command.
+#[derive(Args)]
+pub struct MigrateArgs {
+    /// Preview what would be migrated without actually performing the migration
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be migrated without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Arguments for the purge command.
@@ -77,22 +167,72 @@ pub struct PurgeArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the sync command.
+#[derive(Args)]
+pub struct SyncArgs {
+    /// Initialize a new git repository in ~/.mntn
+    #[arg(
+        long,
+        help = "Initialize a new git repository in ~/.mntn with the provided remote URL"
+    )]
+    pub init: bool,
+    /// Remote URL for git repository initialization
+    #[arg(long, help = "Remote repository URL (required with --init)")]
+    pub remote_url: Option<String>,
+    /// Pull changes from remote repository
+    #[arg(long, help = "Pull latest changes from remote repository")]
+    pub pull: bool,
+    /// Push changes to remote repository
+    #[arg(long, help = "Push local changes to remote repository")]
+    pub push: bool,
+    /// Sync both ways (pull then push)
+    #[arg(
+        long,
+        help = "Sync both ways: pull latest changes then push local changes"
+    )]
+    pub sync: bool,
+    /// Custom commit message for push operations
+    #[arg(
+        long,
+        short = 'm',
+        help = "Custom commit message (default: timestamp-based message)"
+    )]
+    pub message: Option<String>,
+    /// Automatically run 'mntn restore' after pulling changes
+    #[arg(long, help = "Automatically run 'mntn restore' after pulling changes")]
+    pub auto_restore: bool,
+    /// Preview what would be synced without performing any actions
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be synced without performing any actions"
+    )]
+    pub dry_run: bool,
+    /// Show git status for the repository
+    #[arg(long, help = "Show git status for the repository")]
+    pub status: bool,
+}
+
 /// Arguments for the registry command.
 #[derive(Args)]
-pub struct RegistryArgs {
+pub struct ConfigsRegistryArgs {
     #[command(subcommand)]
-    pub action: RegistryActions,
+    pub action: ConfigsRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Registry management actions.
 #[derive(Subcommand)]
-pub enum RegistryActions {
+pub enum ConfigsRegistryActions {
     /// List all registry entries
     #[command(about = "List all entries in the registry")]
     List {
-        /// Filter by category
-        #[arg(long, short = 'c', help = "Filter entries by category")]
-        category: Option<String>,
         /// Show only enabled entries
         #[arg(long, short = 'e', help = "Show only enabled entries")]
         enabled_only: bool,
@@ -112,9 +252,6 @@ pub enum RegistryActions {
         /// Target path where file should be linked
         #[arg(long, short = 't', help = "Target path where file should be linked")]
         target: String,
-        /// Category for organization
-        #[arg(long, short = 'c', help = "Category for organization")]
-        category: String,
         /// Optional description
         #[arg(long, short = 'd', help = "Optional description")]
         description: Option<String>,
@@ -143,6 +280,13 @@ pub enum RegistryActions {
 pub struct PackageRegistryArgs {
     #[command(subcommand)]
     pub action: PackageRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
 }
 
 /// Package registry management actions.
@@ -214,6 +358,53 @@ pub enum PackageRegistryActions {
     },
 }
 
+/// Arguments for the use command.
+#[derive(Args)]
+pub struct UseArgs {
+    /// Profile name to switch to (use 'common' or 'none' to clear active profile)
+    #[arg(help = "Profile name to switch to")]
+    pub profile: String,
+    /// Preview what would be changed without actually switching
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Arguments for the profile command.
+#[derive(Args)]
+pub struct ProfileArgs {
+    #[command(subcommand)]
+    pub action: Option<ProfileActions>,
+}
+
+/// Profile command actions.
+#[derive(Subcommand)]
+pub enum ProfileActions {
+    /// List all available profiles
+    #[command(about = "List all available profiles")]
+    List,
+    /// Create a new profile
+    #[command(about = "Create a new profile")]
+    Create {
+        /// Name for the new profile
+        #[arg(help = "Name for the new profile")]
+        name: String,
+        /// Optional description for the profile
+        #[arg(long, short = 'd', help = "Optional description for the profile")]
+        description: Option<String>,
+    },
+    /// Delete a profile
+    #[command(about = "Delete a profile")]
+    Delete {
+        /// Name of the profile to delete
+        #[arg(help = "Name of the profile to delete")]
+        name: String,
+    },
+}
+
 /// Available maintenance commands for `mntn`.
 ///
 /// Some commands are only available on macOS systems.
@@ -221,12 +412,12 @@ pub enum PackageRegistryActions {
 pub enum Commands {
     /// Create a backup of important system configurations and user data
     #[command(about = "Backup system configurations and user data to a safe location")]
-    Backup,
+    Backup(BackupArgs),
 
     /// Configure biometric authentication for sudo operations (macOS only)
     #[cfg(target_os = "macos")]
     #[command(about = "Enable Touch ID or Face ID authentication for sudo commands")]
-    BiometricSudo,
+    BiometricSudo(BiometricSudoArgs),
 
     /// Clean temporary files, caches, and unnecessary data from the system
     #[command(about = "Remove temporary files, caches, logs, and other unnecessary data")]
@@ -241,23 +432,43 @@ pub enum Commands {
     #[command(about = "Install mntn and optionally set up automated maintenance tasks")]
     Install(InstallArgs),
 
-    /// Create symbolic links for configurations and dotfiles
-    #[command(about = "Create and manage symbolic links for dotfiles and configurations")]
-    Link,
-
     /// Thoroughly remove files and reset configurations to defaults
     #[command(about = "Completely remove files and reset system configurations")]
     Purge(PurgeArgs),
 
     /// Restore system configurations and data from a previous backup
     #[command(about = "Restore system state from a previously created backup")]
-    Restore,
+    Restore(RestoreArgs),
 
-    /// Manage the registry of files and folders to backup and link
-    #[command(about = "Manage the registry of files and folders for backup and linking")]
-    Registry(RegistryArgs),
+    /// Manage the registry of configuration files and directories
+    #[command(about = "Manage the registry of configuration files and directories")]
+    RegistryConfigs(ConfigsRegistryArgs),
 
-    /// Manage the package manager registry for backup
-    #[command(about = "Manage the package manager registry for backup operations")]
-    PackageRegistry(PackageRegistryArgs),
+    /// Manage the registry of package managers for backup
+    #[command(about = "Manage the registry of package managers for backup operations")]
+    RegistryPackages(PackageRegistryArgs),
+
+    /// Switch to a different profile
+    #[command(about = "Switch to a different profile")]
+    Use(UseArgs),
+
+    /// Manage profiles (list, create, delete)
+    #[command(about = "Manage profiles (list, create, delete)")]
+    Profile(ProfileArgs),
+
+    /// Synchronize configurations with a git repository
+    #[command(about = "Sync configurations with a git repository (pull/push/both)")]
+    Sync(SyncArgs),
+
+    /// Validate configuration files and symlinks
+    #[command(about = "Validate JSON configs, symlinks, and registry files")]
+    Validate(ValidateArgs),
+
+    /// Migrate legacy backup files to the new structure
+    #[command(about = "Migrate legacy backup files to common/profiles structure")]
+    Migrate(MigrateArgs),
+
+    /// Interactive setup wizard for new users
+    #[command(about = "Interactive wizard to configure mntn for your system")]
+    Setup,
 }

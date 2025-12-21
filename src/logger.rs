@@ -12,11 +12,34 @@ pub fn log(message: &str) {
     let log_path = mntn_dir.join("mntn.log"); // ~/.mntn/mntn.log
     let timestamp = Local::now().format("[%Y-%m-%d %H:%M:%S]").to_string();
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)
-        .unwrap();
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) else {
+        return;
+    };
 
-    writeln!(file, "{} {}", timestamp, message).unwrap();
+    let _ = writeln!(file, "{} {}", timestamp, message);
+}
+
+/// Logs and prints an error message
+pub fn log_error(context: &str, error: impl std::fmt::Display) {
+    let msg = format!("{}: {}", context, error);
+    println!("❌ {}", msg);
+    log(&msg);
+}
+
+/// Logs and prints a success message
+pub fn log_success(message: &str) {
+    println!("✅ {}", message);
+    log(message);
+}
+
+/// Logs and prints a warning message
+pub fn log_warning(message: &str) {
+    println!("⚠️ {}", message);
+    log(message);
+}
+
+/// Logs and prints an info message
+pub fn log_info(message: &str) {
+    println!("ℹ️ {}", message);
+    log(message);
 }

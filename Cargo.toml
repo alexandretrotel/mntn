@@ -1,6 +1,6 @@
 [package]
 name = "mntn"
-version = "1.4.0"
+version = "2.0.0"
 edition = "2024"
 description = "A Rust-based CLI tool for system maintenance."
 license = "MIT"
@@ -10,16 +10,24 @@ name = "mntn"
 path = "src/main.rs"
 
 [dependencies]
-chrono = "0.4.41"
-clap = { version = "4.5.38", features = ["derive"] }
+chrono = "0.4.42"
+gethostname = "1.1.0"
+rayon = "1.11.0"
+clap = { version = "4.5.53", features = ["derive"] }
 directories-next = "2.0.0"
-glob = "0.3.2"
-inquire = "0.7.5"
-plist = "1.7.1"
-regex = "1.11.1"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+glob = "0.3.3"
+inquire = "0.9.1"
+plist = "1.8.0"
+regex = "1.11.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
 shellexpand = "3.1.1"
-tempfile = "3.13.0"
+tempfile = "3.23.0"
 trash = "5.2.2"
 which = "8.0.0"
+whoami = "1.6.1"
+libc = "0.2.178"
+signal-hook = "0.3.18"
+
+[dev-dependencies]
+serial_test = "3.2.0"

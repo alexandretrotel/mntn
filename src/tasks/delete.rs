@@ -1,5 +1,6 @@
 use crate::cli::DeleteArgs;
-use crate::logger::log;
+use crate::logger::{log, log_error, log_info, log_success, log_warning};
+use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::get_base_dirs;
 use inquire::{MultiSelect, Select};
 use plist::Value;
@@ -34,61 +35,85 @@ fn trashed_files() -> &'static Mutex<VecDeque<PathBuf>> {
     TRASHED_FILES.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-/// Guides the user through selecting an installed macOS `.app` bundle from the `/Applications` directory,
-/// then deletes it along with associated files and folders (e.g., caches, preferences, logs).
-///
-/// The process involves:
-/// - Checking if the selected app is managed by Homebrew (`brew uninstall --cask`)
-/// - If not, locating associated files via name and bundle identifier matches
-/// - Confirming with the user which related files to delete
-/// - Moving selected files to the system Trash (non-destructive) or permanently deleting them
-pub fn run(args: DeleteArgs) {
-    if args.dry_run {
-        println!("🔍 Running in dry-run mode - no files will be deleted");
-    } else if args.permanent {
-        println!("🗑 Permanently deleting application and related files...");
-    } else {
-        println!("🗑 Moving application and related files to trash...");
-    }
-    log(&format!(
-        "Starting app deletion with args: dry_run={}, permanent={}",
-        args.dry_run, args.permanent
-    ));
+/// Delete task for removing applications and related files
+pub struct DeleteTask {
+    args: DeleteArgs,
+}
 
-    match prompt_user_to_select_app() {
-        Ok(Some(app_name)) => match delete(&app_name, &args) {
-            Ok(true) => {
-                if args.dry_run {
-                    println!("✅ {} and related files would be removed.", app_name);
-                } else {
-                    println!("✅ {} and related files removed.", app_name);
-                }
-                log(&format!("Processed {} and related files", app_name));
-            }
-            Ok(false) => {
-                if args.dry_run {
-                    println!(
-                        "⚠️ {} would be partially deleted (some issues detected).",
-                        app_name
-                    );
-                } else {
-                    println!(
-                        "⚠️ {} was partially deleted (some errors occurred).",
-                        app_name
-                    );
-                }
-                log(&format!("Partial processing for {}", app_name));
-            }
-            Err(e) => prompt_error(&format!("Failed to process {}", app_name), e),
-        },
-        Ok(None) => {
-            println!("📁 No apps found or no selection made.");
-            log("No apps found or no selection made");
+impl DeleteTask {
+    pub fn new(args: DeleteArgs) -> Self {
+        Self { args }
+    }
+}
+
+impl Task for DeleteTask {
+    fn name(&self) -> &str {
+        "Delete"
+    }
+
+    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.args.permanent {
+            println!("Permanently deleting application and related files...");
+        } else {
+            println!("Moving application and related files to trash...");
         }
-        Err(e) => prompt_error("Error selecting app", e),
+        log(&format!(
+            "Starting app deletion with args: dry_run={}, permanent={}",
+            self.args.dry_run, self.args.permanent
+        ));
+
+        match prompt_user_to_select_app() {
+            Ok(Some(app_name)) => match delete(&app_name, &self.args) {
+                Ok(true) => {
+                    log_success(&format!("{} and related files removed", app_name));
+                }
+                Ok(false) => {
+                    log_warning(&format!(
+                        "{} was partially deleted (some errors occurred)",
+                        app_name
+                    ));
+                }
+                Err(e) => log_error(&format!("Failed to process {}", app_name), e),
+            },
+            Ok(None) => {
+                log_info("No apps found or no selection made");
+            }
+            Err(e) => log_error("Error selecting app", e),
+        }
+
+        log("Operation complete");
+
+        Ok(())
     }
 
-    log("Operation complete");
+    fn dry_run(&self) -> Vec<PlannedOperation> {
+        let mut operations = Vec::new();
+        operations.push(PlannedOperation::new("Prompt user to select application"));
+        operations.push(PlannedOperation::new("Find related files and directories"));
+        operations.push(PlannedOperation::new(
+            "Prompt user to select files to delete",
+        ));
+
+        let action = if self.args.permanent {
+            "permanently delete"
+        } else {
+            "move to trash"
+        };
+        operations.push(PlannedOperation::new(format!(
+            "Would {} selected files",
+            action
+        )));
+
+        operations
+    }
+}
+
+/// Run with CLI args
+pub fn run_with_args(args: DeleteArgs) {
+    use crate::tasks::core::TaskExecutor;
+    let dry_run = args.dry_run;
+    let mut task = DeleteTask::new(args);
+    TaskExecutor::run(&mut task, dry_run);
 }
 
 /// Prompts the user to choose an installed application from `/Applications`.
@@ -101,10 +126,10 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
     for entry in fs::read_dir(apps_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "app") {
-            if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                app_names.push(name.to_string());
-            }
+        if path.extension().is_some_and(|ext| ext == "app")
+            && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+        {
+            app_names.push(name.to_string());
         }
     }
 
@@ -114,7 +139,7 @@ fn prompt_user_to_select_app() -> std::io::Result<Option<String>> {
 
     let selection = Select::new("Select an app to delete:", app_names)
         .prompt()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     Ok(Some(selection))
 }
@@ -130,10 +155,10 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
         if args.dry_run {
             println!("[DRY RUN] Would uninstall {} via Homebrew", app_name);
         } else {
-            println!("🗑️ Uninstalling {} via Homebrew...", app_name);
+            println!("Uninstalling {} via Homebrew...", app_name);
             log(&format!("Uninstalling {} via Homebrew", app_name));
             let status = Command::new("brew")
-                .args(&["uninstall", "--cask", app_name])
+                .args(["uninstall", "--cask", app_name])
                 .status();
 
             if !matches!(status, Ok(s) if s.success()) {
@@ -166,14 +191,14 @@ fn delete(app_name: &str, args: &DeleteArgs) -> std::io::Result<bool> {
         .collect();
 
     if options.is_empty() && !app_path.exists() {
-        println!("📁 No related files found for {}", app_name);
+        println!("No related files found for {}", app_name);
         return Ok(true);
     }
 
     let selected = if !options.is_empty() {
         MultiSelect::new("Select items to delete:", options)
             .prompt()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
+            .map_err(|e| std::io::Error::other(e.to_string()))?
     } else {
         Vec::new()
     };
@@ -321,17 +346,15 @@ fn process_directory(
         let path = entry.path();
         let name = path.file_name().unwrap_or_default();
 
-        let matches = name.to_str().map_or(false, |name_str| {
-            re_app.is_match(name_str)
-                || re_bundle.as_ref().map_or(false, |re| re.is_match(name_str))
+        let matches = name.to_str().is_some_and(|name_str| {
+            re_app.is_match(name_str) || re_bundle.as_ref().is_some_and(|re| re.is_match(name_str))
         });
 
-        if matches {
-            if (is_app_dir && path.is_dir())
-                || (!is_app_dir && path.extension().map_or(false, |ext| ext == "plist"))
-            {
-                results.push(path);
-            }
+        if matches
+            && ((is_app_dir && path.is_dir())
+                || (!is_app_dir && path.extension().is_some_and(|ext| ext == "plist")))
+        {
+            results.push(path);
         }
     }
 }
@@ -355,18 +378,18 @@ fn get_bundle_identifier(app_path: &Path) -> Option<String> {
 
 /// Determines whether an app is installed via Homebrew Cask.
 fn is_homebrew_app(app_name: &str) -> bool {
-    let output = Command::new("brew").args(&["list", "--cask"]).output();
+    let output = Command::new("brew").args(["list", "--cask"]).output();
 
     let stdout = match output {
         Ok(o) => match String::from_utf8(o.stdout) {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Invalid UTF-8 output from brew: {}", e);
+                log_error("Invalid UTF-8 output from brew", e);
                 return false;
             }
         },
         Err(e) => {
-            eprintln!("Failed to run brew: {}", e);
+            log_error("Failed to run brew", e);
             return false;
         }
     };
@@ -395,7 +418,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
 
     if args.permanent {
         if needs_sudo {
-            println!("🗑 [SUDO] Permanently deleting: {}", path.display());
+            println!("[SUDO] Permanently deleting: {}", path.display());
             log(&format!(
                 "Permanently deleting with sudo: {}",
                 path.display()
@@ -404,12 +427,12 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
             let status = if path.is_dir() {
                 match fs::remove_dir_all(path) {
                     Ok(()) => Ok(std::process::ExitStatus::from_raw(0)),
-                    Err(_) => Command::new("sudo").args(&["rm", "-rf"]).arg(path).status(),
+                    Err(_) => Command::new("sudo").args(["rm", "-rf"]).arg(path).status(),
                 }
             } else {
                 match fs::remove_file(path) {
                     Ok(()) => Ok(std::process::ExitStatus::from_raw(0)),
-                    Err(_) => Command::new("sudo").args(&["rm", "-f"]).arg(path).status(),
+                    Err(_) => Command::new("sudo").args(["rm", "-f"]).arg(path).status(),
                 }
             };
 
@@ -424,7 +447,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
                 }
             }
         } else {
-            println!("🗑 Permanently deleting: {}", path.display());
+            println!("Permanently deleting: {}", path.display());
             log(&format!("Permanently deleting: {}", path.display()));
 
             let result = if path.is_dir() {
@@ -450,7 +473,7 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
         } else {
             "Moving to trash"
         };
-        println!("🗑 {}: {}", action_desc, path.display());
+        println!("{}: {}", action_desc, path.display());
         log(&format!("{}: {}", action_desc, path.display()));
 
         match trash::delete(path) {
@@ -471,6 +494,5 @@ fn process_file(path: &Path, args: &DeleteArgs, needs_sudo: bool) -> std::io::Re
 
 /// Helper function to log and display an error in a consistent format.
 fn prompt_error(context: &str, error: impl std::fmt::Debug) {
-    println!("❌ {}: {:?}", context, error);
-    log(&format!("{}: {:?}", context, error));
+    log_error(context, format!("{:?}", error));
 }
