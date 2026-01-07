@@ -253,9 +253,13 @@ fn run_backup(profile_name: &Option<String>, include_encrypted: bool) {
 
     let skip_encrypted = !include_encrypted;
     if include_encrypted {
-        println!("   Note: Encrypted configs will be included and you will be prompted for a password if needed.");
+        println!(
+            "   Note: Encrypted configs will be included and you will be prompted for a password if needed."
+        );
     } else {
-        println!("   Note: Encrypted configs are skipped to avoid prompting for a password during initial setup.");
+        println!(
+            "   Note: Encrypted configs are skipped to avoid prompting for a password during initial setup."
+        );
     }
 
     let mut task = crate::tasks::backup::BackupTask::new(profile, skip_encrypted);
