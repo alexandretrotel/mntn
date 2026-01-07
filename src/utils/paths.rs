@@ -17,6 +17,9 @@ pub const PROFILE_CONFIG_FILE: &str = "profile.json";
 /// Relative path to the file used for storing the active profile name.
 pub const ACTIVE_PROFILE_FILE: &str = ".active-profile";
 
+/// Relative path to the directory used for storing encrypted backup files.
+pub const ENCRYPTED_DIR: &str = "encrypted";
+
 pub fn get_mntn_dir() -> PathBuf {
     let base_dirs = get_base_dirs();
     let home_dir = base_dirs.home_dir();
@@ -52,6 +55,11 @@ pub fn get_packages_dir() -> PathBuf {
 /// Returns the path to the package manager registry file
 pub fn get_package_registry_path() -> PathBuf {
     get_mntn_dir().join("package_registry.json")
+}
+
+/// Returns the path to the encrypted configs registry file
+pub fn get_encrypted_registry_path() -> PathBuf {
+    get_mntn_dir().join("encrypted_configs_registry.json")
 }
 
 pub fn get_profile_config_path() -> PathBuf {
@@ -183,6 +191,18 @@ mod tests {
     fn test_get_package_registry_path_structure() {
         let path = get_package_registry_path();
         assert!(path.ends_with("package_registry.json"));
+    }
+
+    #[test]
+    fn test_get_encrypted_registry_path_structure() {
+        let path = get_encrypted_registry_path();
+        assert!(path.ends_with("encrypted_configs_registry.json"));
+        assert!(path.to_string_lossy().contains(".mntn"));
+    }
+
+    #[test]
+    fn test_encrypted_dir_constant() {
+        assert_eq!(ENCRYPTED_DIR, "encrypted");
     }
 
     #[test]

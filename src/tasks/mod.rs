@@ -6,6 +6,7 @@ pub mod configs_registry;
 pub mod core;
 #[cfg(target_os = "macos")]
 pub mod delete;
+pub mod encrypted_configs_registry;
 pub mod install;
 pub mod migrate;
 pub mod package_registry;

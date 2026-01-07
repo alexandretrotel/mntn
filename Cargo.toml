@@ -17,9 +17,13 @@ name = "mntn"
 path = "src/main.rs"
 
 [dependencies]
+age = "0.10"
+base64 = "0.22"
 chrono = "0.4.42"
 gethostname = "1.1.0"
 rayon = "1.11.0"
+rpassword = "7"
+sha2 = "0.10"
 clap = { version = "4.5.53", features = ["derive"] }
 directories-next = "2.0.0"
 glob = "0.3.3"

@@ -235,7 +235,7 @@ fn run_backup(profile_name: &Option<String>) {
         None => ActiveProfile::common_only(),
     };
 
-    let mut task = crate::tasks::backup::BackupTask::new(profile);
+    let mut task = crate::tasks::backup::BackupTask::new(profile, true);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
         log_error("Error during backup", e);
     }
