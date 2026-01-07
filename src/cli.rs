@@ -28,6 +28,12 @@ pub struct BackupArgs {
     /// Target a specific profile for backup (defaults to active profile, or common if none)
     #[arg(long, short = 'p', help = "Target a specific profile for backup")]
     pub profile: Option<String>,
+    /// Skip encrypted configs (by default, encrypted configs are included)
+    #[arg(
+        long,
+        help = "Skip encrypted configs backup (will not prompt for password)"
+    )]
+    pub skip_encrypted: bool,
 }
 
 impl BackupArgs {
@@ -98,6 +104,12 @@ pub struct RestoreArgs {
         help = "Show what would be restored without performing any actions"
     )]
     pub dry_run: bool,
+    /// Skip encrypted configs (by default, encrypted configs are included)
+    #[arg(
+        long,
+        help = "Skip encrypted configs restore (will not prompt for password)"
+    )]
+    pub skip_encrypted: bool,
 }
 
 impl RestoreArgs {
@@ -358,6 +370,75 @@ pub enum PackageRegistryActions {
     },
 }
 
+/// Arguments for the encrypted registry command.
+#[derive(Args)]
+pub struct EncryptedRegistryArgs {
+    #[command(subcommand)]
+    pub action: EncryptedRegistryActions,
+    /// Preview what would be changed without actually performing the changes
+    #[arg(
+        long,
+        short = 'n',
+        help = "Show what would be changed without performing any actions"
+    )]
+    pub dry_run: bool,
+}
+
+/// Encrypted registry management actions.
+#[derive(Subcommand)]
+pub enum EncryptedRegistryActions {
+    /// List all encrypted registry entries
+    #[command(about = "List all entries in the encrypted registry")]
+    List {
+        /// Show only enabled entries
+        #[arg(long, short = 'e', help = "Show only enabled entries")]
+        enabled_only: bool,
+    },
+    /// Add a new entry to the encrypted registry
+    #[command(about = "Add a new entry to the encrypted registry")]
+    Add {
+        /// Unique ID for the entry
+        #[arg(help = "Unique identifier for the registry entry")]
+        id: String,
+        /// Human-readable name
+        #[arg(long, short = 'n', help = "Human-readable name for the entry")]
+        name: String,
+        /// Source path within backup/encrypted directory
+        #[arg(
+            long,
+            short = 's',
+            help = "Source path within ~/.mntn/backup/*/encrypted/"
+        )]
+        source: String,
+        /// Target path where file should be restored
+        #[arg(long, short = 't', help = "Target path where file should be restored")]
+        target: String,
+        /// Optional description
+        #[arg(long, short = 'd', help = "Optional description")]
+        description: Option<String>,
+        /// Encrypt the filename in backup
+        #[arg(long, help = "Encrypt the filename when backing up")]
+        encrypt_filename: bool,
+    },
+    /// Remove an entry from the encrypted registry
+    #[command(about = "Remove an entry from the encrypted registry")]
+    Remove {
+        /// ID of the entry to remove
+        #[arg(help = "ID of the entry to remove")]
+        id: String,
+    },
+    /// Enable or disable an encrypted entry
+    #[command(about = "Enable or disable an encrypted registry entry")]
+    Toggle {
+        /// ID of the entry to toggle
+        #[arg(help = "ID of the entry to toggle")]
+        id: String,
+        /// Enable the entry
+        #[arg(long, short = 'e', help = "Enable the entry")]
+        enable: bool,
+    },
+}
+
 /// Arguments for the use command.
 #[derive(Args)]
 pub struct UseArgs {
@@ -447,6 +528,10 @@ pub enum Commands {
     /// Manage the registry of package managers for backup
     #[command(about = "Manage the registry of package managers for backup operations")]
     RegistryPackages(PackageRegistryArgs),
+
+    /// Manage the registry of encrypted configuration files
+    #[command(about = "Manage the registry of encrypted configuration files")]
+    RegistryEncrypted(EncryptedRegistryArgs),
 
     /// Switch to a different profile
     #[command(about = "Switch to a different profile")]

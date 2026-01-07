@@ -1,19 +1,26 @@
+use crate::encryption::{decrypt_file, get_encrypted_path, prompt_password};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
+use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
-use crate::utils::paths::get_registry_path;
+use crate::utils::paths::{get_encrypted_registry_path, get_registry_path};
 use crate::utils::system::rsync_directory;
+use age::secrecy::SecretString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct RestoreTask {
     profile: ActiveProfile,
+    skip_encrypted: bool,
 }
 
 impl RestoreTask {
-    pub fn new(profile: ActiveProfile) -> Self {
-        Self { profile }
+    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+        Self {
+            profile,
+            skip_encrypted,
+        }
     }
 }
 
@@ -51,6 +58,21 @@ impl Task for RestoreTask {
             }
         }
 
+        // Handle encrypted configs restore
+        if !self.skip_encrypted {
+            match prompt_password(false) {
+                Ok(password) => {
+                    let (encrypted_restored, encrypted_skipped) =
+                        restore_encrypted_config_files(&self.profile, &password);
+                    restored_count += encrypted_restored;
+                    skipped_count += encrypted_skipped;
+                }
+                Err(e) => {
+                    log_warning(&format!("Skipping encrypted restore: {}", e));
+                }
+            }
+        }
+
         log_success(&format!(
             "Restore complete. {} restored, {} skipped",
             restored_count, skipped_count
@@ -83,6 +105,32 @@ impl Task for RestoreTask {
             }
         }
 
+        // Include encrypted configs in dry-run if not skipped
+        if !self.skip_encrypted
+            && let Ok(registry) =
+                EncryptedConfigsRegistry::load_or_create(&get_encrypted_registry_path())
+        {
+            for (_id, entry) in registry.get_enabled_entries() {
+                let encrypted_path = get_encrypted_path(&entry.source_path, entry.encrypt_filename);
+                let target_path = &entry.target_path;
+
+                match self.profile.resolve_encrypted_source(&encrypted_path) {
+                    Some(resolved) => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Restore {} (encrypted) [{}]", entry.name, resolved.layer),
+                            format!("{} -> {}", resolved.path.display(), target_path.display()),
+                        ));
+                    }
+                    None => {
+                        operations.push(PlannedOperation::with_target(
+                            format!("Skip {} (encrypted, no source)", entry.name),
+                            format!("??? -> {}", target_path.display()),
+                        ));
+                    }
+                }
+            }
+        }
+
         operations
     }
 }
@@ -90,7 +138,10 @@ impl Task for RestoreTask {
 pub fn run_with_args(args: crate::cli::RestoreArgs) {
     use crate::tasks::core::TaskExecutor;
     let profile = args.resolve_profile();
-    TaskExecutor::run(&mut RestoreTask::new(profile), args.dry_run);
+    TaskExecutor::run(
+        &mut RestoreTask::new(profile, args.skip_encrypted),
+        args.dry_run,
+    );
 }
 
 /// Attempts to restore a configuration file from a backup to its target location.
@@ -194,6 +245,100 @@ fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> 
     }
 }
 
+/// Restores encrypted configuration files based on the encrypted registry entries.
+/// Returns a tuple of (restored_count, skipped_count).
+fn restore_encrypted_config_files(profile: &ActiveProfile, password: &SecretString) -> (u32, u32) {
+    let registry_path = get_encrypted_registry_path();
+    let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
+        Ok(registry) => registry,
+        Err(e) => {
+            log_warning(&format!(
+                "Failed to load encrypted registry, skipping encrypted restore: {}",
+                e
+            ));
+            return (0, 0);
+        }
+    };
+
+    let enabled_entries: Vec<_> = registry.get_enabled_entries().collect();
+
+    if enabled_entries.is_empty() {
+        log_info("No encrypted configuration files found to restore");
+        return (0, 0);
+    }
+
+    println!(
+        "🔐 Restoring {} encrypted configuration files...",
+        enabled_entries.len()
+    );
+
+    let mut restored_count = 0;
+    let mut skipped_count = 0;
+
+    for (id, entry) in enabled_entries {
+        let target_path = &entry.target_path;
+        let encrypted_path = get_encrypted_path(&entry.source_path, entry.encrypt_filename);
+
+        match profile.resolve_encrypted_source(&encrypted_path) {
+            Some(resolved) => {
+                println!("🔐 Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
+
+                // Handle legacy symlinks
+                if target_path.is_symlink() {
+                    if let Err(e) = fs::remove_file(target_path) {
+                        log_warning(&format!(
+                            "Failed to remove legacy symlink for {}: {}",
+                            entry.name, e
+                        ));
+                        skipped_count += 1;
+                        continue;
+                    }
+                    log(&format!(
+                        "Removed legacy symlink at {}",
+                        target_path.display()
+                    ));
+                }
+
+                // Ensure parent directory exists
+                if let Some(parent) = target_path.parent()
+                    && let Err(e) = fs::create_dir_all(parent)
+                {
+                    log_warning(&format!(
+                        "Failed to create directory for {}: {}",
+                        entry.name, e
+                    ));
+                    skipped_count += 1;
+                    continue;
+                }
+
+                // Decrypt and restore the file
+                match decrypt_file(&resolved.path, target_path, password) {
+                    Ok(()) => {
+                        log(&format!("Restored encrypted {}", entry.name));
+                        restored_count += 1;
+                    }
+                    Err(e) => {
+                        log_warning(&format!(
+                            "Failed to restore encrypted {}: {}",
+                            entry.name, e
+                        ));
+                        skipped_count += 1;
+                    }
+                }
+            }
+            None => {
+                log_info(&format!(
+                    "No encrypted backup found for {} in any layer",
+                    entry.name
+                ));
+                skipped_count += 1;
+            }
+        }
+    }
+
+    (restored_count, skipped_count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,20 +351,28 @@ mod tests {
 
     #[test]
     fn test_restore_task_name() {
-        let task = RestoreTask::new(create_test_profile());
+        let task = RestoreTask::new(create_test_profile(), true);
         assert_eq!(task.name(), "Restore");
     }
 
     #[test]
     fn test_restore_task_new() {
         let profile = create_test_profile();
-        let task = RestoreTask::new(profile.clone());
+        let task = RestoreTask::new(profile.clone(), false);
         assert_eq!(task.profile.name, profile.name);
+        assert!(!task.skip_encrypted);
+    }
+
+    #[test]
+    fn test_restore_task_new_skip_encrypted() {
+        let profile = create_test_profile();
+        let task = RestoreTask::new(profile.clone(), true);
+        assert!(task.skip_encrypted);
     }
 
     #[test]
     fn test_restore_task_dry_run() {
-        let task = RestoreTask::new(create_test_profile());
+        let task = RestoreTask::new(create_test_profile(), true);
         // Should not panic - just verify it returns successfully
         let _ops = task.dry_run();
     }
@@ -355,7 +508,7 @@ mod tests {
     #[test]
     fn test_restore_task_profile_display() {
         let profile = ActiveProfile::with_profile("test-profile");
-        let task = RestoreTask::new(profile);
+        let task = RestoreTask::new(profile, true);
 
         // Profile should be stored correctly
         assert_eq!(task.profile.name, Some("test-profile".to_string()));

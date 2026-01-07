@@ -24,6 +24,7 @@ A Rust-based CLI tool for system maintenance and dotfiles management with a prof
   - [Validation Guide](#validation-guide)
   - [Package Registry Management](#package-registry-management)
   - [Configuration Registry Management](#configuration-registry-management)
+  - [Encrypted Configuration Registry Management](#encrypted-configuration-registry-management)
   - [Automated Maintenance Setup](#automated-maintenance-setup)
   - [System Cleaning Guide](#system-cleaning-guide)
   - [Service Management with Purge](#service-management-with-purge)
@@ -47,6 +48,7 @@ A Rust-based CLI tool for system maintenance and dotfiles management with a prof
 - **Package Registry**: Centralized management of package managers for backup operations.
 - **Purge**: Deletes unused services with user confirmation.
 - **Registry**: Centralized management of configuration files and directories.
+- **Encrypted Registry**: Secure management of sensitive configuration files with password-based encryption.
 - **Sync**: Git integration for synchronizing configurations across machines.
 - **Validate**: Checks configuration files and layer resolution status.
 
@@ -436,6 +438,83 @@ mntn registry-configs add my_config \
 
 # Enable/disable entries
 mntn registry-configs toggle my_config --enable
+```
+
+### Encrypted Configuration Registry Management
+
+The encrypted registry provides secure backup and restore for sensitive configuration files like SSH keys and credentials. Files are encrypted using password-based encryption before being backed up.
+
+```bash
+# List all encrypted entries
+mntn registry-encrypted list
+
+# List only enabled entries
+mntn registry-encrypted list --enabled-only
+
+# Add new encrypted entry
+mntn registry-encrypted add ssh_github_key \
+  --name "GitHub SSH Key" \
+  --source "ssh/id_github" \
+  --target "~/.ssh/id_github" \
+  --description "GitHub-specific SSH key" \
+  --encrypt-filename
+
+# Remove an entry
+mntn registry-encrypted remove ssh_github_key
+
+# Enable/disable entries
+mntn registry-encrypted toggle ssh_config --enable
+
+# Preview changes
+mntn registry-encrypted add my_secret --name "Secret" \
+  --source "secrets/my.key" --target "~/.config/secret.key" \
+  --dry-run
+```
+
+**Encryption Features:**
+
+- **Password-based encryption**: Uses age encryption with secure password prompts
+- **Filename encryption**: Optionally encrypt filenames for additional security
+- **Seamless integration**: Works with `backup` and `restore` commands
+- **Skip option**: Use `--skip-encrypted` flag to skip encrypted backups/restores
+
+**Default Encrypted Entries:**
+
+- `ssh_config` - SSH client configuration file (`~/.ssh/config`)
+- `ssh_private_key` - SSH Ed25519 private key (`~/.ssh/id_ed25519`)
+
+**Backup Workflow with Encryption:**
+
+```bash
+# Backup with encryption (will prompt for password)
+mntn backup
+
+# Backup without encrypted files
+mntn backup --skip-encrypted
+
+# Restore with decryption (will prompt for password)
+mntn restore
+
+# Restore without encrypted files
+mntn restore --skip-encrypted
+```
+
+**Storage Structure:**
+
+Encrypted files are stored in a separate `encrypted/` directory within your backup:
+
+```text
+~/.mntn/backup/
+├── common/
+│   └── encrypted/
+│       └── ssh/
+│           ├── config.age
+│           └── [hash].age  # Encrypted filename
+└── profiles/
+    └── work/
+        └── encrypted/
+            └── ssh/
+                └── config.age
 ```
 
 ### Automated Maintenance Setup

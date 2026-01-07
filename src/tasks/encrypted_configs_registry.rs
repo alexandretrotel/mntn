@@ -1,37 +1,40 @@
-use crate::cli::{ConfigsRegistryActions, ConfigsRegistryArgs};
+use crate::cli::{EncryptedRegistryActions, EncryptedRegistryArgs};
 use crate::logger::{log, log_error, log_success};
-use crate::registries::configs_registry::{ConfigsRegistry, RegistryEntry};
+use crate::registries::encrypted_configs_registry::{
+    EncryptedConfigsRegistry, EncryptedRegistryEntry,
+};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
-use crate::utils::paths::get_registry_path;
+use crate::utils::paths::get_encrypted_registry_path;
 use shellexpand;
 
-/// Configs registry management task
-pub struct ConfigsRegistryTask {
-    args: ConfigsRegistryArgs,
+/// Encrypted configs registry management task
+pub struct EncryptedConfigsRegistryTask {
+    args: EncryptedRegistryArgs,
 }
 
-impl ConfigsRegistryTask {
-    pub fn new(args: ConfigsRegistryArgs) -> Self {
+impl EncryptedConfigsRegistryTask {
+    pub fn new(args: EncryptedRegistryArgs) -> Self {
         Self { args }
     }
 }
 
-impl Task for ConfigsRegistryTask {
+impl Task for EncryptedConfigsRegistryTask {
     fn name(&self) -> &str {
-        "Configs Registry"
+        "Encrypted Configs Registry"
     }
 
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         match &self.args.action {
-            ConfigsRegistryActions::List { enabled_only } => {
+            EncryptedRegistryActions::List { enabled_only } => {
                 list_entries(*enabled_only);
             }
-            ConfigsRegistryActions::Add {
+            EncryptedRegistryActions::Add {
                 id,
                 name,
                 source,
                 target,
                 description,
+                encrypt_filename,
             } => {
                 add_entry(
                     id.clone(),
@@ -39,12 +42,13 @@ impl Task for ConfigsRegistryTask {
                     source.clone(),
                     target.clone(),
                     description.clone(),
+                    *encrypt_filename,
                 );
             }
-            ConfigsRegistryActions::Remove { id } => {
+            EncryptedRegistryActions::Remove { id } => {
                 remove_entry(id.clone());
             }
-            ConfigsRegistryActions::Toggle { id, enable } => {
+            EncryptedRegistryActions::Toggle { id, enable } => {
                 toggle_entry(id.clone(), *enable);
             }
         }
@@ -53,13 +57,13 @@ impl Task for ConfigsRegistryTask {
 
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
-        let registry_path = get_registry_path();
+        let registry_path = get_encrypted_registry_path();
 
         match &self.args.action {
-            ConfigsRegistryActions::List { .. } => {
-                operations.push(PlannedOperation::new("List registry entries"));
+            EncryptedRegistryActions::List { .. } => {
+                operations.push(PlannedOperation::new("List encrypted registry entries"));
             }
-            ConfigsRegistryActions::Add {
+            EncryptedRegistryActions::Add {
                 id,
                 name,
                 source,
@@ -67,32 +71,32 @@ impl Task for ConfigsRegistryTask {
                 ..
             } => {
                 operations.push(PlannedOperation::with_target(
-                    format!("Add registry entry '{}' ({})", name, id),
+                    format!("Add encrypted registry entry '{}' ({})", name, id),
                     format!("Source: {}, Target: {}", source, target),
                 ));
                 operations.push(PlannedOperation::with_target(
-                    "Save registry".to_string(),
+                    "Save encrypted registry".to_string(),
                     registry_path.display().to_string(),
                 ));
             }
-            ConfigsRegistryActions::Remove { id } => {
+            EncryptedRegistryActions::Remove { id } => {
                 operations.push(PlannedOperation::with_target(
-                    format!("Remove registry entry ({})", id),
+                    format!("Remove encrypted registry entry ({})", id),
                     registry_path.display().to_string(),
                 ));
                 operations.push(PlannedOperation::with_target(
-                    "Save registry".to_string(),
+                    "Save encrypted registry".to_string(),
                     registry_path.display().to_string(),
                 ));
             }
-            ConfigsRegistryActions::Toggle { id, enable } => {
-                let action = if *enable { "enable" } else { "disable" };
+            EncryptedRegistryActions::Toggle { id, enable } => {
+                let action = if *enable { "Enable" } else { "Disable" };
                 operations.push(PlannedOperation::with_target(
-                    format!("{} registry entry ({})", action, id),
+                    format!("{} encrypted registry entry ({})", action, id),
                     registry_path.display().to_string(),
                 ));
                 operations.push(PlannedOperation::with_target(
-                    "Save registry".to_string(),
+                    "Save encrypted registry".to_string(),
                     registry_path.display().to_string(),
                 ));
             }
@@ -103,25 +107,25 @@ impl Task for ConfigsRegistryTask {
 }
 
 /// Run with CLI args
-pub fn run_with_args(args: ConfigsRegistryArgs) {
+pub fn run_with_args(args: EncryptedRegistryArgs) {
     let dry_run = args.dry_run;
-    let mut task = ConfigsRegistryTask::new(args);
+    let mut task = EncryptedConfigsRegistryTask::new(args);
     TaskExecutor::run(&mut task, dry_run);
 }
 
-/// List registry entries
+/// List encrypted registry entries
 fn list_entries(enabled_only: bool) {
-    let registry_path = get_registry_path();
-    let registry = match ConfigsRegistry::load_or_create(&registry_path) {
+    let registry_path = get_encrypted_registry_path();
+    let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            log_error("Failed to load registry", e);
+            log_error("Failed to load encrypted registry", e);
             return;
         }
     };
 
-    println!("Registry Entries");
-    println!("================\n");
+    println!("Encrypted Registry Entries");
+    println!("==========================\n");
 
     let mut entries: Vec<_> = registry.entries.iter().collect();
     entries.sort_by(|a, b| a.0.cmp(b.0));
@@ -132,7 +136,12 @@ fn list_entries(enabled_only: bool) {
         }
 
         let status = if entry.enabled { "[x]" } else { "[ ]" };
-        println!("{} {} ({})", status, entry.name, id);
+        let filename_status = if entry.encrypt_filename {
+            " [encrypted filename]"
+        } else {
+            ""
+        };
+        println!("{} {} ({}){}", status, entry.name, id, filename_status);
         println!("    Source: {}", entry.source_path);
         println!("    Target: {}", entry.target_path.display());
 
@@ -151,19 +160,20 @@ fn list_entries(enabled_only: bool) {
     );
 }
 
-/// Add a new entry to the registry
+/// Add a new entry to the encrypted registry
 fn add_entry(
     id: String,
     name: String,
     source: String,
     target: String,
     description: Option<String>,
+    encrypt_filename: bool,
 ) {
-    let registry_path = get_registry_path();
-    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
+    let registry_path = get_encrypted_registry_path();
+    let mut registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            log_error("Failed to load registry", e);
+            log_error("Failed to load encrypted registry", e);
             return;
         }
     };
@@ -177,33 +187,37 @@ fn add_entry(
     let expanded_target = shellexpand::tilde(&target).to_string();
     let target_path = std::path::PathBuf::from(expanded_target);
 
-    let entry = RegistryEntry {
+    let entry = EncryptedRegistryEntry {
         name: name.clone(),
         source_path: expanded_source,
         target_path,
         enabled: true,
         description,
+        encrypt_filename,
     };
 
     registry.add_entry(id.clone(), entry);
 
     if let Err(e) = registry.save(&registry_path) {
-        log_error("Failed to save registry", e);
+        log_error("Failed to save encrypted registry", e);
         return;
     }
 
-    log_success(&format!("Added entry '{}' to registry", name));
+    log_success(&format!("Added entry '{}' to encrypted registry", name));
     println!("   ID: {}", id);
-    log(&format!("Added registry entry: {} ({})", name, id));
+    log(&format!(
+        "Added encrypted registry entry: {} ({})",
+        name, id
+    ));
 }
 
-/// Remove an entry from the registry
+/// Remove an entry from the encrypted registry
 fn remove_entry(id: String) {
-    let registry_path = get_registry_path();
-    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
+    let registry_path = get_encrypted_registry_path();
+    let mut registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            log_error("Failed to load registry", e);
+            log_error("Failed to load encrypted registry", e);
             return;
         }
     };
@@ -211,12 +225,18 @@ fn remove_entry(id: String) {
     match registry.remove_entry(&id) {
         Some(entry) => {
             if let Err(e) = registry.save(&registry_path) {
-                log_error("Failed to save registry", e);
+                log_error("Failed to save encrypted registry", e);
                 return;
             }
 
-            log_success(&format!("Removed entry '{}' from registry", entry.name));
-            log(&format!("Removed registry entry: {} ({})", entry.name, id));
+            log_success(&format!(
+                "Removed entry '{}' from encrypted registry",
+                entry.name
+            ));
+            log(&format!(
+                "Removed encrypted registry entry: {} ({})",
+                entry.name, id
+            ));
         }
         None => {
             log_error("Entry not found", &id);
@@ -226,11 +246,11 @@ fn remove_entry(id: String) {
 
 /// Toggle an entry's enabled status
 fn toggle_entry(id: String, enable: bool) {
-    let registry_path = get_registry_path();
-    let mut registry = match ConfigsRegistry::load_or_create(&registry_path) {
+    let registry_path = get_encrypted_registry_path();
+    let mut registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
         Err(e) => {
-            log_error("Failed to load registry", e);
+            log_error("Failed to load encrypted registry", e);
             return;
         }
     };
@@ -238,15 +258,15 @@ fn toggle_entry(id: String, enable: bool) {
     match registry.set_entry_enabled(&id, enable) {
         Ok(()) => {
             if let Err(e) = registry.save(&registry_path) {
-                log_error("Failed to save registry", e);
+                log_error("Failed to save encrypted registry", e);
                 return;
             }
 
             let entry = registry.get_entry(&id).unwrap();
-            let action = if enable { "enabled" } else { "disabled" };
+            let action = if enable { "Enabled" } else { "Disabled" };
             log_success(&format!("{} entry '{}'", action, entry.name));
             log(&format!(
-                "{} registry entry: {} ({})",
+                "{} encrypted registry entry: {} ({})",
                 action, entry.name, id
             ));
         }

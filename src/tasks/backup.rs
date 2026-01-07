@@ -1,10 +1,15 @@
+use crate::encryption::{encrypt_file, get_encrypted_path, prompt_password};
 use crate::logger::{log, log_error, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
+use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
-use crate::utils::paths::{get_package_registry_path, get_packages_dir, get_registry_path};
+use crate::utils::paths::{
+    get_encrypted_registry_path, get_package_registry_path, get_packages_dir, get_registry_path,
+};
 use crate::utils::system::{rsync_directory, run_cmd};
+use age::secrecy::SecretString;
 use rayon::prelude::*;
 use std::fs;
 use std::io::Write;
@@ -12,11 +17,15 @@ use std::path::{Path, PathBuf};
 
 pub struct BackupTask {
     profile: ActiveProfile,
+    skip_encrypted: bool,
 }
 
 impl BackupTask {
-    pub fn new(profile: ActiveProfile) -> Self {
-        Self { profile }
+    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+        Self {
+            profile,
+            skip_encrypted,
+        }
     }
 }
 
@@ -37,6 +46,21 @@ impl Task for BackupTask {
 
         backup_package_managers(&package_managers_dir);
         backup_config_files(&backup_dir);
+
+        // Handle encrypted configs backup
+        if !self.skip_encrypted {
+            let encrypted_backup_dir = self.profile.get_encrypted_backup_path();
+            fs::create_dir_all(&encrypted_backup_dir)?;
+
+            match prompt_password(true) {
+                Ok(password) => {
+                    backup_encrypted_config_files(&encrypted_backup_dir, &password);
+                }
+                Err(e) => {
+                    log_warning(&format!("Skipping encrypted backup: {}", e));
+                }
+            }
+        }
 
         log_success("Backup complete");
         Ok(())
@@ -69,6 +93,26 @@ impl Task for BackupTask {
             }
         }
 
+        // Include encrypted configs in dry-run if not skipped
+        if !self.skip_encrypted {
+            let encrypted_backup_dir = self.profile.get_encrypted_backup_path();
+            if let Ok(registry) =
+                EncryptedConfigsRegistry::load_or_create(&get_encrypted_registry_path())
+            {
+                for (_id, entry) in registry.get_enabled_entries() {
+                    let encrypted_path =
+                        get_encrypted_path(&entry.source_path, entry.encrypt_filename);
+                    operations.push(PlannedOperation::with_target(
+                        format!("Backup {} (encrypted)", entry.name),
+                        encrypted_backup_dir
+                            .join(&encrypted_path)
+                            .display()
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+
         operations
     }
 }
@@ -77,7 +121,10 @@ pub fn run_with_args(args: crate::cli::BackupArgs) {
     use crate::tasks::core::TaskExecutor;
 
     let profile = args.resolve_profile();
-    TaskExecutor::run(&mut BackupTask::new(profile), args.dry_run);
+    TaskExecutor::run(
+        &mut BackupTask::new(profile, args.skip_encrypted),
+        args.dry_run,
+    );
 }
 
 /// Backs up package managers based on the package registry entries
@@ -301,6 +348,76 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
     rsync_directory(source, destination)
 }
 
+/// Backs up encrypted configuration files based on the encrypted registry entries
+fn backup_encrypted_config_files(encrypted_backup_dir: &Path, password: &SecretString) {
+    let registry_path = get_encrypted_registry_path();
+    let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
+        Ok(registry) => registry,
+        Err(e) => {
+            log_error(
+                "Failed to load encrypted registry, skipping encrypted backup",
+                e,
+            );
+            return;
+        }
+    };
+
+    let enabled_entries: Vec<_> = registry.get_enabled_entries().collect();
+
+    if enabled_entries.is_empty() {
+        log_info("No encrypted configuration files found to backup");
+        return;
+    }
+
+    println!(
+        "🔐 Backing up {} encrypted configuration files...",
+        enabled_entries.len()
+    );
+
+    for (id, entry) in enabled_entries {
+        let target_path = &entry.target_path;
+
+        if !target_path.exists() {
+            log_warning(&format!(
+                "Source file for {} not found: {}",
+                entry.name,
+                target_path.display()
+            ));
+            continue;
+        }
+
+        // Get the encrypted destination path
+        let encrypted_path = get_encrypted_path(&entry.source_path, entry.encrypt_filename);
+        let backup_destination = encrypted_backup_dir.join(&encrypted_path);
+
+        // Ensure parent directory exists
+        if let Some(parent) = backup_destination.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            log_warning(&format!(
+                "Failed to create backup directory for {}: {}",
+                entry.name, e
+            ));
+            continue;
+        }
+
+        // Encrypt and backup the file
+        match encrypt_file(target_path, &backup_destination, password) {
+            Ok(()) => {
+                println!("🔐 Backed up {} ({})", entry.name, id);
+                log(&format!(
+                    "Backed up encrypted {} from {}",
+                    entry.name,
+                    target_path.display()
+                ));
+            }
+            Err(e) => {
+                log_warning(&format!("Failed to backup encrypted {}: {}", entry.name, e));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,20 +430,28 @@ mod tests {
 
     #[test]
     fn test_backup_task_name() {
-        let task = BackupTask::new(create_test_profile());
+        let task = BackupTask::new(create_test_profile(), true);
         assert_eq!(task.name(), "Backup");
     }
 
     #[test]
     fn test_backup_task_new() {
         let profile = create_test_profile();
-        let task = BackupTask::new(profile.clone());
+        let task = BackupTask::new(profile.clone(), false);
         assert_eq!(task.profile.name, profile.name);
+        assert!(!task.skip_encrypted);
+    }
+
+    #[test]
+    fn test_backup_task_new_skip_encrypted() {
+        let profile = create_test_profile();
+        let task = BackupTask::new(profile.clone(), true);
+        assert!(task.skip_encrypted);
     }
 
     #[test]
     fn test_backup_task_dry_run() {
-        let task = BackupTask::new(create_test_profile());
+        let task = BackupTask::new(create_test_profile(), true);
         // Should not panic - just verify it returns successfully
         let _ops = task.dry_run();
     }
@@ -454,14 +579,14 @@ mod tests {
 
     #[test]
     fn test_backup_task_with_profile() {
-        let task = BackupTask::new(ActiveProfile::with_profile("work"));
+        let task = BackupTask::new(ActiveProfile::with_profile("work"), true);
         let _ops = task.dry_run();
         // Just verify it doesn't panic
     }
 
     #[test]
     fn test_backup_task_common_only() {
-        let task = BackupTask::new(ActiveProfile::common_only());
+        let task = BackupTask::new(ActiveProfile::common_only(), true);
         let _ops = task.dry_run();
         // Just verify it doesn't panic
     }

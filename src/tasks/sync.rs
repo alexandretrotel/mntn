@@ -138,7 +138,10 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
 
         if args.auto_restore {
             println!("Auto-restoring configurations...");
-            crate::tasks::restore::run_with_args(crate::cli::RestoreArgs { dry_run: false });
+            crate::tasks::restore::run_with_args(crate::cli::RestoreArgs {
+                dry_run: false,
+                skip_encrypted: true,
+            });
         }
     }
 

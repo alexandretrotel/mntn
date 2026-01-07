@@ -5,8 +5,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::utils::paths::{
-    get_active_profile_name, get_backup_common_path, get_backup_profile_path, get_backup_root,
-    get_profile_config_path,
+    ENCRYPTED_DIR, get_active_profile_name, get_backup_common_path, get_backup_profile_path,
+    get_backup_root, get_profile_config_path,
 };
 
 /// A profile definition stored in profile.json
@@ -200,6 +200,61 @@ impl ActiveProfile {
             .filter(|(path, _)| path.exists())
             .map(|(path, layer)| ResolvedSource { path, layer })
             .collect()
+    }
+
+    /// Resolves the encrypted source file from the layered backup structure.
+    /// Looks in the 'encrypted/' subdirectory of each layer.
+    /// Priority: profile > common > legacy
+    pub fn resolve_encrypted_source(&self, source_path: &str) -> Option<ResolvedSource> {
+        let candidates = self.get_candidate_encrypted_sources(source_path);
+
+        for (path, layer) in candidates {
+            if path.exists() {
+                return Some(ResolvedSource { path, layer });
+            }
+        }
+
+        None
+    }
+
+    /// Gets all candidate encrypted source paths in priority order.
+    /// These are in the 'encrypted/' subdirectory of each layer.
+    pub fn get_candidate_encrypted_sources(
+        &self,
+        source_path: &str,
+    ) -> Vec<(PathBuf, SourceLayer)> {
+        let mut candidates = Vec::new();
+
+        // Profile layer (highest priority if set)
+        if let Some(profile_name) = &self.name {
+            candidates.push((
+                get_backup_profile_path(profile_name)
+                    .join(ENCRYPTED_DIR)
+                    .join(source_path),
+                SourceLayer::Profile,
+            ));
+        }
+
+        // Common layer
+        candidates.push((
+            get_backup_common_path()
+                .join(ENCRYPTED_DIR)
+                .join(source_path),
+            SourceLayer::Common,
+        ));
+
+        // Legacy layer (lowest priority)
+        candidates.push((
+            get_backup_root().join(ENCRYPTED_DIR).join(source_path),
+            SourceLayer::Legacy,
+        ));
+
+        candidates
+    }
+
+    /// Returns the encrypted backup directory for this profile
+    pub fn get_encrypted_backup_path(&self) -> PathBuf {
+        self.get_backup_path().join(ENCRYPTED_DIR)
     }
 }
 
@@ -449,5 +504,57 @@ mod tests {
         let profile = ActiveProfile::common_only();
         let path = profile.get_backup_path();
         assert!(path.to_string_lossy().contains("common"));
+    }
+
+    #[test]
+    fn test_get_candidate_encrypted_sources_with_profile() {
+        let profile = ActiveProfile::with_profile("test-profile");
+        let candidates = profile.get_candidate_encrypted_sources("ssh/config.age");
+
+        // Should have 3 candidates: profile, common, legacy
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].1, SourceLayer::Profile);
+        assert_eq!(candidates[1].1, SourceLayer::Common);
+        assert_eq!(candidates[2].1, SourceLayer::Legacy);
+
+        // All paths should contain 'encrypted'
+        for (path, _) in &candidates {
+            assert!(path.to_string_lossy().contains("encrypted"));
+        }
+    }
+
+    #[test]
+    fn test_get_candidate_encrypted_sources_without_profile() {
+        let profile = ActiveProfile::common_only();
+        let candidates = profile.get_candidate_encrypted_sources("ssh/config.age");
+
+        // Should have 2 candidates: common, legacy (no profile layer)
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].1, SourceLayer::Common);
+        assert_eq!(candidates[1].1, SourceLayer::Legacy);
+    }
+
+    #[test]
+    fn test_resolve_encrypted_source_returns_none_when_no_files_exist() {
+        let profile = ActiveProfile::with_profile("nonexistent-profile");
+        let result = profile.resolve_encrypted_source("definitely_nonexistent_12345.age");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_encrypted_backup_path_with_profile() {
+        let profile = ActiveProfile::with_profile("work");
+        let path = profile.get_encrypted_backup_path();
+        assert!(path.to_string_lossy().contains("profiles"));
+        assert!(path.to_string_lossy().contains("work"));
+        assert!(path.to_string_lossy().contains("encrypted"));
+    }
+
+    #[test]
+    fn test_get_encrypted_backup_path_common_only() {
+        let profile = ActiveProfile::common_only();
+        let path = profile.get_encrypted_backup_path();
+        assert!(path.to_string_lossy().contains("common"));
+        assert!(path.to_string_lossy().contains("encrypted"));
     }
 }
