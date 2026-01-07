@@ -260,7 +260,7 @@ fn toggle_entry(id: String, enable: bool) {
             }
 
             let entry = registry.get_entry(&id).unwrap();
-            let action = if enable { "enabled" } else { "disabled" };
+            let action = if enable { "Enabled" } else { "Disabled" };
             log_success(&format!("{} entry '{}'", action, entry.name));
             log(&format!(
                 "{} encrypted registry entry: {} ({})",
