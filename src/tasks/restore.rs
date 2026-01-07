@@ -246,7 +246,10 @@ fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> 
 
 /// Restores encrypted configuration files based on the encrypted registry entries.
 /// Returns a tuple of (restored_count, skipped_count).
-fn restore_encrypted_config_files(profile: &ActiveProfile, password: &str) -> (u32, u32) {
+fn restore_encrypted_config_files(
+    profile: &ActiveProfile,
+    password: &age::secrecy::Secret<String>,
+) -> (u32, u32) {
     let registry_path = get_encrypted_registry_path();
     let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,

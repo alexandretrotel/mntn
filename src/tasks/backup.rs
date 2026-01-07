@@ -348,7 +348,10 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
 }
 
 /// Backs up encrypted configuration files based on the encrypted registry entries
-fn backup_encrypted_config_files(encrypted_backup_dir: &Path, password: &str) {
+fn backup_encrypted_config_files(
+    encrypted_backup_dir: &Path,
+    password: &age::secrecy::Secret<String>,
+) {
     let registry_path = get_encrypted_registry_path();
     let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,
