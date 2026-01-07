@@ -3,6 +3,7 @@ use crate::logger::{log, log_error, log_success};
 use crate::registries::configs_registry::{ConfigsRegistry, RegistryEntry};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_registry_path;
+use shellexpand;
 
 /// Configs registry management task
 pub struct ConfigsRegistryTask {
@@ -172,11 +173,13 @@ fn add_entry(
         return;
     }
 
-    let target_path = std::path::PathBuf::from(target);
+    let expanded_source = shellexpand::tilde(&source).to_string();
+    let expanded_target = shellexpand::tilde(&target).to_string();
+    let target_path = std::path::PathBuf::from(expanded_target);
 
     let entry = RegistryEntry {
         name: name.clone(),
-        source_path: source,
+        source_path: expanded_source,
         target_path,
         enabled: true,
         description,
