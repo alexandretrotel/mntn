@@ -36,7 +36,7 @@ shellexpand = "3.1.1"
 tempfile = "3.23.0"
 trash = "5.2.2"
 which = "8.0.0"
-whoami = "1.6.1"
+whoami = "2.0.0"
 libc = "0.2.178"
 signal-hook = "0.3.18"
 
