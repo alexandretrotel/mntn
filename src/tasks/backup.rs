@@ -9,6 +9,7 @@ use crate::utils::paths::{
     get_encrypted_registry_path, get_package_registry_path, get_packages_dir, get_registry_path,
 };
 use crate::utils::system::{rsync_directory, run_cmd};
+use age::secrecy::SecretString;
 use rayon::prelude::*;
 use std::fs;
 use std::io::Write;
@@ -348,10 +349,7 @@ fn backup_directory(source: &PathBuf, destination: &PathBuf) -> std::io::Result<
 }
 
 /// Backs up encrypted configuration files based on the encrypted registry entries
-fn backup_encrypted_config_files(
-    encrypted_backup_dir: &Path,
-    password: &age::secrecy::Secret<String>,
-) {
+fn backup_encrypted_config_files(encrypted_backup_dir: &Path, password: &SecretString) {
     let registry_path = get_encrypted_registry_path();
     let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,

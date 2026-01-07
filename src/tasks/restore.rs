@@ -6,6 +6,7 @@ use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{get_encrypted_registry_path, get_registry_path};
 use crate::utils::system::rsync_directory;
+use age::secrecy::SecretString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -246,10 +247,7 @@ fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> 
 
 /// Restores encrypted configuration files based on the encrypted registry entries.
 /// Returns a tuple of (restored_count, skipped_count).
-fn restore_encrypted_config_files(
-    profile: &ActiveProfile,
-    password: &age::secrecy::Secret<String>,
-) -> (u32, u32) {
+fn restore_encrypted_config_files(profile: &ActiveProfile, password: &SecretString) -> (u32, u32) {
     let registry_path = get_encrypted_registry_path();
     let registry = match EncryptedConfigsRegistry::load_or_create(&registry_path) {
         Ok(registry) => registry,

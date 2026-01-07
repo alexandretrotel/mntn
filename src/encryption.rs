@@ -1,3 +1,4 @@
+use age::secrecy::SecretString;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -6,9 +7,7 @@ use std::path::Path;
 
 /// Prompts the user for a password securely (input is hidden)
 /// If `confirm` is true, asks for password confirmation
-pub fn prompt_password(
-    confirm: bool,
-) -> Result<age::secrecy::Secret<String>, Box<dyn std::error::Error>> {
+pub fn prompt_password(confirm: bool) -> Result<SecretString, Box<dyn std::error::Error>> {
     let password = rpassword::prompt_password("Enter encryption password: ")?;
 
     if password.is_empty() {
@@ -23,14 +22,14 @@ pub fn prompt_password(
     }
 
     // Wrap the password immediately in a Secret so the plain String does not live longer than necessary.
-    Ok(age::secrecy::Secret::new(password))
+    Ok(SecretString::new(password.into()))
 }
 
 /// Encrypts a file using age with password-based encryption
 pub fn encrypt_file(
     source: &Path,
     dest: &Path,
-    password: &age::secrecy::Secret<String>,
+    password: &SecretString,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let content = fs::read(source)?;
 
@@ -53,17 +52,16 @@ pub fn encrypt_file(
 pub fn decrypt_file(
     source: &Path,
     dest: &Path,
-    password: &age::secrecy::Secret<String>,
+    password: &SecretString,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let encrypted = fs::read(source)?;
 
-    let decryptor = match age::Decryptor::new(&encrypted[..])? {
-        age::Decryptor::Passphrase(d) => d,
-        _ => return Err("Unexpected decryptor type".into()),
-    };
+    let decryptor = age::Decryptor::new(&encrypted[..])?;
+
+    let identity = age::scrypt::Identity::new(password.clone());
 
     let mut decrypted = vec![];
-    let mut reader = decryptor.decrypt(password, None)?;
+    let mut reader = decryptor.decrypt(std::iter::once(&identity as &dyn age::Identity))?;
     reader.read_to_end(&mut decrypted)?;
 
     if let Some(parent) = dest.parent() {
@@ -120,7 +118,7 @@ mod tests {
         let original_content = b"Hello, this is secret content!";
         fs::write(&source, original_content).unwrap();
 
-        let password = age::secrecy::Secret::new("test-password-123".to_string());
+        let password = SecretString::new("test-password-123".to_string().into());
 
         encrypt_file(&source, &encrypted, &password).unwrap();
         assert!(encrypted.exists());
@@ -145,9 +143,9 @@ mod tests {
 
         fs::write(&source, b"secret content").unwrap();
 
-        let correct = age::secrecy::Secret::new("correct-password".to_string());
+        let correct = SecretString::new("correct-password".to_string().into());
         encrypt_file(&source, &encrypted, &correct).unwrap();
-        let wrong = age::secrecy::Secret::new("wrong-password".to_string());
+        let wrong = SecretString::new("wrong-password".to_string().into());
         let result = decrypt_file(&encrypted, &decrypted, &wrong);
 
         assert!(result.is_err());
@@ -197,7 +195,7 @@ mod tests {
         let binary_content: Vec<u8> = (0..=255).collect();
         fs::write(&source, &binary_content).unwrap();
 
-        let password = age::secrecy::Secret::new("binary-test".to_string());
+        let password = SecretString::new("binary-test".to_string().into());
         encrypt_file(&source, &encrypted, &password).unwrap();
         decrypt_file(&encrypted, &decrypted, &password).unwrap();
 
