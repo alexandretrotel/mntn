@@ -81,9 +81,9 @@ pub fn decrypt_file(
     Ok(())
 }
 
-/// Encrypts a filename using SHA256 hash and base64 encoding
+/// Hashes a filename using SHA256 and base64 encoding for obfuscation
 /// Returns a deterministic, filesystem-safe string
-pub fn encrypt_filename(filename: &str) -> String {
+pub fn hash_filename(filename: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(filename.as_bytes());
     let hash = hasher.finalize();
@@ -96,7 +96,7 @@ pub fn encrypt_filename(filename: &str) -> String {
 pub fn get_encrypted_path(source_path: &str, encrypt_names: bool) -> String {
     if encrypt_names {
         // Hash the entire path to create a unique, unreadable filename
-        format!("{}.age", encrypt_filename(source_path))
+        format!("{}.age", hash_filename(source_path))
     } else {
         // Keep the original path structure but add .age extension
         format!("{}.age", source_path)
@@ -152,19 +152,19 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_filename() {
+    fn test_hash_filename() {
         let filename = "ssh/id_ed25519";
-        let encrypted = encrypt_filename(filename);
+        let hashed = hash_filename(filename);
 
         // Should be deterministic
-        assert_eq!(encrypted, encrypt_filename(filename));
+        assert_eq!(hashed, hash_filename(filename));
 
         // Should be different from original
-        assert_ne!(encrypted, filename);
+        assert_ne!(hashed, filename);
 
         // Should be base64 URL-safe (no special chars except - and _)
         assert!(
-            encrypted
+            hashed
                 .chars()
                 .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         );
