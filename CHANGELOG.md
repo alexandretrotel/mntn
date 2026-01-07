@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## v2.1.0
+
+### Added
+- **Encrypted Configuration Registry:** Added secure password-based encryption for sensitive configuration files (SSH keys, credentials) with age encryption, filename encryption support, and seamless integration with backup/restore commands.
+
 ## v2.0.0
 
 ### Added
