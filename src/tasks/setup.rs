@@ -51,6 +51,17 @@ pub fn run() {
             .prompt()
     });
 
+    let include_encrypted = if should_backup {
+        prompt_or_abort(|| {
+            Confirm::new("Include encrypted configs in initial backup? (will prompt for a password)")
+                .with_default(false)
+                .with_help_message("Encrypted configs are skipped by default during setup to avoid prompting for a password. Choose yes to include them now.")
+                .prompt()
+        })
+    } else {
+        false
+    };
+
     let should_install_tasks = prompt_or_abort(|| {
         Confirm::new("Install scheduled backup tasks?")
             .with_default(false)
@@ -70,6 +81,11 @@ pub fn run() {
     }
     if should_backup {
         println!("   ✓ Run initial backup");
+        if include_encrypted {
+            println!("   ✓ Include encrypted configs in initial backup");
+        } else {
+            println!("   ⚠ Encrypted configs will be skipped during initial backup");
+        }
     }
     if should_install_tasks {
         println!("   ✓ Install scheduled tasks");
@@ -102,7 +118,7 @@ pub fn run() {
     }
 
     if should_backup {
-        run_backup(&profile_name);
+        run_backup(&profile_name, include_encrypted);
     }
 
     if should_install_tasks {
@@ -227,7 +243,7 @@ fn run_migration() {
     }
 }
 
-fn run_backup(profile_name: &Option<String>) {
+fn run_backup(profile_name: &Option<String>, include_encrypted: bool) {
     println!("Running initial backup...");
 
     let profile = match profile_name {
@@ -235,7 +251,14 @@ fn run_backup(profile_name: &Option<String>) {
         None => ActiveProfile::common_only(),
     };
 
-    let mut task = crate::tasks::backup::BackupTask::new(profile, true);
+    let skip_encrypted = !include_encrypted;
+    if include_encrypted {
+        println!("   Note: Encrypted configs will be included and you will be prompted for a password if needed.");
+    } else {
+        println!("   Note: Encrypted configs are skipped to avoid prompting for a password during initial setup.");
+    }
+
+    let mut task = crate::tasks::backup::BackupTask::new(profile, skip_encrypted);
     if let Err(e) = crate::tasks::core::Task::execute(&mut task) {
         log_error("Error during backup", e);
     }
