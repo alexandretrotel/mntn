@@ -89,7 +89,7 @@ impl Task for EncryptedConfigsRegistryTask {
                 ));
             }
             EncryptedRegistryActions::Toggle { id, enable } => {
-                let action = if *enable { "enable" } else { "disable" };
+                let action = if *enable { "Enable" } else { "Disable" };
                 operations.push(PlannedOperation::with_target(
                     format!("{} encrypted registry entry ({})", action, id),
                     registry_path.display().to_string(),

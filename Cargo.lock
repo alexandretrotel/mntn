@@ -1071,7 +1071,7 @@ dependencies = [
 
 [[package]]
 name = "mntn"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "age",
  "base64 0.22.1",
