@@ -50,7 +50,7 @@ A Rust-based CLI tool for system maintenance and dotfiles management with a prof
 - **Registry**: Centralized management of configuration files and directories.
 - **Encrypted Registry**: Secure management of sensitive configuration files with password-based encryption.
 - **Sync**: Git integration for synchronizing configurations across machines.
-- **Validate**: Checks configuration files and layer resolution status.
+- **Validate**: Checks configuration files, layer resolution status, and file mismatches with backups.
 
 ## Installation
 
@@ -389,6 +389,7 @@ mntn validate
 - **Layer resolution**: Shows which layer each config comes from
 - **JSON configs**: Validates VS Code, Zed settings syntax
 - **Legacy symlinks**: Detects old symlink-based configurations
+- **File mismatches**: Compares current filesystem files with their backups and warns if they differ
 
 **Example output:**
 
@@ -400,9 +401,39 @@ Validating configuration...
  Layer Resolution OK
  JSON Configuration Files OK
  Legacy Symlink Check OK
+ File Mismatch Check OK
 
 Validation complete: 0 error(s), 0 warning(s)
 ```
+
+**File Mismatch Validation:**
+
+The validator automatically compares your current filesystem files with their backed-up versions in `~/.mntn/backup/`. This helps you:
+
+- **Detect unsaved changes**: See if you've edited files locally but haven't backed them up
+- **Identify drift**: Find files that differ from your backups
+- **Encrypted files**: For encrypted registry entries, you'll be prompted for a password once to decrypt and compare
+
+**Example with mismatches:**
+
+```text
+Validating configuration...
+   Profile: profile=work
+
+ Registry Files OK
+ Layer Resolution OK
+ JSON Configuration Files OK
+ Legacy Symlink Check OK
+ File Mismatch Check
+ ! VSCode Settings (vscode_settings): File differs from backup
+   Fix: Run 'mntn backup' to update backup or 'mntn restore' to restore from backup
+ ! SSH Config (ssh_config): Encrypted file differs from backup
+   Fix: Run 'mntn backup' to update backup or 'mntn restore' to restore from backup
+
+Validation complete: 0 error(s), 2 warning(s)
+```
+
+**Note:** If you enter an incorrect password for encrypted files, the validator will skip encrypted file validation and show a warning.
 
 ### Package Registry Management
 

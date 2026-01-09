@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## v2.2.0
+
+### Added
+- **File Mismatch Validation:** The `validate` command now automatically compares current filesystem files with their backups in `~/.mntn/backup/` and warns if they differ. Supports both regular and encrypted registry entries, with password prompting for encrypted files. Helps detect unsaved changes and configuration drift.
+
 ## v2.1.0
 
 ### Added

@@ -1,12 +1,17 @@
+use crate::encryption::{decrypt_file, get_encrypted_path, prompt_password};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::registries::configs_registry::ConfigsRegistry;
+use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
-use crate::utils::paths::{get_backup_root, get_package_registry_path, get_registry_path};
+use crate::utils::paths::{
+    get_backup_root, get_encrypted_registry_path, get_package_registry_path, get_registry_path,
+};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use tempfile::NamedTempFile;
 
 /// Severity level for validation errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -340,6 +345,228 @@ impl Validator for LayerValidator {
     }
 }
 
+/// Validates that current filesystem files match their backups
+pub struct FileMismatchValidator {
+    profile: ActiveProfile,
+}
+
+impl FileMismatchValidator {
+    pub fn new(profile: ActiveProfile) -> Self {
+        Self { profile }
+    }
+}
+
+impl Validator for FileMismatchValidator {
+    fn validate(&self) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+
+        // Validate regular configs registry
+        let registry_path = get_registry_path();
+        let registry = match ConfigsRegistry::load_or_create(&registry_path) {
+            Ok(r) => r,
+            Err(e) => {
+                errors.push(ValidationError::error(format!(
+                    "Could not load configs registry: {}",
+                    e
+                )));
+                return errors;
+            }
+        };
+
+        for (id, entry) in registry.get_enabled_entries() {
+            // Skip if target doesn't exist on filesystem
+            if !entry.target_path.exists() {
+                continue;
+            }
+
+            // Skip directories
+            if entry.target_path.is_dir() {
+                continue;
+            }
+
+            // Resolve backup path
+            if let Some(resolved) = self.profile.resolve_source(&entry.source_path) {
+                // Skip if backup doesn't exist
+                if !resolved.path.exists() {
+                    continue;
+                }
+
+                // Skip if backup is a directory
+                if resolved.path.is_dir() {
+                    continue;
+                }
+
+                // Compare file contents
+                let backup_content = match fs::read(&resolved.path) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        errors.push(ValidationError::warning(format!(
+                            "Could not read backup file for {} ({}): {}",
+                            entry.name, id, e
+                        )));
+                        continue;
+                    }
+                };
+
+                let current_content = match fs::read(&entry.target_path) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        errors.push(ValidationError::warning(format!(
+                            "Could not read current file for {} ({}): {}",
+                            entry.name, id, e
+                        )));
+                        continue;
+                    }
+                };
+
+                if backup_content != current_content {
+                    errors.push(
+                        ValidationError::warning(format!(
+                            "{} ({}): File differs from backup",
+                            entry.name, id
+                        ))
+                        .with_fix("Run 'mntn backup' to update backup or 'mntn restore' to restore from backup"),
+                    );
+                }
+            }
+        }
+
+        // Validate encrypted configs registry
+        let encrypted_registry_path = get_encrypted_registry_path();
+        let encrypted_registry =
+            match EncryptedConfigsRegistry::load_or_create(&encrypted_registry_path) {
+                Ok(r) => r,
+                Err(e) => {
+                    errors.push(ValidationError::error(format!(
+                        "Could not load encrypted configs registry: {}",
+                        e
+                    )));
+                    return errors;
+                }
+            };
+
+        // Prompt for password once
+        let password = match prompt_password(false) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                errors.push(ValidationError::warning(format!(
+                    "Skipping encrypted file validation: {}",
+                    e
+                )));
+                return errors;
+            }
+        };
+
+        for (id, entry) in encrypted_registry.get_enabled_entries() {
+            // Skip if target doesn't exist on filesystem
+            if !entry.target_path.exists() {
+                continue;
+            }
+
+            // Skip directories
+            if entry.target_path.is_dir() {
+                continue;
+            }
+
+            // Get encrypted path
+            let encrypted_path = get_encrypted_path(&entry.source_path, entry.encrypt_filename);
+
+            // Resolve encrypted backup path
+            if let Some(resolved) = self.profile.resolve_encrypted_source(&encrypted_path) {
+                // Skip if backup doesn't exist
+                if !resolved.path.exists() {
+                    continue;
+                }
+
+                // Skip if backup is a directory
+                if resolved.path.is_dir() {
+                    continue;
+                }
+
+                // Create temporary file for decryption (auto-cleanup on drop)
+                let temp_file = match NamedTempFile::new() {
+                    Ok(f) => f,
+                    Err(e) => {
+                        errors.push(ValidationError::warning(format!(
+                            "Could not create temporary file for {} ({}): {}",
+                            entry.name, id, e
+                        )));
+                        continue;
+                    }
+                };
+                let temp_path = temp_file.path().to_path_buf();
+
+                // Try to decrypt
+                match decrypt_file(&resolved.path, &temp_path, &password) {
+                    Ok(()) => {
+                        // Read decrypted content
+                        let backup_content = match fs::read(&temp_path) {
+                            Ok(content) => content,
+                            Err(e) => {
+                                errors.push(ValidationError::warning(format!(
+                                    "Could not read decrypted backup file for {} ({}): {}",
+                                    entry.name, id, e
+                                )));
+                                continue;
+                            }
+                        };
+
+                        // Read current file
+                        let current_content = match fs::read(&entry.target_path) {
+                            Ok(content) => content,
+                            Err(e) => {
+                                errors.push(ValidationError::warning(format!(
+                                    "Could not read current file for {} ({}): {}",
+                                    entry.name, id, e
+                                )));
+                                continue;
+                            }
+                        };
+
+                        // Compare contents
+                        if backup_content != current_content {
+                            errors.push(
+                                ValidationError::warning(format!(
+                                    "{} ({}): Encrypted file differs from backup",
+                                    entry.name, id
+                                ))
+                                .with_fix("Run 'mntn backup' to update backup or 'mntn restore' to restore from backup"),
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        // Check if it's a password error
+                        let error_msg = e.to_string().to_lowercase();
+                        if error_msg.contains("password")
+                            || error_msg.contains("decrypt")
+                            || error_msg.contains("identity")
+                        {
+                            // Wrong password - skip encrypted registry validation
+                            errors.push(ValidationError::warning(
+                                "Skipping encrypted file validation: Incorrect password"
+                                    .to_string(),
+                            ));
+                            return errors;
+                        } else {
+                            // Other error
+                            errors.push(ValidationError::warning(format!(
+                                "Could not decrypt backup file for {} ({}): {}",
+                                entry.name, id, e
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
+        errors
+    }
+
+    fn name(&self) -> &str {
+        "File Mismatch Check"
+    }
+}
+
 /// Validates registry files are valid and consistent
 pub struct RegistryValidator;
 
@@ -425,6 +652,7 @@ impl ConfigValidator {
             Box::new(LayerValidator::new(profile.clone())),
             Box::new(JsonConfigValidator::new(profile.clone())),
             Box::new(LegacySymlinkValidator::new()),
+            Box::new(FileMismatchValidator::new(profile.clone())),
         ];
         Self { validators }
     }
@@ -484,6 +712,7 @@ impl Task for ValidateTask {
             PlannedOperation::new("Validate layer resolution"),
             PlannedOperation::new("Validate JSON configuration files"),
             PlannedOperation::new("Check for legacy symlinks"),
+            PlannedOperation::new("Check file mismatches with backups"),
         ]
     }
 }
@@ -722,19 +951,20 @@ mod tests {
         let task = ValidateTask::new(profile);
         let ops = task.dry_run();
 
-        assert_eq!(ops.len(), 4);
+        assert_eq!(ops.len(), 5);
         assert!(ops.iter().any(|op| op.description.contains("registry")));
         assert!(ops.iter().any(|op| op.description.contains("layer")));
         assert!(ops.iter().any(|op| op.description.contains("JSON")));
         assert!(ops.iter().any(|op| op.description.contains("legacy")));
+        assert!(ops.iter().any(|op| op.description.contains("mismatch")));
     }
 
     #[test]
     fn test_config_validator_new() {
         let profile = ActiveProfile::common_only();
         let validator = ConfigValidator::new(profile);
-        // Should have 4 validators
-        assert_eq!(validator.validators.len(), 4);
+        // Should have 5 validators
+        assert_eq!(validator.validators.len(), 5);
     }
 
     #[test]
