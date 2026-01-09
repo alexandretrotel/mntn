@@ -445,18 +445,8 @@ impl Validator for FileMismatchValidator {
                 }
             };
 
-        // Prompt for password once
-        let password = match prompt_password(false) {
-            Ok(pwd) => pwd,
-            Err(e) => {
-                errors.push(ValidationError::warning(format!(
-                    "Skipping encrypted file validation: {}",
-                    e
-                )));
-                return errors;
-            }
-        };
-
+        // First, check if there are any enabled entries with applicable backups/targets
+        let mut entries_to_validate = Vec::new();
         for (id, entry) in encrypted_registry.get_enabled_entries() {
             // Skip if target doesn't exist on filesystem
             if !entry.target_path.exists() {
@@ -483,77 +473,98 @@ impl Validator for FileMismatchValidator {
                     continue;
                 }
 
-                // Create temporary file for decryption (auto-cleanup on drop)
-                let temp_file = match NamedTempFile::new() {
-                    Ok(f) => f,
-                    Err(e) => {
-                        errors.push(ValidationError::warning(format!(
-                            "Could not create temporary file for {} ({}): {}",
-                            entry.name, id, e
-                        )));
-                        continue;
-                    }
-                };
-                let temp_path = temp_file.path().to_path_buf();
+                // This entry has both target and backup, so it needs validation
+                entries_to_validate.push((id.clone(), entry.clone(), resolved));
+            }
+        }
 
-                // Try to decrypt
-                match decrypt_file(&resolved.path, &temp_path, &password) {
-                    Ok(()) => {
-                        // Read decrypted content
-                        let backup_content = match fs::read(&temp_path) {
-                            Ok(content) => content,
-                            Err(e) => {
-                                errors.push(ValidationError::warning(format!(
-                                    "Could not read decrypted backup file for {} ({}): {}",
-                                    entry.name, id, e
-                                )));
-                                continue;
-                            }
-                        };
+        // Only prompt for password if there are entries to validate
+        if entries_to_validate.is_empty() {
+            return errors;
+        }
 
-                        // Read current file
-                        let current_content = match fs::read(&entry.target_path) {
-                            Ok(content) => content,
-                            Err(e) => {
-                                errors.push(ValidationError::warning(format!(
-                                    "Could not read current file for {} ({}): {}",
-                                    entry.name, id, e
-                                )));
-                                continue;
-                            }
-                        };
+        // Prompt for password once
+        let password = match prompt_password(false) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                errors.push(ValidationError::warning(format!(
+                    "Skipping encrypted file validation: {}",
+                    e
+                )));
+                return errors;
+            }
+        };
 
-                        // Compare contents
-                        if backup_content != current_content {
-                            errors.push(
-                                ValidationError::warning(format!(
-                                    "{} ({}): Encrypted file differs from backup",
-                                    entry.name, id
-                                ))
-                                .with_fix("Run 'mntn backup' to update backup or 'mntn restore' to restore from backup"),
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        // Check if it's a password error
-                        let error_msg = e.to_string().to_lowercase();
-                        if error_msg.contains("password")
-                            || error_msg.contains("decrypt")
-                            || error_msg.contains("identity")
-                        {
-                            // Wrong password - skip encrypted registry validation
-                            errors.push(ValidationError::warning(
-                                "Skipping encrypted file validation: Incorrect password"
-                                    .to_string(),
-                            ));
-                            return errors;
-                        } else {
-                            // Other error
+        for (id, entry, resolved) in entries_to_validate {
+            // Create temporary file for decryption (auto-cleanup on drop)
+            let temp_file = match NamedTempFile::new() {
+                Ok(f) => f,
+                Err(e) => {
+                    errors.push(ValidationError::warning(format!(
+                        "Could not create temporary file for {} ({}): {}",
+                        entry.name, id, e
+                    )));
+                    continue;
+                }
+            };
+            let temp_path = temp_file.path().to_path_buf();
+
+            // Try to decrypt
+            match decrypt_file(&resolved.path, &temp_path, &password) {
+                Ok(()) => {
+                    // Read decrypted content
+                    let backup_content = match fs::read(&temp_path) {
+                        Ok(content) => content,
+                        Err(e) => {
                             errors.push(ValidationError::warning(format!(
-                                "Could not decrypt backup file for {} ({}): {}",
+                                "Could not read decrypted backup file for {} ({}): {}",
                                 entry.name, id, e
                             )));
+                            continue;
                         }
+                    };
+
+                    // Read current file
+                    let current_content = match fs::read(&entry.target_path) {
+                        Ok(content) => content,
+                        Err(e) => {
+                            errors.push(ValidationError::warning(format!(
+                                "Could not read current file for {} ({}): {}",
+                                entry.name, id, e
+                            )));
+                            continue;
+                        }
+                    };
+
+                    // Compare contents
+                    if backup_content != current_content {
+                        errors.push(
+                            ValidationError::warning(format!(
+                                "{} ({}): Encrypted file differs from backup",
+                                entry.name, id
+                            ))
+                            .with_fix("Run 'mntn backup' to update backup or 'mntn restore' to restore from backup"),
+                        );
+                    }
+                }
+                Err(e) => {
+                    // Check if it's a password error
+                    let error_msg = e.to_string().to_lowercase();
+                    if error_msg.contains("password")
+                        || error_msg.contains("decrypt")
+                        || error_msg.contains("identity")
+                    {
+                        // Wrong password - skip encrypted registry validation
+                        errors.push(ValidationError::warning(
+                            "Skipping encrypted file validation: Incorrect password".to_string(),
+                        ));
+                        return errors;
+                    } else {
+                        // Other error
+                        errors.push(ValidationError::warning(format!(
+                            "Could not decrypt backup file for {} ({}): {}",
+                            entry.name, id, e
+                        )));
                     }
                 }
             }
