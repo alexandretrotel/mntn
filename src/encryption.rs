@@ -91,12 +91,24 @@ pub fn hash_filename(filename: &str) -> String {
 }
 
 /// Gets the encrypted file path based on source path and encryption settings
-/// If encrypt_names is true, the filename portion is hashed
+/// If encrypt_names is true, both filename and parent directories are hashed for full obfuscation
+/// while maintaining directory structure for organization
 /// Always appends .age extension
 pub fn get_encrypted_path(source_path: &str, encrypt_names: bool) -> String {
     if encrypt_names {
-        // Hash the entire path to create a unique, unreadable filename
-        format!("{}.age", hash_filename(source_path))
+        let path = Path::new(source_path);
+        let filename_hash = hash_filename(source_path);
+
+        if let Some(parent) = path.parent()
+            && let Some(parent_str) = parent.to_str()
+            && !parent_str.is_empty()
+        {
+            // Hash the parent directory too for full obfuscation
+            let parent_hash = hash_filename(parent_str);
+            return format!("{}/{}.age", parent_hash, filename_hash);
+        }
+
+        format!("{}.age", filename_hash)
     } else {
         // Keep the original path structure but add .age extension
         format!("{}.age", source_path)
@@ -180,8 +192,20 @@ mod tests {
     fn test_get_encrypted_path_with_name_encryption() {
         let path = get_encrypted_path("ssh/config", true);
         assert!(path.ends_with(".age"));
+        // Parent directory should be hashed (not "ssh")
         assert!(!path.contains("ssh"));
         assert!(!path.contains("config"));
+        // Should have structure: {hash_parent}/{hash_filename}.age
+        assert!(path.contains("/"));
+
+        let path_no_parent = get_encrypted_path("config", true);
+        assert!(path_no_parent.ends_with(".age"));
+        assert!(!path_no_parent.contains("/"));
+
+        // Verify deterministic hashing
+        let path1 = get_encrypted_path("ssh/id_ed25519", true);
+        let path2 = get_encrypted_path("ssh/id_ed25519", true);
+        assert_eq!(path1, path2);
     }
 
     #[test]
