@@ -4,6 +4,9 @@ All notable changes to this project are documented in this file.
 
 ## v2.3.0
 
+### Added
+- **Encryption Password Cache:** Added encrypted local password caching with configurable TTL and optional per-profile overrides.
+
 ### Fixed
 - **Package Registry Output:** Strips ANSI escape codes from package registry command output to keep `skills ls -g` clean.
 
