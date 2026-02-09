@@ -281,7 +281,10 @@ fn run_git_diff_bytes(
     args: &[&str],
     mntn_dir: &Path,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let output = Command::new("git").args(args).current_dir(mntn_dir).output()?;
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(mntn_dir)
+        .output()?;
 
     if !output.status.success() {
         let stderr_len = output.stderr.len();
