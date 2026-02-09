@@ -2,6 +2,7 @@ use regex::Regex;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::sync::LazyLock;
 
 /// Runs a system command with the given arguments and returns its standard output as a `String`.
 ///
@@ -22,11 +23,13 @@ pub fn run_cmd_in_dir(
     run_cmd_impl(cmd, args, Some(dir))
 }
 
-/// Strips ANSI escape codes from a string.
+static ANSI_CSI_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]").unwrap());
+
+/// Strips ANSI CSI escape sequences from a string.
 pub fn strip_ansi_codes(input: &str) -> String {
-    // Matches CSI (Control Sequence Introducer) ANSI escape codes.
-    let re = Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]").unwrap();
-    re.replace_all(input, "").to_string()
+    // Matches CSI (Control Sequence Introducer) ANSI escape sequences.
+    ANSI_CSI_RE.replace_all(input, "").to_string()
 }
 
 /// Returns the current git branch name in the given directory.
