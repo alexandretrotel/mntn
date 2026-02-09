@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## v2.3.0
+
+### Added
+- **Sync Diff Views:** Added `mntn sync --diff` and `mntn sync --diff-stat` to show combined unstaged and staged changes.
+  - Uses `--cached` fallback for older git versions when showing staged diffs.
+
+### Fixed
+- **Package Registry Output:** Strips ANSI escape codes from package registry command output to keep `mntn ls -g` clean.
 ## v2.2.0
 
 ### Added

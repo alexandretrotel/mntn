@@ -7,6 +7,7 @@ use chrono::Utc;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 /// Sync task that synchronizes configurations with a git repository
 pub struct SyncTask {
@@ -259,7 +260,7 @@ fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>>
         (vec!["diff"], vec!["diff", "--staged"])
     };
 
-    let unstaged = run_cmd_in_dir("git", &unstaged_args, &mntn_dir)?;
+    let unstaged = run_git_diff_lossy(&unstaged_args, &mntn_dir)?;
     let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;
 
     println!("Unstaged changes (working tree):");
@@ -280,11 +281,32 @@ fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+fn run_git_diff_lossy(
+    args: &[&str],
+    mntn_dir: &Path,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let output = Command::new("git").args(args).current_dir(mntn_dir).output()?;
+
+    if !output.status.success() {
+        let stderr_len = output.stderr.len();
+        let stderr_msg = String::from_utf8(output.stderr)
+            .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
+        return Err(std::io::Error::other(format!(
+            "Command 'git' failed with status {:?}: {}",
+            output.status.code(),
+            stderr_msg
+        ))
+        .into());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 fn run_staged_diff_with_fallback(
     staged_args: &[&str],
     mntn_dir: &Path,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    match run_cmd_in_dir("git", staged_args, mntn_dir) {
+    match run_git_diff_lossy(staged_args, mntn_dir) {
         Ok(output) => Ok(output),
         Err(_) => {
             let mut cached_args = Vec::with_capacity(staged_args.len());
@@ -295,7 +317,7 @@ fn run_staged_diff_with_fallback(
                     cached_args.push(*arg);
                 }
             }
-            run_cmd_in_dir("git", &cached_args, mntn_dir)
+            run_git_diff_lossy(&cached_args, mntn_dir)
         }
     }
 }
