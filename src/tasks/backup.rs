@@ -1,6 +1,7 @@
-use crate::encryption::{encrypt_file, get_encrypted_path, prompt_password};
+use crate::encryption::{encrypt_file, get_encrypted_path};
 use crate::logger::{log, log_error, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
+use crate::security::get_or_prompt_password;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
@@ -52,7 +53,7 @@ impl Task for BackupTask {
             let encrypted_backup_dir = self.profile.get_encrypted_backup_path();
             fs::create_dir_all(&encrypted_backup_dir)?;
 
-            match prompt_password(true) {
+            match get_or_prompt_password(&self.profile, true) {
                 Ok(password) => {
                     backup_encrypted_config_files(&encrypted_backup_dir, &password);
                 }

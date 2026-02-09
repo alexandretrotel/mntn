@@ -1,9 +1,10 @@
-use crate::encryption::{decrypt_file, get_encrypted_path, prompt_password};
+use crate::encryption::{decrypt_file, get_encrypted_path};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
+use crate::security::{get_or_prompt_password, invalidate_password_cache};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::{
     get_backup_root, get_encrypted_registry_path, get_package_registry_path, get_registry_path,
@@ -484,7 +485,7 @@ impl Validator for FileMismatchValidator {
         }
 
         // Prompt for password once
-        let password = match prompt_password(false) {
+        let password = match get_or_prompt_password(&self.profile, false) {
             Ok(pwd) => pwd,
             Err(e) => {
                 errors.push(ValidationError::warning(format!(
@@ -553,7 +554,9 @@ impl Validator for FileMismatchValidator {
                     if error_msg.contains("password")
                         || error_msg.contains("decrypt")
                         || error_msg.contains("identity")
+                        || error_msg.contains("scrypt")
                     {
+                        invalidate_password_cache(&self.profile);
                         // Wrong password - skip encrypted registry validation
                         errors.push(ValidationError::warning(
                             "Skipping encrypted file validation: Incorrect password".to_string(),

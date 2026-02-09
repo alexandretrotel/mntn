@@ -204,6 +204,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Local secrets (not tracked)
+.secrets/
+
 # Backup directories (optional - uncomment if you don't want to track these)
 # symlinks/
 ";
@@ -230,6 +233,11 @@ fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Er
             let mut file = fs::OpenOptions::new().append(true).open(&gitignore_path)?;
             writeln!(file, "\n# mntn log files\nmntn.log")?;
             log_success("Added mntn.log to existing .gitignore");
+        }
+        if !content.contains(".secrets/") {
+            let mut file = fs::OpenOptions::new().append(true).open(&gitignore_path)?;
+            writeln!(file, "\n# Local secrets (not tracked)\n.secrets/")?;
+            log_success("Added .secrets/ to existing .gitignore");
         }
     }
     Ok(())

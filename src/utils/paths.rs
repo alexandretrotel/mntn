@@ -20,6 +20,12 @@ pub const ACTIVE_PROFILE_FILE: &str = ".active-profile";
 /// Relative path to the directory used for storing encrypted backup files.
 pub const ENCRYPTED_DIR: &str = "encrypted";
 
+/// Relative path to the directory used for storing local secrets (not tracked by git).
+pub const SECRETS_DIR: &str = ".secrets";
+
+/// Relative path to the security configuration file.
+pub const SECURITY_CONFIG_FILE: &str = "security.json";
+
 pub fn get_mntn_dir() -> PathBuf {
     let base_dirs = get_base_dirs();
     let home_dir = base_dirs.home_dir();
@@ -60,6 +66,16 @@ pub fn get_package_registry_path() -> PathBuf {
 /// Returns the path to the encrypted configs registry file
 pub fn get_encrypted_registry_path() -> PathBuf {
     get_mntn_dir().join("encrypted_configs_registry.json")
+}
+
+/// Returns the path to the security configuration file
+pub fn get_security_config_path() -> PathBuf {
+    get_mntn_dir().join(SECURITY_CONFIG_FILE)
+}
+
+/// Returns the path to the secrets directory
+pub fn get_secrets_dir() -> PathBuf {
+    get_mntn_dir().join(SECRETS_DIR)
 }
 
 pub fn get_profile_config_path() -> PathBuf {
@@ -136,6 +152,16 @@ mod tests {
     #[test]
     fn test_active_profile_file_constant() {
         assert_eq!(ACTIVE_PROFILE_FILE, ".active-profile");
+    }
+
+    #[test]
+    fn test_secrets_dir_constant() {
+        assert_eq!(SECRETS_DIR, ".secrets");
+    }
+
+    #[test]
+    fn test_security_config_file_constant() {
+        assert_eq!(SECURITY_CONFIG_FILE, "security.json");
     }
 
     #[test]
