@@ -19,6 +19,8 @@ pub struct SyncTask {
     pub auto_restore: bool,
     pub dry_run: bool,
     pub status: bool,
+    pub diff: bool,
+    pub diff_stat: bool,
 }
 
 impl SyncTask {
@@ -33,6 +35,8 @@ impl SyncTask {
             auto_restore: args.auto_restore,
             dry_run: args.dry_run,
             status: args.status,
+            diff: args.diff,
+            diff_stat: args.diff_stat,
         }
     }
 }
@@ -53,10 +57,20 @@ impl Task for SyncTask {
             auto_restore: self.auto_restore,
             dry_run: self.dry_run,
             status: self.status,
+            diff: self.diff,
+            diff_stat: self.diff_stat,
         };
 
         if args.status {
             show_git_status()?;
+            if !args.diff && !args.diff_stat {
+                return Ok(());
+            }
+        }
+
+        if args.diff || args.diff_stat {
+            let show_stat_only = args.diff_stat && !args.diff;
+            show_git_diff(show_stat_only)?;
             return Ok(());
         }
 
@@ -68,6 +82,23 @@ impl Task for SyncTask {
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
         let mntn_dir = get_mntn_dir();
+
+        if self.status {
+            operations.push(PlannedOperation::new("Show git status"));
+            if !self.diff && !self.diff_stat {
+                return operations;
+            }
+        }
+
+        if self.diff || self.diff_stat {
+            let label = if self.diff_stat && !self.diff {
+                "Show git diff summary"
+            } else {
+                "Show git diff"
+            };
+            operations.push(PlannedOperation::new(label));
+            return operations;
+        }
 
         if self.init {
             operations.push(PlannedOperation::with_target(
@@ -217,6 +248,35 @@ fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
     let mntn_dir = get_mntn_dir();
     let output = run_cmd_in_dir("git", &["status", "--short", "--branch"], &mntn_dir)?;
     println!("{}", output);
+    Ok(())
+}
+
+fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mntn_dir = get_mntn_dir();
+    let (unstaged_args, staged_args) = if show_stat_only {
+        (vec!["diff", "--stat"], vec!["diff", "--staged", "--stat"])
+    } else {
+        (vec!["diff"], vec!["diff", "--staged"])
+    };
+
+    let unstaged = run_cmd_in_dir("git", &unstaged_args, &mntn_dir)?;
+    let staged = run_cmd_in_dir("git", &staged_args, &mntn_dir)?;
+
+    println!("Unstaged changes (working tree):");
+    if unstaged.trim().is_empty() {
+        println!("(none)");
+    } else {
+        println!("{}", unstaged);
+    }
+
+    println!();
+    println!("Staged changes (index):");
+    if staged.trim().is_empty() {
+        println!("(none)");
+    } else {
+        println!("{}", staged);
+    }
+
     Ok(())
 }
 
