@@ -375,18 +375,22 @@ mod tests {
         let old_home = env::var_os("HOME");
         let old_userprofile = env::var_os("USERPROFILE");
 
-        env::set_var("HOME", temp_dir.path());
-        env::set_var("USERPROFILE", temp_dir.path());
+        unsafe {
+            env::set_var("HOME", temp_dir.path());
+            env::set_var("USERPROFILE", temp_dir.path());
+        }
 
         f();
 
-        match old_home {
-            Some(value) => env::set_var("HOME", value),
-            None => env::remove_var("HOME"),
-        }
-        match old_userprofile {
-            Some(value) => env::set_var("USERPROFILE", value),
-            None => env::remove_var("USERPROFILE"),
+        unsafe {
+            match old_home {
+                Some(value) => env::set_var("HOME", value),
+                None => env::remove_var("HOME"),
+            }
+            match old_userprofile {
+                Some(value) => env::set_var("USERPROFILE", value),
+                None => env::remove_var("USERPROFILE"),
+            }
         }
     }
 
