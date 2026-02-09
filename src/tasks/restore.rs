@@ -1,8 +1,9 @@
-use crate::encryption::{decrypt_file, get_encrypted_path, prompt_password};
+use crate::encryption::{decrypt_file, get_encrypted_path, is_password_error};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
+use crate::security::{get_or_prompt_password, invalidate_password_cache};
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{get_encrypted_registry_path, get_registry_path};
 use crate::utils::system::rsync_directory;
@@ -60,7 +61,7 @@ impl Task for RestoreTask {
 
         // Handle encrypted configs restore
         if !self.skip_encrypted {
-            match prompt_password(false) {
+            match get_or_prompt_password(&self.profile, false) {
                 Ok(password) => {
                     let (encrypted_restored, encrypted_skipped) =
                         restore_encrypted_config_files(&self.profile, &password);
@@ -318,6 +319,10 @@ fn restore_encrypted_config_files(profile: &ActiveProfile, password: &SecretStri
                         restored_count += 1;
                     }
                     Err(e) => {
+                        let err_msg = e.to_string();
+                        if is_password_error(&err_msg) {
+                            invalidate_password_cache(profile);
+                        }
                         log_warning(&format!(
                             "Failed to restore encrypted {}: {}",
                             entry.name, e

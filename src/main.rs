@@ -4,6 +4,7 @@ mod logger;
 mod profile;
 mod registries;
 mod registry;
+mod security;
 mod tasks;
 mod utils;
 

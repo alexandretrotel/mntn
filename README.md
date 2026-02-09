@@ -25,6 +25,7 @@ A Rust-based CLI tool for system maintenance and dotfiles management with a prof
   - [Package Registry Management](#package-registry-management)
   - [Configuration Registry Management](#configuration-registry-management)
   - [Encrypted Configuration Registry Management](#encrypted-configuration-registry-management)
+  - [Encryption Password Cache](#encryption-password-cache)
   - [Automated Maintenance Setup](#automated-maintenance-setup)
   - [System Cleaning Guide](#system-cleaning-guide)
   - [Service Management with Purge](#service-management-with-purge)
@@ -166,7 +167,9 @@ mntn uses a **profile-based architecture** that simplifies configuration managem
 │   └── packages/                  # Package lists
 │       ├── brew.txt
 │       └── npm.txt
+├── .secrets/                      # Local secrets (not tracked by git)
 ├── profile.json                   # Profile definitions
+├── security.json                  # Security settings (password cache)
 ├── .active-profile                # Currently active profile
 ├── configs_registry.json          # Tracked config files
 └── package_registry.json          # Package managers to backup
@@ -549,6 +552,54 @@ Encrypted files are stored in a separate `encrypted/` directory within your back
         └── encrypted/
             └── ssh/
                 └── config.age
+```
+
+### Encryption Password Cache
+
+mntn can cache the encryption password locally in an encrypted file to avoid retyping it.
+
+The `.secrets/` directory is excluded from git when you use `mntn sync`.
+
+**Defaults:**
+
+- Enabled by default
+- Global scope
+- TTL: `1h`
+
+**Files created:**
+
+- `~/.mntn/security.json` - global and per-profile cache settings
+- `~/.mntn/.secrets/password-cache.key` - local encryption key
+- `~/.mntn/.secrets/password-cache.global.age` - encrypted cached password
+- `~/.mntn/.secrets/password-cache.<profile>.age` - per-profile cache file when configured
+
+**TTL options:**
+
+- `15m`
+- `1h`
+- `8h`
+- `1d`
+- `7d`
+- `never`
+
+**Example config:**
+
+```json
+{
+  "version": "1.0.0",
+  "password_cache": {
+    "enabled": true,
+    "ttl": "1h"
+  },
+  "profiles": {
+    "work": {
+      "password_cache": {
+        "enabled": true,
+        "ttl": "15m"
+      }
+    }
+  }
+}
 ```
 
 ### Automated Maintenance Setup

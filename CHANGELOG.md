@@ -5,6 +5,7 @@ All notable changes to this project are documented in this file.
 ## v2.3.0
 
 ### Added
+- **Encryption Password Cache:** Added encrypted local password caching with configurable TTL and optional per-profile overrides.
 - **Sync Diff Views:** Added `mntn sync --diff` to show combined unstaged and staged changes.
   - Uses `--cached` fallback for older git versions when showing staged diffs.
 
