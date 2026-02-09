@@ -1109,6 +1109,7 @@ dependencies = [
  "trash",
  "which",
  "whoami",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

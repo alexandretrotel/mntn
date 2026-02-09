@@ -22,6 +22,10 @@ pub const ENCRYPTED_DIR: &str = "encrypted";
 
 /// Relative path to the directory used for storing local secrets (not tracked by git).
 pub const SECRETS_DIR: &str = ".secrets";
+/// Relative path to the directory used for storing cached secrets.
+pub const SECRETS_CACHE_DIR: &str = "cache";
+/// Relative path to the directory used for storing encryption keys.
+pub const SECRETS_KEYS_DIR: &str = "keys";
 
 /// Relative path to the security configuration file.
 pub const SECURITY_CONFIG_FILE: &str = "security.json";
@@ -76,6 +80,23 @@ pub fn get_security_config_path() -> PathBuf {
 /// Returns the path to the secrets directory
 pub fn get_secrets_dir() -> PathBuf {
     get_mntn_dir().join(SECRETS_DIR)
+}
+
+/// Returns the path to the secrets cache directory
+pub fn get_secrets_cache_dir() -> PathBuf {
+    get_secrets_dir().join(SECRETS_CACHE_DIR)
+}
+
+/// Returns the path to the secrets key directory.
+/// Override with MNTN_SECRETS_KEY_DIR for higher security setups.
+pub fn get_secrets_keys_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("MNTN_SECRETS_KEY_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    get_secrets_dir().join(SECRETS_KEYS_DIR)
 }
 
 pub fn get_profile_config_path() -> PathBuf {

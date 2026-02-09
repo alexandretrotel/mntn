@@ -168,6 +168,8 @@ mntn uses a **profile-based architecture** that simplifies configuration managem
 │       ├── brew.txt
 │       └── npm.txt
 ├── .secrets/                      # Local secrets (not tracked by git)
+│   ├── cache/                     # Encrypted password cache files
+│   └── keys/                      # Encryption keys for local cache
 ├── profile.json                   # Profile definitions
 ├── security.json                  # Security settings (password cache)
 ├── .active-profile                # Currently active profile
@@ -569,9 +571,14 @@ The `.secrets/` directory is excluded from git when you use `mntn sync`.
 **Files created:**
 
 - `~/.mntn/security.json` - global and per-profile cache settings
-- `~/.mntn/.secrets/password-cache.key` - local encryption key
-- `~/.mntn/.secrets/password-cache.global.age` - encrypted cached password
-- `~/.mntn/.secrets/password-cache.<profile>.age` - per-profile cache file when configured
+- `~/.mntn/.secrets/keys/password-cache.key` - local encryption key
+- `~/.mntn/.secrets/cache/password-cache.global.age` - encrypted cached password
+- `~/.mntn/.secrets/cache/password-cache.<profile>.age` - per-profile cache file when configured
+
+**Hardening options:**
+
+- Set `MNTN_SECRETS_KEY_DIR` to store the cache key in a separate directory (recommended for higher security).
+- If you need stronger guarantees, consider using an OS key store (not currently built-in).
 
 **TTL options:**
 
@@ -580,7 +587,7 @@ The `.secrets/` directory is excluded from git when you use `mntn sync`.
 - `8h`
 - `1d`
 - `7d`
-- `never`
+- `never` (intentional: cache persists until invalidated; use only if acceptable for your threat model)
 
 **Example config:**
 

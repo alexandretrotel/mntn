@@ -1,8 +1,11 @@
 use crate::encryption::prompt_password;
 use crate::logger::log_warning;
 use crate::profile::ActiveProfile;
-use crate::utils::paths::{get_secrets_dir, get_security_config_path};
-use age::secrecy::{ExposeSecret, SecretString};
+use crate::utils::paths::{
+    get_secrets_cache_dir, get_secrets_keys_dir, get_security_config_path,
+};
+use crate::utils::permissions::{lock_down_dir, lock_down_file};
+use age::secrecy::{ExposeSecret, SecretBox, SecretString};
 use age::{Decryptor, Encryptor};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -79,7 +82,28 @@ impl Default for SecurityConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PasswordCacheRecord {
     created_at: i64,
-    password: String,
+    #[serde(with = "secret_string_serde")]
+    password: SecretString,
+}
+
+mod secret_string_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(value: &SecretString, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(value.expose_secret())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SecretString, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(SecretString::new(value.into()))
+    }
 }
 
 impl SecurityConfig {
@@ -113,7 +137,9 @@ impl SecurityConfig {
         }
 
         let config = Self::default();
-        let _ = config.save(&path);
+        if let Err(e) = config.save(&path) {
+            log_warning(&format!("Failed to save security config: {}", e));
+        }
         config
     }
 
@@ -171,7 +197,7 @@ pub fn invalidate_password_cache(profile: &ActiveProfile) {
 }
 
 fn get_password_cache_path(profile: &ActiveProfile, per_profile: bool) -> PathBuf {
-    let secrets_dir = get_secrets_dir();
+    let secrets_dir = get_secrets_cache_dir();
     if per_profile {
         let name = sanitize_profile_name(profile.name.as_deref().unwrap_or("common"));
         secrets_dir.join(format!("{}.{}.age", PASSWORD_CACHE_FILE_PREFIX, name))
@@ -215,42 +241,10 @@ fn load_cached_password(
         }
     };
 
-    let encrypted = match fs::read(&cache_path) {
-        Ok(data) => data,
-        Err(e) => {
-            log_warning(&format!("Failed to read password cache: {}", e));
-            return None;
-        }
-    };
-
-    let decryptor = match Decryptor::new(&encrypted[..]) {
-        Ok(decryptor) => decryptor,
-        Err(e) => {
-            log_warning(&format!("Failed to parse password cache: {}", e));
-            let _ = fs::remove_file(&cache_path);
-            return None;
-        }
-    };
-
-    let mut decrypted = Vec::new();
-    let mut reader = match decryptor.decrypt(std::iter::once(&identity as &dyn age::Identity)) {
-        Ok(reader) => reader,
-        Err(e) => {
-            log_warning(&format!("Failed to decrypt password cache: {}", e));
-            let _ = fs::remove_file(&cache_path);
-            return None;
-        }
-    };
-    if reader.read_to_end(&mut decrypted).is_err() {
-        log_warning("Failed to read decrypted password cache");
-        let _ = fs::remove_file(&cache_path);
-        return None;
-    }
-
-    let record: PasswordCacheRecord = match serde_json::from_slice(&decrypted) {
+    let record = match read_cached_password_record(&cache_path, &identity) {
         Ok(record) => record,
-        Err(e) => {
-            log_warning(&format!("Failed to parse password cache record: {}", e));
+        Err(err) => {
+            log_warning(&format!("Failed to read password cache record: {}", err));
             let _ = fs::remove_file(&cache_path);
             return None;
         }
@@ -264,7 +258,7 @@ fn load_cached_password(
         }
     }
 
-    Some(SecretString::new(record.password.into()))
+    Some(record.password)
 }
 
 fn store_cached_password(
@@ -275,14 +269,8 @@ fn store_cached_password(
     let cache_path = get_password_cache_path(profile, per_profile);
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)?;
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o700);
-        if let Some(parent) = cache_path.parent() {
-            let _ = fs::set_permissions(parent, perms);
+        if let Err(e) = lock_down_dir(parent) {
+            log_warning(&format!("Failed to lock down cache directory: {}", e));
         }
     }
 
@@ -292,9 +280,9 @@ fn store_cached_password(
 
     let record = PasswordCacheRecord {
         created_at: Utc::now().timestamp(),
-        password: password.expose_secret().to_string(),
+        password: password.clone(),
     };
-    let serialized = serde_json::to_vec(&record)?;
+    let serialized = SecretBox::new(Box::new(serde_json::to_vec(&record)?));
 
     let mut tmp_path = cache_path.with_extension("tmp");
     if tmp_path.exists() {
@@ -303,15 +291,13 @@ fn store_cached_password(
 
     let mut tmp_file = fs::File::create(&tmp_path)?;
     let mut writer = encryptor.wrap_output(&mut tmp_file)?;
-    writer.write_all(&serialized)?;
+    writer.write_all(serialized.expose_secret())?;
     writer.finish()?;
+    drop(serialized);
     tmp_file.sync_all()?;
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        let _ = fs::set_permissions(&tmp_path, perms);
+    if let Err(e) = lock_down_file(&tmp_path) {
+        log_warning(&format!("Failed to lock down cache file: {}", e));
     }
 
     fs::rename(&tmp_path, &cache_path)?;
@@ -320,43 +306,123 @@ fn store_cached_password(
 }
 
 fn get_or_create_cache_identity() -> Result<age::x25519::Identity, Box<dyn std::error::Error>> {
-    let secrets_dir = get_secrets_dir();
-    fs::create_dir_all(&secrets_dir)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o700);
-        let _ = fs::set_permissions(&secrets_dir, perms);
+    let keys_dir = get_secrets_keys_dir();
+    fs::create_dir_all(&keys_dir)?;
+    if let Err(e) = lock_down_dir(&keys_dir) {
+        log_warning(&format!("Failed to lock down key directory: {}", e));
     }
 
-    let key_path = secrets_dir.join(PASSWORD_CACHE_KEY_FILE);
+    let key_path = keys_dir.join(PASSWORD_CACHE_KEY_FILE);
     if key_path.exists() {
-        let key = fs::read_to_string(&key_path)?;
-        let identity: age::x25519::Identity = key.parse()?;
+        let key = fs::read_to_string(&key_path).map_err(|e| {
+            log_warning(&format!("Failed to read cache key: {}", e));
+            e
+        })?;
+        let identity: age::x25519::Identity = key.parse().map_err(|e| {
+            log_warning(&format!("Failed to parse cache key: {}", e));
+            e
+        })?;
         return Ok(identity);
     }
 
-    let identity = age::x25519::Identity::generate();
-    #[cfg(unix)]
+    match fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&key_path)
     {
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .mode(0o600)
-            .open(&key_path)?;
-        let key = identity.to_string();
-        file.write_all(key.expose_secret().as_bytes())?;
-        file.sync_all()?;
+        Ok(mut file) => {
+            let identity = age::x25519::Identity::generate();
+            let key = identity.to_string();
+            file.write_all(key.expose_secret().as_bytes())
+                .map_err(|e| {
+                    log_warning(&format!("Failed to write cache key: {}", e));
+                    e
+                })?;
+            file.sync_all().map_err(|e| {
+                log_warning(&format!("Failed to sync cache key: {}", e));
+                e
+            })?;
+            if let Err(e) = lock_down_file(&key_path) {
+                log_warning(&format!("Failed to lock down cache key file: {}", e));
+            }
+            Ok(identity)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            let key = fs::read_to_string(&key_path).map_err(|e| {
+                log_warning(&format!("Failed to read cache key: {}", e));
+                e
+            })?;
+            let identity: age::x25519::Identity = key.parse().map_err(|e| {
+                log_warning(&format!("Failed to parse cache key: {}", e));
+                e
+            })?;
+            Ok(identity)
+        }
+        Err(e) => {
+            log_warning(&format!("Failed to create cache key: {}", e));
+            Err(e.into())
+        }
     }
-    #[cfg(not(unix))]
-    {
-        let key = identity.to_string();
-        fs::write(&key_path, key.expose_secret().as_bytes())?;
+}
+
+fn read_cached_password_record(
+    cache_path: &Path,
+    identity: &age::x25519::Identity,
+) -> Result<PasswordCacheRecord, String> {
+    let mut last_error = None;
+
+    for attempt in 0..2 {
+        let encrypted = fs::read(cache_path).map_err(|e| {
+            last_error = Some(format!("Failed to read password cache: {}", e));
+            last_error.clone().unwrap()
+        })?;
+
+        let decryptor = match Decryptor::new(&encrypted[..]) {
+            Ok(decryptor) => decryptor,
+            Err(e) => {
+                last_error = Some(format!("Failed to parse password cache: {}", e));
+                if attempt == 0 {
+                    continue;
+                }
+                return Err(last_error.clone().unwrap());
+            }
+        };
+
+        let mut decrypted = Vec::new();
+        let mut reader = match decryptor.decrypt(std::iter::once(identity as &dyn age::Identity)) {
+            Ok(reader) => reader,
+            Err(e) => {
+                last_error = Some(format!("Failed to decrypt password cache: {}", e));
+                if attempt == 0 {
+                    continue;
+                }
+                return Err(last_error.clone().unwrap());
+            }
+        };
+        if reader.read_to_end(&mut decrypted).is_err() {
+            last_error = Some("Failed to read decrypted password cache".to_string());
+            if attempt == 0 {
+                continue;
+            }
+            return Err(last_error.clone().unwrap());
+        }
+
+        let decrypted = SecretBox::new(Box::new(decrypted));
+        let record: PasswordCacheRecord = match serde_json::from_slice(decrypted.expose_secret()) {
+            Ok(record) => record,
+            Err(e) => {
+                last_error = Some(format!("Failed to parse password cache record: {}", e));
+                if attempt == 0 {
+                    continue;
+                }
+                return Err(last_error.clone().unwrap());
+            }
+        };
+        drop(decrypted);
+        return Ok(record);
     }
 
-    Ok(identity)
+    Err(last_error.unwrap_or_else(|| "Failed to read password cache".to_string()))
 }
 
 #[cfg(test)]
@@ -412,7 +478,7 @@ mod tests {
 
         let record = PasswordCacheRecord {
             created_at,
-            password: password.to_string(),
+            password: SecretString::new(password.to_string().into()),
         };
         let serialized = serde_json::to_vec(&record).unwrap();
 
