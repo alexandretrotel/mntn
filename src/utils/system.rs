@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -19,6 +20,13 @@ pub fn run_cmd_in_dir(
     dir: &Path,
 ) -> Result<String, Box<dyn std::error::Error>> {
     run_cmd_impl(cmd, args, Some(dir))
+}
+
+/// Strips ANSI escape codes from a string.
+pub fn strip_ansi_codes(input: &str) -> String {
+    // Matches CSI (Control Sequence Introducer) ANSI escape codes.
+    let re = Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]").unwrap();
+    re.replace_all(input, "").to_string()
 }
 
 /// Returns the current git branch name in the given directory.
@@ -191,6 +199,13 @@ mod tests {
         let output = result.unwrap();
         assert!(output.contains("a.txt"));
         assert!(output.contains("b.txt"));
+    }
+
+    #[test]
+    fn test_strip_ansi_codes_removes_colors() {
+        let input = "\u{1b}[1mBold\u{1b}[0m \u{1b}[36mCyan\u{1b}[0m";
+        let output = strip_ansi_codes(input);
+        assert_eq!(output, "Bold Cyan");
     }
 
     #[test]
