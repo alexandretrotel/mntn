@@ -8,7 +8,7 @@ use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{
     get_encrypted_registry_path, get_package_registry_path, get_packages_dir, get_registry_path,
 };
-use crate::utils::system::{rsync_directory, run_cmd};
+use crate::utils::system::{rsync_directory, run_cmd, strip_ansi_codes};
 use age::secrecy::SecretString;
 use rayon::prelude::*;
 use std::fs;
@@ -171,6 +171,7 @@ fn backup_package_managers(package_managers_dir: &Path) {
     for (id, entry, result) in results {
         match result {
             Ok(content) => {
+                let content = strip_ansi_codes(&content);
                 let output_path = package_managers_dir.join(&entry.output_file);
                 let tmp_path = output_path.with_extension("tmp");
 
