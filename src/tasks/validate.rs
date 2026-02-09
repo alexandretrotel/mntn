@@ -1,4 +1,4 @@
-use crate::encryption::{decrypt_file, get_encrypted_path};
+use crate::encryption::{decrypt_file, get_encrypted_path, is_password_error};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::{ActiveProfile, ProfileConfig};
 use crate::registries::configs_registry::ConfigsRegistry;
@@ -550,12 +550,8 @@ impl Validator for FileMismatchValidator {
                 }
                 Err(e) => {
                     // Check if it's a password error
-                    let error_msg = e.to_string().to_lowercase();
-                    if error_msg.contains("password")
-                        || error_msg.contains("decrypt")
-                        || error_msg.contains("identity")
-                        || error_msg.contains("scrypt")
-                    {
+                    let error_msg = e.to_string();
+                    if is_password_error(&error_msg) {
                         invalidate_password_cache(&self.profile);
                         // Wrong password - skip encrypted registry validation
                         errors.push(ValidationError::warning(

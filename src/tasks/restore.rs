@@ -1,4 +1,4 @@
-use crate::encryption::{decrypt_file, get_encrypted_path};
+use crate::encryption::{decrypt_file, get_encrypted_path, is_password_error};
 use crate::logger::{log, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
 use crate::registries::configs_registry::ConfigsRegistry;
@@ -342,11 +342,6 @@ fn restore_encrypted_config_files(profile: &ActiveProfile, password: &SecretStri
     }
 
     (restored_count, skipped_count)
-}
-
-fn is_password_error(message: &str) -> bool {
-    let msg = message.to_lowercase();
-    msg.contains("password") || msg.contains("passphrase") || msg.contains("scrypt")
 }
 
 #[cfg(test)]

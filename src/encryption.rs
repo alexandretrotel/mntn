@@ -81,6 +81,15 @@ pub fn decrypt_file(
     Ok(())
 }
 
+pub fn is_password_error(message: &str) -> bool {
+    let msg = message.to_lowercase();
+    msg.contains("password")
+        || msg.contains("passphrase")
+        || msg.contains("decrypt")
+        || msg.contains("identity")
+        || msg.contains("scrypt")
+}
+
 /// Hashes a filename using SHA256 and base64 encoding for obfuscation
 /// Returns a deterministic, filesystem-safe string
 pub fn hash_filename(filename: &str) -> String {

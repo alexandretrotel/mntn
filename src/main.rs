@@ -1,10 +1,10 @@
 mod cli;
 mod encryption;
 mod logger;
-mod security;
 mod profile;
 mod registries;
 mod registry;
+mod security;
 mod tasks;
 mod utils;
 

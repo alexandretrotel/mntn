@@ -1,10 +1,10 @@
 use crate::encryption::{encrypt_file, get_encrypted_path};
 use crate::logger::{log, log_error, log_info, log_success, log_warning};
 use crate::profile::ActiveProfile;
-use crate::security::get_or_prompt_password;
 use crate::registries::configs_registry::ConfigsRegistry;
 use crate::registries::encrypted_configs_registry::EncryptedConfigsRegistry;
 use crate::registries::package_registry::PackageRegistry;
+use crate::security::get_or_prompt_password;
 use crate::tasks::core::{PlannedOperation, Task};
 use crate::utils::paths::{
     get_encrypted_registry_path, get_package_registry_path, get_packages_dir, get_registry_path,
