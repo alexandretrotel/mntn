@@ -367,6 +367,7 @@ mntn sync --pull
 
 # Show diffs before syncing (uses --cached fallback for staged diffs)
 mntn sync --diff
+mntn sync --diff-stat
 
 # Push local changes
 mntn sync --push --message "Update configs"
