@@ -223,6 +223,12 @@ pub struct SyncArgs {
     /// Show git status for the repository
     #[arg(long, help = "Show git status for the repository")]
     pub status: bool,
+    /// Show git diff for the repository (full changes)
+    #[arg(long, help = "Show git diff for the repository (full changes)")]
+    pub diff: bool,
+    /// Show git diff summary for the repository
+    #[arg(long, help = "Show git diff --stat for the repository")]
+    pub diff_stat: bool,
 }
 
 /// Arguments for the registry command.
