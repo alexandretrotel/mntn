@@ -32,13 +32,13 @@ fn set_owner_only_dacl(path: &Path, is_dir: bool) -> io::Result<()> {
     use std::ptr;
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, GetLastError, ERROR_INSUFFICIENT_BUFFER, HANDLE,
+        CloseHandle, ERROR_INSUFFICIENT_BUFFER, GetLastError, HANDLE,
     };
     use windows_sys::Win32::Security::{
-        GetTokenInformation, OpenProcessToken, SetEntriesInAclW, SetNamedSecurityInfoW, TokenUser,
-        DACL_SECURITY_INFORMATION, EXPLICIT_ACCESS_W, NO_MULTIPLE_TRUSTEE,
-        PROTECTED_DACL_SECURITY_INFORMATION, SE_FILE_OBJECT, SET_ACCESS, TOKEN_QUERY, TOKEN_USER,
-        TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
+        DACL_SECURITY_INFORMATION, EXPLICIT_ACCESS_W, GetTokenInformation, NO_MULTIPLE_TRUSTEE,
+        OpenProcessToken, PROTECTED_DACL_SECURITY_INFORMATION, SE_FILE_OBJECT, SET_ACCESS,
+        SetEntriesInAclW, SetNamedSecurityInfoW, TOKEN_QUERY, TOKEN_USER, TRUSTEE_IS_SID,
+        TRUSTEE_IS_USER, TRUSTEE_W, TokenUser,
     };
     use windows_sys::Win32::System::Memory::LocalFree;
     use windows_sys::Win32::System::Threading::GetCurrentProcess;
@@ -103,7 +103,8 @@ fn set_owner_only_dacl(path: &Path, is_dir: bool) -> io::Result<()> {
     };
 
     let mut new_acl = ptr::null_mut();
-    let acl_result = unsafe { SetEntriesInAclW(1, &explicit_access, ptr::null_mut(), &mut new_acl) };
+    let acl_result =
+        unsafe { SetEntriesInAclW(1, &explicit_access, ptr::null_mut(), &mut new_acl) };
     if acl_result != 0 {
         return Err(io::Error::from_raw_os_error(acl_result as i32));
     }

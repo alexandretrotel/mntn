@@ -1,9 +1,7 @@
 use crate::encryption::prompt_password;
 use crate::logger::log_warning;
 use crate::profile::ActiveProfile;
-use crate::utils::paths::{
-    get_secrets_cache_dir, get_secrets_keys_dir, get_security_config_path,
-};
+use crate::utils::paths::{get_secrets_cache_dir, get_secrets_keys_dir, get_security_config_path};
 use crate::utils::permissions::{lock_down_dir, lock_down_file};
 use age::secrecy::{ExposeSecret, SecretBox, SecretString};
 use age::{Decryptor, Encryptor};
@@ -318,9 +316,8 @@ fn get_or_create_cache_identity() -> Result<age::x25519::Identity, Box<dyn std::
             log_warning(&format!("Failed to read cache key: {}", e));
             e
         })?;
-        let identity: age::x25519::Identity = key.parse().map_err(|e| {
+        let identity: age::x25519::Identity = key.parse().inspect_err(|&e| {
             log_warning(&format!("Failed to parse cache key: {}", e));
-            e
         })?;
         return Ok(identity);
     }
@@ -352,9 +349,8 @@ fn get_or_create_cache_identity() -> Result<age::x25519::Identity, Box<dyn std::
                 log_warning(&format!("Failed to read cache key: {}", e));
                 e
             })?;
-            let identity: age::x25519::Identity = key.parse().map_err(|e| {
+            let identity: age::x25519::Identity = key.parse().inspect_err(|&e| {
                 log_warning(&format!("Failed to parse cache key: {}", e));
-                e
             })?;
             Ok(identity)
         }
