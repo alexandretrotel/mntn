@@ -32,21 +32,22 @@ fn set_owner_only_dacl(path: &Path, is_dir: bool) -> io::Result<()> {
     use std::ptr;
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, ERROR_INSUFFICIENT_BUFFER, GetLastError, HANDLE,
+        CloseHandle, ERROR_INSUFFICIENT_BUFFER, GetLastError, HANDLE, LocalFree,
+    };
+    use windows_sys::Win32::Security::Authorization::{
+        EXPLICIT_ACCESS_W, NO_MULTIPLE_TRUSTEE, SE_FILE_OBJECT, SET_ACCESS, SetEntriesInAclW,
+        SetNamedSecurityInfoW, TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
     };
     use windows_sys::Win32::Security::{
-        DACL_SECURITY_INFORMATION, EXPLICIT_ACCESS_W, GetTokenInformation, NO_MULTIPLE_TRUSTEE,
-        OpenProcessToken, PROTECTED_DACL_SECURITY_INFORMATION, SE_FILE_OBJECT, SET_ACCESS,
-        SetEntriesInAclW, SetNamedSecurityInfoW, TOKEN_QUERY, TOKEN_USER, TRUSTEE_IS_SID,
-        TRUSTEE_IS_USER, TRUSTEE_W, TokenUser,
+        ACL, DACL_SECURITY_INFORMATION, GetTokenInformation, PROTECTED_DACL_SECURITY_INFORMATION,
+        TOKEN_QUERY, TOKEN_USER, TokenUser,
     };
-    use windows_sys::Win32::System::Memory::LocalFree;
-    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     const GENERIC_ALL: u32 = 0x1000_0000;
     const SUB_CONTAINERS_AND_OBJECTS_INHERIT: u32 = 0x00000003;
 
-    let mut token: HANDLE = 0;
+    let mut token: HANDLE = std::ptr::null_mut();
     let opened = unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) };
     if opened == 0 {
         return Err(io::Error::last_os_error());
@@ -102,7 +103,7 @@ fn set_owner_only_dacl(path: &Path, is_dir: bool) -> io::Result<()> {
         Trustee: trustee,
     };
 
-    let mut new_acl = ptr::null_mut();
+    let mut new_acl: *mut ACL = ptr::null_mut();
     let acl_result =
         unsafe { SetEntriesInAclW(1, &explicit_access, ptr::null_mut(), &mut new_acl) };
     if acl_result != 0 {
