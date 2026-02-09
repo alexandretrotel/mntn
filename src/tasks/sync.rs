@@ -21,7 +21,6 @@ pub struct SyncTask {
     pub dry_run: bool,
     pub status: bool,
     pub diff: bool,
-    pub diff_stat: bool,
 }
 
 impl SyncTask {
@@ -37,7 +36,6 @@ impl SyncTask {
             dry_run: args.dry_run,
             status: args.status,
             diff: args.diff,
-            diff_stat: args.diff_stat,
         }
     }
 }
@@ -59,19 +57,17 @@ impl Task for SyncTask {
             dry_run: self.dry_run,
             status: self.status,
             diff: self.diff,
-            diff_stat: self.diff_stat,
         };
 
         if args.status {
             show_git_status()?;
-            if !args.diff && !args.diff_stat {
+            if !args.diff {
                 return Ok(());
             }
         }
 
-        if args.diff || args.diff_stat {
-            let show_stat_only = args.diff_stat && !args.diff;
-            show_git_diff(show_stat_only)?;
+        if args.diff {
+            show_git_diff()?;
             return Ok(());
         }
 
@@ -86,18 +82,13 @@ impl Task for SyncTask {
 
         if self.status {
             operations.push(PlannedOperation::new("Show git status"));
-            if !self.diff && !self.diff_stat {
+            if !self.diff {
                 return operations;
             }
         }
 
-        if self.diff || self.diff_stat {
-            let label = if self.diff_stat && !self.diff {
-                "Show git diff summary"
-            } else {
-                "Show git diff"
-            };
-            operations.push(PlannedOperation::new(label));
+        if self.diff {
+            operations.push(PlannedOperation::new("Show git diff"));
             return operations;
         }
 
@@ -252,39 +243,44 @@ fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn show_git_diff() -> Result<(), Box<dyn std::error::Error>> {
     let mntn_dir = get_mntn_dir();
-    let (unstaged_args, staged_args) = if show_stat_only {
-        (vec!["diff", "--stat"], vec!["diff", "--staged", "--stat"])
-    } else {
-        (vec!["diff"], vec!["diff", "--staged"])
-    };
+    let unstaged_args = ["diff", "--color=always"];
+    let staged_args = ["diff", "--staged", "--color=always"];
 
-    let unstaged = run_git_diff_lossy(&unstaged_args, &mntn_dir)?;
+    let unstaged = run_git_diff_bytes(&unstaged_args, &mntn_dir)?;
     let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;
 
-    println!("Unstaged changes (working tree):");
-    if unstaged.trim().is_empty() {
-        println!("(none)");
-    } else {
-        println!("{}", unstaged);
-    }
-
-    println!();
-    println!("Staged changes (index):");
-    if staged.trim().is_empty() {
-        println!("(none)");
-    } else {
-        println!("{}", staged);
-    }
+    print_diff_block("Unstaged changes (working tree):", &unstaged)?;
+    print_diff_block("Staged changes (index):", &staged)?;
 
     Ok(())
 }
 
-fn run_git_diff_lossy(
+fn run_staged_diff_with_fallback(
+    staged_args: &[&str],
+    mntn_dir: &Path,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    match run_git_diff_bytes(staged_args, mntn_dir) {
+        Ok(output) => Ok(output),
+        Err(_) => {
+            let mut cached_args = Vec::with_capacity(staged_args.len());
+            for arg in staged_args {
+                if *arg == "--staged" {
+                    cached_args.push("--cached");
+                } else {
+                    cached_args.push(*arg);
+                }
+            }
+            run_git_diff_bytes(&cached_args, mntn_dir)
+        }
+    }
+}
+
+fn run_git_diff_bytes(
     args: &[&str],
     mntn_dir: &Path,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let output = Command::new("git").args(args).current_dir(mntn_dir).output()?;
 
     if !output.status.success() {
@@ -299,27 +295,26 @@ fn run_git_diff_lossy(
         .into());
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    Ok(output.stdout)
 }
 
-fn run_staged_diff_with_fallback(
-    staged_args: &[&str],
-    mntn_dir: &Path,
-) -> Result<String, Box<dyn std::error::Error>> {
-    match run_git_diff_lossy(staged_args, mntn_dir) {
-        Ok(output) => Ok(output),
-        Err(_) => {
-            let mut cached_args = Vec::with_capacity(staged_args.len());
-            for arg in staged_args {
-                if *arg == "--staged" {
-                    cached_args.push("--cached");
-                } else {
-                    cached_args.push(*arg);
-                }
-            }
-            run_git_diff_lossy(&cached_args, mntn_dir)
-        }
+fn print_diff_block(title: &str, content: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+
+    println!("{}", title);
+    if content.iter().all(|b| b.is_ascii_whitespace()) {
+        println!("(none)");
+        println!();
+        return Ok(());
     }
+
+    let mut stdout = std::io::stdout();
+    stdout.write_all(content)?;
+    if !content.ends_with(b"\n") {
+        stdout.write_all(b"\n")?;
+    }
+    println!();
+    Ok(())
 }
 
 fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
