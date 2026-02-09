@@ -260,7 +260,7 @@ fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>>
     };
 
     let unstaged = run_cmd_in_dir("git", &unstaged_args, &mntn_dir)?;
-    let staged = run_cmd_in_dir("git", &staged_args, &mntn_dir)?;
+    let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;
 
     println!("Unstaged changes (working tree):");
     if unstaged.trim().is_empty() {
@@ -278,6 +278,26 @@ fn show_git_diff(show_stat_only: bool) -> Result<(), Box<dyn std::error::Error>>
     }
 
     Ok(())
+}
+
+fn run_staged_diff_with_fallback(
+    staged_args: &[&str],
+    mntn_dir: &Path,
+) -> Result<String, Box<dyn std::error::Error>> {
+    match run_cmd_in_dir("git", staged_args, mntn_dir) {
+        Ok(output) => Ok(output),
+        Err(_) => {
+            let mut cached_args = Vec::with_capacity(staged_args.len());
+            for arg in staged_args {
+                if *arg == "--staged" {
+                    cached_args.push("--cached");
+                } else {
+                    cached_args.push(*arg);
+                }
+            }
+            run_cmd_in_dir("git", &cached_args, mntn_dir)
+        }
+    }
 }
 
 fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
