@@ -7,6 +7,7 @@ use chrono::Utc;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 /// Sync task that synchronizes configurations with a git repository
 pub struct SyncTask {
@@ -19,6 +20,7 @@ pub struct SyncTask {
     pub auto_restore: bool,
     pub dry_run: bool,
     pub status: bool,
+    pub diff: bool,
 }
 
 impl SyncTask {
@@ -33,6 +35,7 @@ impl SyncTask {
             auto_restore: args.auto_restore,
             dry_run: args.dry_run,
             status: args.status,
+            diff: args.diff,
         }
     }
 }
@@ -53,10 +56,18 @@ impl Task for SyncTask {
             auto_restore: self.auto_restore,
             dry_run: self.dry_run,
             status: self.status,
+            diff: self.diff,
         };
 
         if args.status {
             show_git_status()?;
+            if !args.diff {
+                return Ok(());
+            }
+        }
+
+        if args.diff {
+            show_git_diff()?;
             return Ok(());
         }
 
@@ -68,6 +79,18 @@ impl Task for SyncTask {
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
         let mntn_dir = get_mntn_dir();
+
+        if self.status {
+            operations.push(PlannedOperation::new("Show git status"));
+            if !self.diff {
+                return operations;
+            }
+        }
+
+        if self.diff {
+            operations.push(PlannedOperation::new("Show git diff"));
+            return operations;
+        }
 
         if self.init {
             operations.push(PlannedOperation::with_target(
@@ -220,6 +243,83 @@ fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
     let mntn_dir = get_mntn_dir();
     let output = run_cmd_in_dir("git", &["status", "--short", "--branch"], &mntn_dir)?;
     println!("{}", output);
+    Ok(())
+}
+
+fn show_git_diff() -> Result<(), Box<dyn std::error::Error>> {
+    let mntn_dir = get_mntn_dir();
+    let unstaged_args = ["diff", "--color=always"];
+    let staged_args = ["diff", "--staged", "--color=always"];
+
+    let unstaged = run_git_diff_bytes(&unstaged_args, &mntn_dir)?;
+    let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;
+
+    print_diff_block("Unstaged changes (working tree):", &unstaged)?;
+    print_diff_block("Staged changes (index):", &staged)?;
+
+    Ok(())
+}
+
+fn run_staged_diff_with_fallback(
+    staged_args: &[&str],
+    mntn_dir: &Path,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    match run_git_diff_bytes(staged_args, mntn_dir) {
+        Ok(output) => Ok(output),
+        Err(_) => {
+            let mut cached_args = Vec::with_capacity(staged_args.len());
+            for arg in staged_args {
+                if *arg == "--staged" {
+                    cached_args.push("--cached");
+                } else {
+                    cached_args.push(*arg);
+                }
+            }
+            run_git_diff_bytes(&cached_args, mntn_dir)
+        }
+    }
+}
+
+fn run_git_diff_bytes(
+    args: &[&str],
+    mntn_dir: &Path,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(mntn_dir)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr_len = output.stderr.len();
+        let stderr_msg = String::from_utf8(output.stderr)
+            .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
+        return Err(std::io::Error::other(format!(
+            "Command 'git' failed with status {:?}: {}",
+            output.status.code(),
+            stderr_msg
+        ))
+        .into());
+    }
+
+    Ok(output.stdout)
+}
+
+fn print_diff_block(title: &str, content: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+
+    println!("{}", title);
+    if content.iter().all(|b| b.is_ascii_whitespace()) {
+        println!("(none)");
+        println!();
+        return Ok(());
+    }
+
+    let mut stdout = std::io::stdout();
+    stdout.write_all(content)?;
+    if !content.ends_with(b"\n") {
+        stdout.write_all(b"\n")?;
+    }
+    println!();
     Ok(())
 }
 
