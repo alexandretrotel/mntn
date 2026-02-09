@@ -248,8 +248,8 @@ fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
 
 fn show_git_diff() -> Result<(), Box<dyn std::error::Error>> {
     let mntn_dir = get_mntn_dir();
-    let unstaged_args = ["diff", "--color=always"];
-    let staged_args = ["diff", "--staged", "--color=always"];
+    let unstaged_args = ["diff", "--color=auto"];
+    let staged_args = ["diff", "--staged", "--color=auto"];
 
     let unstaged = run_git_diff_bytes(&unstaged_args, &mntn_dir)?;
     let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;

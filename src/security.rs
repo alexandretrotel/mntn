@@ -125,7 +125,17 @@ impl SecurityConfig {
             return Self::default();
         }
 
-        Self::load(&path).unwrap_or_default()
+        match Self::load(&path) {
+            Ok(config) => config,
+            Err(e) => {
+                log_warning(&format!(
+                    "Failed to load security configuration from '{}': {}. Falling back to defaults.",
+                    path.display(),
+                    e
+                ));
+                Self::default()
+            }
+        }
     }
 
     pub fn load_or_create() -> Self {
@@ -298,6 +308,12 @@ fn store_cached_password(
         log_warning(&format!("Failed to lock down cache file: {}", e));
     }
 
+    #[cfg(windows)]
+    {
+        if cache_path.exists() {
+            let _ = fs::remove_file(&cache_path);
+        }
+    }
     fs::rename(&tmp_path, &cache_path)?;
 
     Ok(())
@@ -437,23 +453,37 @@ mod tests {
         let old_home = env::var_os("HOME");
         let old_userprofile = env::var_os("USERPROFILE");
 
+        struct EnvGuard {
+            old_home: Option<std::ffi::OsString>,
+            old_userprofile: Option<std::ffi::OsString>,
+        }
+
+        impl Drop for EnvGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    match self.old_home.take() {
+                        Some(value) => env::set_var("HOME", value),
+                        None => env::remove_var("HOME"),
+                    }
+                    match self.old_userprofile.take() {
+                        Some(value) => env::set_var("USERPROFILE", value),
+                        None => env::remove_var("USERPROFILE"),
+                    }
+                }
+            }
+        }
+
         unsafe {
             env::set_var("HOME", temp_dir.path());
             env::set_var("USERPROFILE", temp_dir.path());
         }
 
-        f();
+        let _guard = EnvGuard {
+            old_home,
+            old_userprofile,
+        };
 
-        unsafe {
-            match old_home {
-                Some(value) => env::set_var("HOME", value),
-                None => env::remove_var("HOME"),
-            }
-            match old_userprofile {
-                Some(value) => env::set_var("USERPROFILE", value),
-                None => env::remove_var("USERPROFILE"),
-            }
-        }
+        f();
     }
 
     fn write_cache_record(
