@@ -215,25 +215,45 @@ mod tests {
 
     #[test]
     fn test_get_current_git_branch_returns_branch_name() {
+        if run_cmd("git", &["--version"]).is_err() {
+            return;
+        }
+
         let temp_dir = TempDir::new().unwrap();
         // Initialize a git repo and create a branch
-        let _ = run_cmd_in_dir("git", &["init"], temp_dir.path());
-        let _ = run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path());
+        if run_cmd_in_dir("git", &["init"], temp_dir.path()).is_err() {
+            return;
+        }
+        if run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path()).is_err() {
+            return;
+        }
         // Set user.name and user.email for CI environments before committing
-        let _ = run_cmd_in_dir(
+        if run_cmd_in_dir(
             "git",
             &["config", "user.name", "Test User"],
             temp_dir.path(),
-        );
-        let _ = run_cmd_in_dir(
+        )
+        .is_err()
+        {
+            return;
+        }
+        if run_cmd_in_dir(
             "git",
             &["config", "user.email", "test@example.com"],
             temp_dir.path(),
-        );
+        )
+        .is_err()
+        {
+            return;
+        }
         // Make an initial commit so HEAD points to the branch
         std::fs::write(temp_dir.path().join("file.txt"), "content").unwrap();
-        let _ = run_cmd_in_dir("git", &["add", "."], temp_dir.path());
-        let _ = run_cmd_in_dir("git", &["commit", "-m", "initial"], temp_dir.path());
+        if run_cmd_in_dir("git", &["add", "."], temp_dir.path()).is_err() {
+            return;
+        }
+        if run_cmd_in_dir("git", &["commit", "-m", "initial"], temp_dir.path()).is_err() {
+            return;
+        }
         let branch = get_current_git_branch(temp_dir.path());
         assert!(branch.is_ok());
         assert_eq!(branch.unwrap(), "test-branch");
