@@ -547,7 +547,8 @@ mod tests {
             let ttl_seconds = PasswordCacheTtl::OneHour.as_seconds().unwrap();
             let expired_at = Utc::now().timestamp() - ttl_seconds - 1;
 
-            write_cache_record(&profile, true, expired_at, "expired-pass");
+            let password = format!("expired-pass-{}-{}", std::process::id(), expired_at);
+            write_cache_record(&profile, true, expired_at, &password);
 
             let cache_path = get_password_cache_path(&profile, true);
             assert!(cache_path.exists());
