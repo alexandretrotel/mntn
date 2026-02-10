@@ -235,7 +235,7 @@ mod tests {
 
         fs::write(&registry_path, "{ invalid json }").unwrap();
 
-        let result: Result<Registry<TestEntry>, _> = Registry::load_or_create(&registry_path);
+        let result: Result<Registry<TestEntry>> = Registry::load_or_create(&registry_path);
         assert!(result.is_err());
     }
 
