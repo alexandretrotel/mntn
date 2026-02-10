@@ -59,7 +59,7 @@ impl Task for PurgeTask {
         "Purge"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         #[cfg(target_os = "macos")]
         println!("🧼 Listing all launch agents and daemons...");
         #[cfg(target_os = "linux")]

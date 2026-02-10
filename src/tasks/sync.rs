@@ -3,10 +3,12 @@ use crate::logger::{log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd_in_dir;
+use anyhow::bail;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 /// Sync task that synchronizes configurations with a git repository
 pub struct SyncTask {
@@ -19,6 +21,7 @@ pub struct SyncTask {
     pub auto_restore: bool,
     pub dry_run: bool,
     pub status: bool,
+    pub diff: bool,
 }
 
 impl SyncTask {
@@ -33,6 +36,7 @@ impl SyncTask {
             auto_restore: args.auto_restore,
             dry_run: args.dry_run,
             status: args.status,
+            diff: args.diff,
         }
     }
 }
@@ -42,7 +46,7 @@ impl Task for SyncTask {
         "Sync"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         let args = SyncArgs {
             init: self.init,
             remote_url: self.remote_url.clone(),
@@ -53,10 +57,18 @@ impl Task for SyncTask {
             auto_restore: self.auto_restore,
             dry_run: self.dry_run,
             status: self.status,
+            diff: self.diff,
         };
 
         if args.status {
             show_git_status()?;
+            if !args.diff {
+                return Ok(());
+            }
+        }
+
+        if args.diff {
+            show_git_diff()?;
             return Ok(());
         }
 
@@ -68,6 +80,18 @@ impl Task for SyncTask {
     fn dry_run(&self) -> Vec<PlannedOperation> {
         let mut operations = Vec::new();
         let mntn_dir = get_mntn_dir();
+
+        if self.status {
+            operations.push(PlannedOperation::new("Show git status"));
+            if !self.diff {
+                return operations;
+            }
+        }
+
+        if self.diff {
+            operations.push(PlannedOperation::new("Show git diff"));
+            return operations;
+        }
 
         if self.init {
             operations.push(PlannedOperation::with_target(
@@ -107,20 +131,18 @@ pub fn run_with_args(args: SyncArgs) {
     TaskExecutor::run(&mut task, args.dry_run);
 }
 
-fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_with_git(args: SyncArgs) -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
 
     if !mntn_dir.join(".git").exists() {
         if args.init {
             if args.remote_url.is_none() {
-                return Err("Remote URL is required when using --init".into());
+                bail!("Remote URL is required when using --init");
             }
             initialize_git_repo(&mntn_dir, args.remote_url.as_ref().unwrap())?;
             create_default_gitignore(&mntn_dir)?;
         } else {
-            return Err(
-                "No git repository found. Use --init with --remote-url to initialize.".into(),
-            );
+            bail!("No git repository found. Use --init with --remote-url to initialize.");
         }
     } else {
         if args.init {
@@ -167,10 +189,7 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn initialize_git_repo(
-    mntn_dir: &Path,
-    remote_url: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn initialize_git_repo(mntn_dir: &Path, remote_url: &str) -> anyhow::Result<()> {
     println!("Initializing git repository in {}", mntn_dir.display());
 
     run_cmd_in_dir("git", &["init"], mntn_dir)?;
@@ -184,7 +203,7 @@ fn initialize_git_repo(
     Ok(())
 }
 
-fn create_default_gitignore(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_default_gitignore(mntn_dir: &Path) -> anyhow::Result<()> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         let default_gitignore = "# mntn log files
@@ -213,14 +232,85 @@ Thumbs.db
     Ok(())
 }
 
-fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
+fn show_git_status() -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
     let output = run_cmd_in_dir("git", &["status", "--short", "--branch"], &mntn_dir)?;
     println!("{}", output);
     Ok(())
 }
 
-fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn show_git_diff() -> anyhow::Result<()> {
+    let mntn_dir = get_mntn_dir();
+    let unstaged_args = ["diff", "--color=always"];
+    let staged_args = ["diff", "--staged", "--color=always"];
+
+    let unstaged = run_git_diff_bytes(&unstaged_args, &mntn_dir)?;
+    let staged = run_staged_diff_with_fallback(&staged_args, &mntn_dir)?;
+
+    print_diff_block("Unstaged changes (working tree):", &unstaged)?;
+    print_diff_block("Staged changes (index):", &staged)?;
+
+    Ok(())
+}
+
+fn run_staged_diff_with_fallback(staged_args: &[&str], mntn_dir: &Path) -> anyhow::Result<Vec<u8>> {
+    match run_git_diff_bytes(staged_args, mntn_dir) {
+        Ok(output) => Ok(output),
+        Err(_) => {
+            let mut cached_args = Vec::with_capacity(staged_args.len());
+            for arg in staged_args {
+                if *arg == "--staged" {
+                    cached_args.push("--cached");
+                } else {
+                    cached_args.push(*arg);
+                }
+            }
+            run_git_diff_bytes(&cached_args, mntn_dir)
+        }
+    }
+}
+
+fn run_git_diff_bytes(args: &[&str], mntn_dir: &Path) -> anyhow::Result<Vec<u8>> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(mntn_dir)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr_len = output.stderr.len();
+        let stderr_msg = String::from_utf8(output.stderr)
+            .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
+        return Err(std::io::Error::other(format!(
+            "Command 'git' failed with status {:?}: {}",
+            output.status.code(),
+            stderr_msg
+        ))
+        .into());
+    }
+
+    Ok(output.stdout)
+}
+
+fn print_diff_block(title: &str, content: &[u8]) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    println!("{}", title);
+    if content.iter().all(|b| b.is_ascii_whitespace()) {
+        println!("(none)");
+        println!();
+        return Ok(());
+    }
+
+    let mut stdout = std::io::stdout();
+    stdout.write_all(content)?;
+    if !content.ends_with(b"\n") {
+        stdout.write_all(b"\n")?;
+    }
+    println!();
+    Ok(())
+}
+
+fn ensure_gitignore_exists(mntn_dir: &Path) -> anyhow::Result<()> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         create_default_gitignore(mntn_dir)?;

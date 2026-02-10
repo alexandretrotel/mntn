@@ -365,6 +365,12 @@ mntn sync --init --remote-url https://github.com/yourusername/dotfiles.git
 # Pull latest changes
 mntn sync --pull
 
+# Show status before syncing
+mntn sync --status
+
+# Show diffs before syncing (uses --cached fallback for staged diffs)
+mntn sync --diff
+
 # Push local changes
 mntn sync --push --message "Update configs"
 

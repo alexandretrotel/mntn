@@ -3,7 +3,7 @@ use crate::logger::{log_error, log_info, log_success, log_warning};
 use crate::profile::ProfileConfig;
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::{clear_active_profile, get_active_profile_name, set_active_profile};
-use std::io;
+use anyhow::bail;
 
 pub struct UseProfileTask {
     profile_name: String,
@@ -24,7 +24,7 @@ impl Task for UseProfileTask {
         "Use Profile"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         let config = ProfileConfig::load_or_default();
 
         // Allow switching to "common" or "none" to clear active profile
@@ -40,10 +40,7 @@ impl Task for UseProfileTask {
             println!();
             println!("Create it with: mntn profile create {}", self.profile_name);
             println!("   Or list available profiles: mntn profile list");
-            return Err(Box::new(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Profile '{}' does not exist", self.profile_name),
-            )));
+            bail!("Profile '{}' does not exist", self.profile_name);
         }
 
         // Check if already on this profile

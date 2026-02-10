@@ -29,7 +29,7 @@ impl Task for CleanTask {
         "Clean"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("🧹 Cleaning system junk...");
 
         let args = CleanArgs {

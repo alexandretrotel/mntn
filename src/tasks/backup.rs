@@ -34,7 +34,7 @@ impl Task for BackupTask {
         "Backup"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         let backup_dir = self.profile.get_backup_path();
         fs::create_dir_all(&backup_dir)?;
 

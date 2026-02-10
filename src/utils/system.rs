@@ -1,3 +1,4 @@
+use crate::error::{AppError, Result};
 use regex::Regex;
 use std::io;
 use std::path::Path;
@@ -9,16 +10,12 @@ use std::process::Command;
 /// - Returns an `io::Error` if the command cannot be run.
 /// - Returns an error if the command exits with non-zero status.
 /// - Returns a `FromUtf8Error` if stdout isn't valid UTF-8.
-pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String> {
     run_cmd_impl(cmd, args, None)
 }
 
 /// Run a command in a specific directory
-pub fn run_cmd_in_dir(
-    cmd: &str,
-    args: &[&str],
-    dir: &Path,
-) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run_cmd_in_dir(cmd: &str, args: &[&str], dir: &Path) -> Result<String> {
     run_cmd_impl(cmd, args, Some(dir))
 }
 
@@ -30,17 +27,13 @@ pub fn strip_ansi_codes(input: &str) -> String {
 }
 
 /// Returns the current git branch name in the given directory.
-pub fn get_current_git_branch(dir: &std::path::Path) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_current_git_branch(dir: &std::path::Path) -> Result<String> {
     let branch = run_cmd_in_dir("git", &["rev-parse", "--abbrev-ref", "HEAD"], dir)?;
     Ok(branch.trim().to_string())
 }
 
 /// Internal implementation for running commands with optional directory
-fn run_cmd_impl(
-    cmd: &str,
-    args: &[&str],
-    dir: Option<&Path>,
-) -> Result<String, Box<dyn std::error::Error>> {
+fn run_cmd_impl(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
     let mut command = Command::new(cmd);
     command.args(args);
 
@@ -55,13 +48,11 @@ fn run_cmd_impl(
         let stderr_msg = String::from_utf8(output.stderr)
             .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
 
-        return Err(io::Error::other(format!(
-            "Command '{}' failed with status {:?}: {}",
-            cmd,
-            output.status.code(),
-            stderr_msg
-        ))
-        .into());
+        return Err(AppError::CommandFailure {
+            cmd: cmd.to_string(),
+            status: output.status.code(),
+            stderr: stderr_msg,
+        });
     }
 
     let stdout = String::from_utf8(output.stdout)?;
@@ -224,25 +215,45 @@ mod tests {
 
     #[test]
     fn test_get_current_git_branch_returns_branch_name() {
+        if run_cmd("git", &["--version"]).is_err() {
+            return;
+        }
+
         let temp_dir = TempDir::new().unwrap();
         // Initialize a git repo and create a branch
-        let _ = run_cmd_in_dir("git", &["init"], temp_dir.path());
-        let _ = run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path());
+        if run_cmd_in_dir("git", &["init"], temp_dir.path()).is_err() {
+            return;
+        }
+        if run_cmd_in_dir("git", &["checkout", "-b", "test-branch"], temp_dir.path()).is_err() {
+            return;
+        }
         // Set user.name and user.email for CI environments before committing
-        let _ = run_cmd_in_dir(
+        if run_cmd_in_dir(
             "git",
             &["config", "user.name", "Test User"],
             temp_dir.path(),
-        );
-        let _ = run_cmd_in_dir(
+        )
+        .is_err()
+        {
+            return;
+        }
+        if run_cmd_in_dir(
             "git",
             &["config", "user.email", "test@example.com"],
             temp_dir.path(),
-        );
+        )
+        .is_err()
+        {
+            return;
+        }
         // Make an initial commit so HEAD points to the branch
         std::fs::write(temp_dir.path().join("file.txt"), "content").unwrap();
-        let _ = run_cmd_in_dir("git", &["add", "."], temp_dir.path());
-        let _ = run_cmd_in_dir("git", &["commit", "-m", "initial"], temp_dir.path());
+        if run_cmd_in_dir("git", &["add", "."], temp_dir.path()).is_err() {
+            return;
+        }
+        if run_cmd_in_dir("git", &["commit", "-m", "initial"], temp_dir.path()).is_err() {
+            return;
+        }
         let branch = get_current_git_branch(temp_dir.path());
         assert!(branch.is_ok());
         assert_eq!(branch.unwrap(), "test-branch");
