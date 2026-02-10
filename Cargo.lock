@@ -1087,6 +1087,7 @@ name = "mntn"
 version = "2.2.0"
 dependencies = [
  "age",
+ "anyhow",
  "base64 0.22.1",
  "chrono",
  "clap",
@@ -1106,6 +1107,7 @@ dependencies = [
  "shellexpand",
  "signal-hook 0.4.3",
  "tempfile",
+ "thiserror 1.0.69",
  "trash",
  "which",
  "whoami",

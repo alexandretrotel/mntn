@@ -19,7 +19,7 @@ impl Task for BiometricSudoTask {
         "Biometric Sudo"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("🔐 Configuring Touch ID for sudo...");
         log("Starting Touch ID sudo configuration");
 
@@ -30,7 +30,7 @@ impl Task for BiometricSudoTask {
             }
             Err(e) => {
                 log_error("Failed to configure Touch ID for sudo", &e);
-                Err(Box::new(e))
+                Err(e.into())
             }
         }
     }

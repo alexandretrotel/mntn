@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 age = "0.11.2"
+anyhow = "1.0.83"
 base64 = "0.22"
 chrono = "0.4.42"
 gethostname = "1.1.0"
@@ -39,6 +40,7 @@ which = "8.0.0"
 whoami = "2.0.0"
 libc = "0.2.178"
 signal-hook = "0.4.1"
+thiserror = "1.0.69"
 
 [dev-dependencies]
 serial_test = "3.2.0"

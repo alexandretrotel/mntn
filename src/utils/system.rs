@@ -1,3 +1,4 @@
+use crate::error::{AppError, Result};
 use regex::Regex;
 use std::io;
 use std::path::Path;
@@ -9,16 +10,12 @@ use std::process::Command;
 /// - Returns an `io::Error` if the command cannot be run.
 /// - Returns an error if the command exits with non-zero status.
 /// - Returns a `FromUtf8Error` if stdout isn't valid UTF-8.
-pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<String> {
     run_cmd_impl(cmd, args, None)
 }
 
 /// Run a command in a specific directory
-pub fn run_cmd_in_dir(
-    cmd: &str,
-    args: &[&str],
-    dir: &Path,
-) -> Result<String, Box<dyn std::error::Error>> {
+pub fn run_cmd_in_dir(cmd: &str, args: &[&str], dir: &Path) -> Result<String> {
     run_cmd_impl(cmd, args, Some(dir))
 }
 
@@ -30,17 +27,13 @@ pub fn strip_ansi_codes(input: &str) -> String {
 }
 
 /// Returns the current git branch name in the given directory.
-pub fn get_current_git_branch(dir: &std::path::Path) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_current_git_branch(dir: &std::path::Path) -> Result<String> {
     let branch = run_cmd_in_dir("git", &["rev-parse", "--abbrev-ref", "HEAD"], dir)?;
     Ok(branch.trim().to_string())
 }
 
 /// Internal implementation for running commands with optional directory
-fn run_cmd_impl(
-    cmd: &str,
-    args: &[&str],
-    dir: Option<&Path>,
-) -> Result<String, Box<dyn std::error::Error>> {
+fn run_cmd_impl(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
     let mut command = Command::new(cmd);
     command.args(args);
 
@@ -55,13 +48,11 @@ fn run_cmd_impl(
         let stderr_msg = String::from_utf8(output.stderr)
             .unwrap_or_else(|_| format!("<non-UTF-8 stderr data: {} bytes>", stderr_len));
 
-        return Err(io::Error::other(format!(
-            "Command '{}' failed with status {:?}: {}",
-            cmd,
-            output.status.code(),
-            stderr_msg
-        ))
-        .into());
+        return Err(AppError::CommandFailure {
+            cmd: cmd.to_string(),
+            status: output.status.code(),
+            stderr: stderr_msg,
+        });
     }
 
     let stdout = String::from_utf8(output.stdout)?;

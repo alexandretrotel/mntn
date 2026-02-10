@@ -1,4 +1,5 @@
 use age::secrecy::SecretString;
+use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -7,17 +8,19 @@ use std::path::Path;
 
 /// Prompts the user for a password securely (input is hidden)
 /// If `confirm` is true, asks for password confirmation
-pub fn prompt_password(confirm: bool) -> Result<SecretString, Box<dyn std::error::Error>> {
-    let password = rpassword::prompt_password("Enter encryption password: ")?;
+pub fn prompt_password(confirm: bool) -> Result<SecretString> {
+    let password =
+        rpassword::prompt_password("Enter encryption password: ").context("Read password")?;
 
     if password.is_empty() {
-        return Err("Password cannot be empty".into());
+        bail!("Password cannot be empty");
     }
 
     if confirm {
-        let confirmation = rpassword::prompt_password("Confirm encryption password: ")?;
+        let confirmation = rpassword::prompt_password("Confirm encryption password: ")
+            .context("Read password confirmation")?;
         if password != confirmation {
-            return Err("Passwords do not match".into());
+            bail!("Passwords do not match");
         }
     }
 
@@ -26,56 +29,63 @@ pub fn prompt_password(confirm: bool) -> Result<SecretString, Box<dyn std::error
 }
 
 /// Encrypts a file using age with password-based encryption
-pub fn encrypt_file(
-    source: &Path,
-    dest: &Path,
-    password: &SecretString,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let content = fs::read(source)?;
+pub fn encrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
+    let content = fs::read(source)
+        .with_context(|| format!("Read source file for encryption: {}", source.display()))?;
 
     let encryptor = age::Encryptor::with_user_passphrase(password.clone());
 
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Create parent directory: {}", parent.display()))?;
     }
 
     let mut encrypted = vec![];
-    let mut writer = encryptor.wrap_output(&mut encrypted)?;
-    writer.write_all(&content)?;
-    writer.finish()?;
+    let mut writer = encryptor
+        .wrap_output(&mut encrypted)
+        .context("Initialize encryptor")?;
+    writer
+        .write_all(&content)
+        .context("Write encrypted content")?;
+    writer.finish().context("Finalize encryption output")?;
 
-    fs::write(dest, encrypted)?;
+    fs::write(dest, encrypted)
+        .with_context(|| format!("Write encrypted file: {}", dest.display()))?;
     Ok(())
 }
 
 /// Decrypts a file using age with password-based encryption
-pub fn decrypt_file(
-    source: &Path,
-    dest: &Path,
-    password: &SecretString,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let encrypted = fs::read(source)?;
+pub fn decrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
+    let encrypted = fs::read(source)
+        .with_context(|| format!("Read encrypted file for decryption: {}", source.display()))?;
 
-    let decryptor = age::Decryptor::new(&encrypted[..])?;
+    let decryptor = age::Decryptor::new(&encrypted[..]).context("Create decryptor")?;
 
     let identity = age::scrypt::Identity::new(password.clone());
 
     let mut decrypted = vec![];
-    let mut reader = decryptor.decrypt(std::iter::once(&identity as &dyn age::Identity))?;
-    reader.read_to_end(&mut decrypted)?;
+    let mut reader = decryptor
+        .decrypt(std::iter::once(&identity as &dyn age::Identity))
+        .context("Decrypt payload")?;
+    reader
+        .read_to_end(&mut decrypted)
+        .context("Read decrypted payload")?;
 
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Create parent directory: {}", parent.display()))?;
     }
 
-    fs::write(dest, decrypted)?;
+    fs::write(dest, decrypted)
+        .with_context(|| format!("Write decrypted file: {}", dest.display()))?;
 
     // Set restrictive permissions on sensitive files (Unix only)
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let permissions = std::fs::Permissions::from_mode(0o600);
-        fs::set_permissions(dest, permissions)?;
+        fs::set_permissions(dest, permissions)
+            .with_context(|| format!("Set permissions on: {}", dest.display()))?;
     }
 
     Ok(())

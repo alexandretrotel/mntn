@@ -3,6 +3,7 @@ use crate::logger::{log_info, log_success};
 use crate::tasks::core::{PlannedOperation, Task, TaskExecutor};
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd_in_dir;
+use anyhow::bail;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
@@ -45,7 +46,7 @@ impl Task for SyncTask {
         "Sync"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         let args = SyncArgs {
             init: self.init,
             remote_url: self.remote_url.clone(),
@@ -130,20 +131,18 @@ pub fn run_with_args(args: SyncArgs) {
     TaskExecutor::run(&mut task, args.dry_run);
 }
 
-fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_with_git(args: SyncArgs) -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
 
     if !mntn_dir.join(".git").exists() {
         if args.init {
             if args.remote_url.is_none() {
-                return Err("Remote URL is required when using --init".into());
+                bail!("Remote URL is required when using --init");
             }
             initialize_git_repo(&mntn_dir, args.remote_url.as_ref().unwrap())?;
             create_default_gitignore(&mntn_dir)?;
         } else {
-            return Err(
-                "No git repository found. Use --init with --remote-url to initialize.".into(),
-            );
+            bail!("No git repository found. Use --init with --remote-url to initialize.");
         }
     } else {
         if args.init {
@@ -190,10 +189,7 @@ fn sync_with_git(args: SyncArgs) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn initialize_git_repo(
-    mntn_dir: &Path,
-    remote_url: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn initialize_git_repo(mntn_dir: &Path, remote_url: &str) -> anyhow::Result<()> {
     println!("Initializing git repository in {}", mntn_dir.display());
 
     run_cmd_in_dir("git", &["init"], mntn_dir)?;
@@ -207,7 +203,7 @@ fn initialize_git_repo(
     Ok(())
 }
 
-fn create_default_gitignore(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_default_gitignore(mntn_dir: &Path) -> anyhow::Result<()> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         let default_gitignore = "# mntn log files
@@ -236,14 +232,14 @@ Thumbs.db
     Ok(())
 }
 
-fn show_git_status() -> Result<(), Box<dyn std::error::Error>> {
+fn show_git_status() -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
     let output = run_cmd_in_dir("git", &["status", "--short", "--branch"], &mntn_dir)?;
     println!("{}", output);
     Ok(())
 }
 
-fn show_git_diff() -> Result<(), Box<dyn std::error::Error>> {
+fn show_git_diff() -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
     let unstaged_args = ["diff", "--color=always"];
     let staged_args = ["diff", "--staged", "--color=always"];
@@ -257,10 +253,7 @@ fn show_git_diff() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_staged_diff_with_fallback(
-    staged_args: &[&str],
-    mntn_dir: &Path,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn run_staged_diff_with_fallback(staged_args: &[&str], mntn_dir: &Path) -> anyhow::Result<Vec<u8>> {
     match run_git_diff_bytes(staged_args, mntn_dir) {
         Ok(output) => Ok(output),
         Err(_) => {
@@ -277,11 +270,11 @@ fn run_staged_diff_with_fallback(
     }
 }
 
-fn run_git_diff_bytes(
-    args: &[&str],
-    mntn_dir: &Path,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let output = Command::new("git").args(args).current_dir(mntn_dir).output()?;
+fn run_git_diff_bytes(args: &[&str], mntn_dir: &Path) -> anyhow::Result<Vec<u8>> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(mntn_dir)
+        .output()?;
 
     if !output.status.success() {
         let stderr_len = output.stderr.len();
@@ -298,7 +291,7 @@ fn run_git_diff_bytes(
     Ok(output.stdout)
 }
 
-fn print_diff_block(title: &str, content: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn print_diff_block(title: &str, content: &[u8]) -> anyhow::Result<()> {
     use std::io::Write;
 
     println!("{}", title);
@@ -317,7 +310,7 @@ fn print_diff_block(title: &str, content: &[u8]) -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-fn ensure_gitignore_exists(mntn_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn ensure_gitignore_exists(mntn_dir: &Path) -> anyhow::Result<()> {
     let gitignore_path = mntn_dir.join(".gitignore");
     if !gitignore_path.exists() {
         create_default_gitignore(mntn_dir)?;

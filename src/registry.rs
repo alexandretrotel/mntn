@@ -1,3 +1,4 @@
+use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, collections::HashMap, path::PathBuf};
 
@@ -34,7 +35,7 @@ where
     T: RegistryEntryLike + Clone + Serialize + for<'a> Deserialize<'a>,
 {
     /// Load registry from file, creating default if it doesn't exist
-    pub fn load_or_create(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>>
+    pub fn load_or_create(path: &PathBuf) -> Result<Self>
     where
         Self: Default,
     {
@@ -50,7 +51,7 @@ where
     }
 
     /// Save registry to file with entries sorted alphabetically by key
-    pub fn save(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save(&self, path: &PathBuf) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -83,13 +84,13 @@ where
     }
 
     /// Enable/disable an entry
-    pub fn set_entry_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String> {
+    pub fn set_entry_enabled(&mut self, id: &str, enabled: bool) -> Result<()> {
         match self.entries.get_mut(id) {
             Some(entry) => {
                 entry.set_enabled(enabled);
                 Ok(())
             }
-            None => Err(format!("Entry '{}' not found", id)),
+            None => Err(AppError::RegistryEntryNotFound { id: id.to_string() }),
         }
     }
 
@@ -102,6 +103,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::AppError;
     use std::fs;
     use tempfile::TempDir;
 
@@ -448,7 +450,10 @@ mod tests {
         let result = registry.set_entry_enabled("nonexistent", true);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not found"));
+        assert!(matches!(
+            result.unwrap_err(),
+            AppError::RegistryEntryNotFound { .. }
+        ));
     }
 
     #[test]

@@ -165,7 +165,7 @@ impl Task for MigrateTask {
         "Migrate"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("Migrating legacy backup files to common/...");
 
         // First, clean up any legacy symlinks at target locations
