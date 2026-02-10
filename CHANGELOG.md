@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 - **Package Registry Output:** Strips ANSI escape codes from package registry command output to keep package registry output clean.
+
 ## v2.2.0
 
 ### Added
