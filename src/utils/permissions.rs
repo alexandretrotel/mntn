@@ -47,7 +47,7 @@ fn set_owner_only_dacl(path: &Path, is_dir: bool) -> io::Result<()> {
     const GENERIC_ALL: u32 = 0x1000_0000;
     const SUB_CONTAINERS_AND_OBJECTS_INHERIT: u32 = 0x00000003;
 
-    let mut token: HANDLE = std::ptr::null_mut();
+    let mut token: HANDLE = 0;
     let opened = unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) };
     if opened == 0 {
         return Err(io::Error::last_os_error());
