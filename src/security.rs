@@ -297,26 +297,33 @@ fn store_cached_password(
         tmp_path = cache_path.with_extension(format!("tmp.{}", std::process::id()));
     }
 
-    let mut tmp_file = fs::File::create(&tmp_path)?;
-    let mut writer = encryptor.wrap_output(&mut tmp_file)?;
-    writer.write_all(serialized.expose_secret())?;
-    writer.finish()?;
-    drop(serialized);
-    tmp_file.sync_all()?;
+    let write_result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut tmp_file = fs::File::create(&tmp_path)?;
+        let mut writer = encryptor.wrap_output(&mut tmp_file)?;
+        writer.write_all(serialized.expose_secret())?;
+        writer.finish()?;
+        drop(serialized);
+        tmp_file.sync_all()?;
 
-    if let Err(e) = lock_down_file(&tmp_path) {
-        log_warning(&format!("Failed to lock down cache file: {}", e));
-    }
-
-    #[cfg(windows)]
-    {
-        if cache_path.exists() {
-            let _ = fs::remove_file(&cache_path);
+        if let Err(e) = lock_down_file(&tmp_path) {
+            log_warning(&format!("Failed to lock down cache file: {}", e));
         }
-    }
-    fs::rename(&tmp_path, &cache_path)?;
 
-    Ok(())
+        #[cfg(windows)]
+        {
+            if cache_path.exists() {
+                let _ = fs::remove_file(&cache_path);
+            }
+        }
+        fs::rename(&tmp_path, &cache_path)?;
+        Ok(())
+    })();
+
+    if write_result.is_err() {
+        let _ = fs::remove_file(&tmp_path);
+    }
+
+    write_result
 }
 
 fn get_or_create_cache_identity() -> Result<age::x25519::Identity, Box<dyn std::error::Error>> {
