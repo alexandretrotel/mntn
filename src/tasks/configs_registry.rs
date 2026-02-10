@@ -21,7 +21,7 @@ impl Task for ConfigsRegistryTask {
         "Configs Registry"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         match &self.args.action {
             ConfigsRegistryActions::List { enabled_only } => {
                 list_entries(*enabled_only);

@@ -27,7 +27,7 @@ impl Task for InstallTask {
         "Install"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("Installing scheduled tasks...");
 
         let mut tasks: Vec<ScheduledTask> = vec![ScheduledTask::backup_hourly()];
@@ -123,7 +123,7 @@ impl ScheduledTask {
         }
     }
 
-    fn install(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn install(&self) -> anyhow::Result<()> {
         #[cfg(target_os = "macos")]
         {
             self.install_launchd()
@@ -139,7 +139,7 @@ impl ScheduledTask {
     }
 
     #[cfg(target_os = "macos")]
-    fn install_launchd(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn install_launchd(&self) -> anyhow::Result<()> {
         let binary_path = which(&self.binary)?.to_str().unwrap().to_string();
         let base_dirs = get_base_dirs();
         let home_dir = base_dirs.home_dir();
@@ -184,7 +184,7 @@ impl ScheduledTask {
     }
 
     #[cfg(target_os = "linux")]
-    fn install_systemd_user(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn install_systemd_user(&self) -> anyhow::Result<()> {
         let binary_path = which(&self.binary)?.to_str().unwrap().to_string();
         let base_dirs = get_base_dirs();
         let config_dir = base_dirs.config_dir();
@@ -232,7 +232,7 @@ impl ScheduledTask {
     }
 
     #[cfg(target_os = "windows")]
-    fn install_windows(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn install_windows(&self) -> anyhow::Result<()> {
         let binary_path = which(&self.binary)?.to_str().unwrap().to_string();
         let task_name = format!("mntn-{}", self.label);
         let mut schedule = String::from("HOURLY");

@@ -1,4 +1,5 @@
 use crate::logger::{log, log_error};
+use anyhow::Result;
 
 /// Represents a planned operation that a task would perform
 #[derive(Debug, Clone)]
@@ -29,7 +30,7 @@ pub trait Task {
     fn name(&self) -> &str;
 
     /// Execute the task
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+    fn execute(&mut self) -> Result<()>;
 
     /// Preview what the task would do (for dry-run mode)
     fn dry_run(&self) -> Vec<PlannedOperation>;
@@ -75,8 +76,6 @@ impl TaskExecutor {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::*;
 
     #[test]
@@ -158,7 +157,7 @@ mod tests {
             &self.name
         }
 
-        fn execute(&mut self) -> Result<(), Box<dyn Error>> {
+        fn execute(&mut self) -> Result<()> {
             self.executed = true;
             Ok(())
         }
@@ -263,7 +262,7 @@ mod tests {
             &self.name
         }
 
-        fn execute(&mut self) -> Result<(), Box<dyn Error>> {
+        fn execute(&mut self) -> anyhow::Result<()> {
             self.execute_count += 1;
             Ok(())
         }

@@ -20,7 +20,7 @@ impl Task for PackageRegistryTask {
         "Package Registry"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         match &self.args.action {
             PackageRegistryActions::List {
                 enabled_only,

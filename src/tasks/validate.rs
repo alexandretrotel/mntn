@@ -694,7 +694,7 @@ impl Task for ValidateTask {
         "Validate"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("🔍 Validating configuration...");
         println!("   Profile: {}", self.profile);
         log("Starting validation");

@@ -1,5 +1,6 @@
 mod cli;
 mod encryption;
+mod error;
 mod logger;
 mod profile;
 mod registries;

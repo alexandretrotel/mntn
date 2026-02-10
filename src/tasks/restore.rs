@@ -29,7 +29,7 @@ impl Task for RestoreTask {
         "Restore"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         println!("Starting restore process...");
         println!("   Profile: {}", self.profile);
 

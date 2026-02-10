@@ -51,7 +51,7 @@ impl Task for DeleteTask {
         "Delete"
     }
 
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> anyhow::Result<()> {
         if self.args.permanent {
             println!("Permanently deleting application and related files...");
         } else {
