@@ -43,7 +43,8 @@ fn backup_encrypted_configs_with_password(
                 "{}",
                 yellow(&format!(
                     "     skipped missing target {} ({})",
-                    entry.target_path.display(), id
+                    entry.target_path.display(),
+                    id
                 ))
             );
             continue;
