@@ -7,14 +7,6 @@ pub fn restore_configs(backup_path: &Path, target_path: &Path, file_name: &str) 
         return restore_directory(backup_path, target_path, file_name);
     }
 
-    if target_path.is_symlink() {
-        if let Err(e) = fs::remove_file(target_path) {
-            eprintln!("Failed to remove legacy symlink for {}: {}", file_name, e);
-            return false;
-        }
-        println!("Removed legacy symlink at {}", target_path.display());
-    }
-
     let contents = match fs::read(backup_path) {
         Ok(c) => c,
         Err(e) => {
@@ -43,14 +35,6 @@ pub fn restore_configs(backup_path: &Path, target_path: &Path, file_name: &str) 
 }
 
 fn restore_directory(backup_path: &Path, target_path: &Path, dir_name: &str) -> bool {
-    if target_path.is_symlink() {
-        if let Err(e) = fs::remove_file(target_path) {
-            eprintln!("Failed to remove legacy symlink for {}: {}", dir_name, e);
-            return false;
-        }
-        println!("Removed legacy symlink at {}", target_path.display());
-    }
-
     if let Err(e) = fs::create_dir_all(target_path) {
         eprintln!("Failed to create target directory for {}: {}", dir_name, e);
         return false;

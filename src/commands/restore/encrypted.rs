@@ -41,15 +41,6 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
             Some(resolved) => {
                 println!("Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
 
-                if target_path.is_symlink() {
-                    if let Err(e) = fs::remove_file(target_path) {
-                        eprintln!("Failed to remove legacy symlink for {}: {}", entry.name, e);
-                        skipped_count += 1;
-                        continue;
-                    }
-                    println!("Removed legacy symlink at {}", target_path.display());
-                }
-
                 if let Some(parent) = target_path.parent()
                     && let Err(e) = fs::create_dir_all(parent)
                 {
