@@ -29,12 +29,10 @@ impl Command for BackupTask {
 
     fn execute(&mut self) -> anyhow::Result<()> {
         let mntn_dir = get_mntn_dir();
+        crate::commands::git::init_repo_if_missing(&mntn_dir)?;
+
         let backup_path = self.profile.get_backup_path();
         fs::create_dir_all(&backup_path)?;
-
-        if !mntn_dir.exists() {
-            crate::commands::git::init_repo_if_missing(&mntn_dir)?;
-        }
 
         println!("Backing up...");
         println!("   Target: {}", self.profile);

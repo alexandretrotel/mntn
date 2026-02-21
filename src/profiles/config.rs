@@ -11,10 +11,19 @@ pub struct ProfileDefinition {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileConfig {
     pub version: String,
     pub profiles: HashMap<String, ProfileDefinition>,
+}
+
+impl Default for ProfileConfig {
+    fn default() -> Self {
+        Self {
+            version: "1.0.0".to_string(),
+            profiles: HashMap::new(),
+        }
+    }
 }
 
 impl ProfileConfig {

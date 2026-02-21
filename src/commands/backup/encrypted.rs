@@ -41,7 +41,7 @@ fn backup_encrypted_configs_with_password(encrypted_backup_path: &Path, password
         enabled_entries.len()
     );
 
-    for (id, entry) in enabled_entries {
+    for (_, entry) in enabled_entries {
         let target_path = &entry.target_path;
 
         if !target_path.exists() {
@@ -68,7 +68,6 @@ fn backup_encrypted_configs_with_password(encrypted_backup_path: &Path, password
 
         match encrypt_file(target_path, &backup_destination, password) {
             Ok(()) => {
-                println!("Backed up {} ({})", entry.name, id);
                 println!(
                     "Backed up encrypted {} from {}",
                     entry.name,

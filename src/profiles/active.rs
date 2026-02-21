@@ -79,6 +79,9 @@ pub fn get_active_profile_name() -> Option<String> {
 
 pub fn set_active_profile(profile_name: &str) -> io::Result<()> {
     let active_profile_path = get_active_profile_path();
+    if let Some(parent) = active_profile_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(active_profile_path, profile_name)
 }
 

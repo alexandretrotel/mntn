@@ -5,6 +5,9 @@ use crate::profiles::{
 };
 use anyhow::bail;
 
+const COMMON: &str = "common";
+const NONE: &str = "none";
+
 pub struct UseTask {
     profile_name: String,
 }
@@ -15,7 +18,7 @@ impl UseTask {
     }
 
     fn is_clearing_profile(&self) -> bool {
-        self.profile_name == "common" || self.profile_name == "none"
+        self.profile_name == COMMON || self.profile_name == NONE
     }
 }
 
@@ -29,12 +32,11 @@ impl Command for UseTask {
 
         if self.is_clearing_profile() {
             clear_active_profile()?;
-            println!("Switched to common (no active profile)");
+            println!("Switched to {} (no active profile)", COMMON);
             return Ok(());
         }
 
         if !config.profile_exists(&self.profile_name) {
-            eprintln!("Profile '{}' does not exist", self.profile_name);
             println!();
             println!("Create it with: mntn profile create {}", self.profile_name);
             println!("   Or list available profiles: mntn profile list");

@@ -27,6 +27,10 @@ pub fn backup_file(source: &Path, destination: &Path) -> std::io::Result<()> {
         }
     }
 
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
     fs::copy(source, destination)?;
     Ok(())
 }
@@ -49,11 +53,13 @@ pub fn backup_directory(source: &Path, destination: &Path) -> std::io::Result<()
             .canonicalize()
             .unwrap_or_else(|_| destination.to_path_buf());
 
-        if canonical_target == canonical_dest
-            || canonical_dest.starts_with(&canonical_target)
-            || canonical_target.starts_with(&canonical_dest)
-        {
-            fs::remove_file(source)?;
+        if canonical_target == canonical_dest {
+            let file_type = fs::symlink_metadata(source)?.file_type();
+            if file_type.is_dir() || (file_type.is_symlink() && fs::metadata(source)?.is_dir()) {
+                fs::remove_dir(source)?;
+            } else {
+                fs::remove_file(source)?;
+            }
             fs::create_dir_all(source)?;
             crate::utils::filesystem::copy_dir_recursive(&canonical_target, source)?;
             println!("Converted symlink to real directory: {}", source.display());

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use crate::utils::paths::{
     get_common_path, get_encrypted_common_path, get_encrypted_profiles_path, get_profiles_path,
@@ -29,6 +29,10 @@ pub struct ResolvedSource {
 
 impl ActiveProfile {
     pub fn resolve_source(&self, source_path: &str) -> Option<ResolvedSource> {
+        if !is_valid_source_path(source_path) {
+            return None;
+        }
+
         let candidates = self.get_candidate_sources(source_path);
 
         for (path, layer) in candidates {
@@ -41,6 +45,10 @@ impl ActiveProfile {
     }
 
     pub fn get_candidate_sources(&self, source_path: &str) -> Vec<(PathBuf, SourceLayer)> {
+        if !is_valid_source_path(source_path) {
+            return Vec::new();
+        }
+
         let mut candidates = Vec::new();
 
         if let Some(profile_name) = &self.name {
@@ -63,6 +71,10 @@ impl ActiveProfile {
     }
 
     pub fn resolve_encrypted_source(&self, source_path: &str) -> Option<ResolvedSource> {
+        if !is_valid_source_path(source_path) {
+            return None;
+        }
+
         let candidates = self.get_candidate_encrypted_sources(source_path);
 
         for (path, layer) in candidates {
@@ -78,6 +90,10 @@ impl ActiveProfile {
         &self,
         source_path: &str,
     ) -> Vec<(PathBuf, SourceLayer)> {
+        if !is_valid_source_path(source_path) {
+            return Vec::new();
+        }
+
         let mut candidates = Vec::new();
 
         if let Some(profile_name) = &self.name {
@@ -94,4 +110,16 @@ impl ActiveProfile {
 
         candidates
     }
+}
+
+fn is_valid_source_path(source_path: &str) -> bool {
+    if source_path.is_empty() {
+        return false;
+    }
+
+    let path = Path::new(source_path);
+    !path.is_absolute()
+        && !path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
 }

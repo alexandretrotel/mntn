@@ -4,6 +4,7 @@ use crate::utils::system::run_cmd;
 use anyhow::bail;
 use std::fs;
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 pub fn run(args: GitArgs) {
     if let Err(e) = run_git_passthrough(args.args) {
@@ -15,8 +16,27 @@ fn run_git_passthrough(args: Vec<String>) -> anyhow::Result<()> {
     let mntn_dir = get_mntn_dir();
     ensure_git_repo(&mntn_dir)?;
     let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let output = run_cmd("git", &args_ref, Some(&mntn_dir))?;
-    print!("{}", output);
+    run_cmd_passthrough("git", &args_ref, Some(&mntn_dir))?;
+    Ok(())
+}
+
+fn run_cmd_passthrough(cmd: &str, args: &[&str], dir: Option<&Path>) -> anyhow::Result<()> {
+    let mut command = Command::new(cmd);
+    command
+        .args(args)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    if let Some(d) = dir {
+        command.current_dir(d);
+    }
+
+    let status = command.status()?;
+    if !status.success() {
+        bail!("{} exited with status {}", cmd, status);
+    }
+
     Ok(())
 }
 
