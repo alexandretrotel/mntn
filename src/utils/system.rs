@@ -1,12 +1,27 @@
 use crate::errors::{AppError, Result};
-use regex::Regex;
 use std::io;
 use std::path::Path;
 use std::process::Command;
 
 pub fn strip_ansi_codes(input: &str) -> String {
-    let re = Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]").unwrap();
-    re.replace_all(input, "").to_string()
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' && matches!(chars.peek(), Some('[')) {
+            let _ = chars.next();
+            for c in chars.by_ref() {
+                if ('@'..='~').contains(&c) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        output.push(ch);
+    }
+
+    output
 }
 
 pub fn run_cmd(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
@@ -49,4 +64,24 @@ pub fn sync_directory_contents(source: &Path, dest: &Path) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+pub fn is_command_available(command: &str) -> bool {
+    let command_path = Path::new(command);
+    if command_path.components().count() > 1 {
+        return command_path.is_file();
+    }
+
+    let Some(path_var) = std::env::var_os("PATH") else {
+        return false;
+    };
+
+    for path_dir in std::env::split_paths(&path_var) {
+        let candidate = path_dir.join(command);
+        if candidate.is_file() {
+            return true;
+        }
+    }
+
+    false
 }

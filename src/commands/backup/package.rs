@@ -1,7 +1,6 @@
 use crate::registry::package::PackageRegistry;
 use crate::utils::paths::get_package_registry_path;
 use crate::utils::system::{run_cmd, strip_ansi_codes};
-use rayon::prelude::*;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -35,7 +34,7 @@ pub fn backup_packages(packages_path: &Path) {
     );
 
     let results: Vec<_> = compatible_entries
-        .par_iter()
+        .iter()
         .map(|(id, entry)| {
             let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
             let result = match run_cmd(&entry.command, &args, None) {

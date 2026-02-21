@@ -2,6 +2,7 @@ use crate::commands::validate::types::{ValidationError, Validator};
 use crate::registry::config::ConfigRegistry;
 use crate::registry::package::PackageRegistry;
 use crate::utils::paths::{get_config_registry_path, get_package_registry_path};
+use crate::utils::system::is_command_available;
 use std::collections::HashMap;
 
 pub struct RegistryFilesValidator;
@@ -46,7 +47,7 @@ impl Validator for RegistryFilesValidator {
             Ok(registry) => {
                 let current_platform = PackageRegistry::get_current_platform();
                 for (id, entry) in registry.get_platform_compatible_entries(&current_platform) {
-                    if which::which(&entry.command).is_err() {
+                    if !is_command_available(&entry.command) {
                         errors.push(
                             ValidationError::info(format!(
                                 "Package manager '{}' ({}) not found in PATH",
