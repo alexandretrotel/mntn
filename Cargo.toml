@@ -19,7 +19,6 @@ path = "src/main.rs"
 [dependencies]
 age = "0.11.2"
 anyhow = "1.0.83"
-chrono = "0.4.42"
 rayon = "1.11.0"
 rpassword = "7"
 clap = { version = "4.5.53", features = ["derive"] }
@@ -27,6 +26,5 @@ directories-next = "2.0.0"
 regex = "1.11.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-shellexpand = "3.1.1"
 which = "8.0.0"
 thiserror = "2.0.18"
