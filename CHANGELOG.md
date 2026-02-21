@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.0.0
+
+### Breaking
+- Removed `install`, `setup`, and `migrate` commands.
+- Removed `delete` and `purge` commands.
+- Removed `biometric-sudo` command.
+- Removed `clean` command.
+- Removed `registry` command.
+- Replaced `git` subcommands with passthrough `mntn git <args>`.
+- Unified `registry-configs`, `registry-packages`, and `registry-encrypted` into `registry --type`.
+- Renamed registry and profile files.
+
+Migration:
+1. Rename `~/.mntn/profile.json` to `~/.mntn/profiles.json`.
+2. Rename `~/.mntn/configs_registry.json` or `~/.mntn/configs.registry.json` to `~/.mntn/config.registry.json`.
+3. Rename `~/.mntn/package_registry.json` to `~/.mntn/package.registry.json`.
+4. Rename `~/.mntn/encrypted_registry.json` or `~/.mntn/encrypted_configs_registry.json` to `~/.mntn/encrypted.registry.json`.
+
+Commands:
+```bash
+mv ~/.mntn/profile.json ~/.mntn/profiles.json
+mv ~/.mntn/configs_registry.json ~/.mntn/config.registry.json 2>/dev/null || true
+mv ~/.mntn/configs.registry.json ~/.mntn/config.registry.json 2>/dev/null || true
+mv ~/.mntn/package_registry.json ~/.mntn/package.registry.json
+mv ~/.mntn/encrypted_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null || true
+mv ~/.mntn/encrypted_configs_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null || true
+```
+
+### Added
+- Initialize git repository when `mntn backup` creates `~/.mntn`.
+
 ## v2.3.0
 
 ### Added
