@@ -40,7 +40,7 @@ fn run_cmd_passthrough(cmd: &str, args: &[&str], dir: Option<&Path>) -> anyhow::
     Ok(())
 }
 
-fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
+pub(crate) fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
     if !mntn_dir.join(".git").exists() {
         bail!("No git repository found in ~/.mntn. Run 'mntn backup' to initialize it.");
     }

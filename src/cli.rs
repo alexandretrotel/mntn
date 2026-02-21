@@ -30,6 +30,9 @@ pub(crate) enum Commands {
     #[command(about = "Run git commands in the mntn repository")]
     Git(GitArgs),
 
+    #[command(about = "Stage, commit, and push to the mntn repository")]
+    Sync(SyncArgs),
+
     #[command(about = "Validate JSON configs, symlinks, and registry files")]
     Validate(ValidateArgs),
 }
@@ -85,6 +88,16 @@ impl ValidateArgs {
 pub(crate) struct GitArgs {
     #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
     pub args: Vec<String>,
+}
+
+#[derive(Args)]
+pub(crate) struct SyncArgs {
+    #[arg(
+        long,
+        short = 'm',
+        help = "Custom commit message; defaults to \"chore: sync mntn\" when omitted"
+    )]
+    pub message: Option<String>,
 }
 
 #[derive(Args)]

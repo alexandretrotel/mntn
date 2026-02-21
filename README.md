@@ -31,6 +31,7 @@ mntn use work
 - `profile` - list/create/delete profiles
 - `use` - switch active profile
 - `git` - run any git command inside `~/.mntn`
+- `sync` - run `git add .`, `git commit -m "chore: sync mntn"` (with `--message` to override), and `git push` inside `~/.mntn`
 
 ## Directory Layout
 

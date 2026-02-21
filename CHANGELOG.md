@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.0.1
+
+### Added
+- Added `mntn sync` to stage all changes under `~/.mntn`, commit them with `chore: sync mntn` by default, and push the repository (use `--message` to override).
+
 ## v3.0.0
 
 ### Breaking
