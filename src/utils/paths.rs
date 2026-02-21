@@ -23,8 +23,16 @@ pub fn get_common_path() -> PathBuf {
     get_backup_path().join(COMMON_DIR)
 }
 
+pub fn get_encrypted_common_path() -> PathBuf {
+    get_common_path().join(ENCRYPTED_DIR)
+}
+
 pub fn get_profiles_path(profile_name: &str) -> PathBuf {
     get_backup_path().join(PROFILES_DIR).join(profile_name)
+}
+
+pub fn get_encrypted_profiles_path(profile_name: &str) -> PathBuf {
+    get_profiles_path(profile_name).join(ENCRYPTED_DIR)
 }
 
 pub fn get_config_registry_path() -> PathBuf {
