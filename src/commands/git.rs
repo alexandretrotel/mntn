@@ -49,7 +49,7 @@ fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn init_repo_if_missing(mntn_dir: &Path) -> anyhow::Result<()> {
+pub(crate) fn init_repo_if_missing(mntn_dir: &Path) -> anyhow::Result<()> {
     if mntn_dir.join(".git").exists() {
         ensure_gitignore_exists(mntn_dir)?;
         return Ok(());
@@ -82,7 +82,7 @@ Thumbs.db
 *.swo
 ";
         fs::write(&gitignore_path, default_gitignore)?;
-        println!("Created default .gitignore with mntn.log excluded");
+        println!("Created default .gitignore");
     }
     Ok(())
 }

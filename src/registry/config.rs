@@ -24,7 +24,8 @@ impl Default for ConfigRegistry {
     fn default() -> Self {
         let mut entries = HashMap::new();
 
-        let base_dirs = BaseDirs::new().unwrap();
+        let base_dirs = BaseDirs::new()
+            .expect("failed to get user base dirs: $HOME not set or platform dirs unavailable");
         let home_dir = base_dirs.home_dir();
         let data_dir = base_dirs.data_dir();
 

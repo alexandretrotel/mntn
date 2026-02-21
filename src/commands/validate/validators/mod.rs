@@ -4,4 +4,4 @@ mod layer_resolution;
 mod registry_files;
 mod validation_suite;
 
-pub use validation_suite::ValidationSuite;
+pub(crate) use validation_suite::ValidationSuite;

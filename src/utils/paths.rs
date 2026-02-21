@@ -60,8 +60,8 @@ pub(crate) fn get_active_profile_path() -> PathBuf {
 }
 
 pub(crate) fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
-    if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
-        return PathBuf::from(xdg_config).join(relative_path);
+    if let Some(xdg_config) = xdg_config_home_dir() {
+        return xdg_config.join(relative_path);
     }
     BaseDirs::new()
         .unwrap()
@@ -71,7 +71,7 @@ pub(crate) fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
 }
 
 pub(crate) fn get_ghostty_config_path() -> PathBuf {
-    if std::env::var_os("XDG_CONFIG_HOME").is_some() {
+    if xdg_config_home_dir().is_some() {
         return get_xdg_or_default_config_path("ghostty/config");
     }
 
@@ -86,5 +86,12 @@ pub(crate) fn get_ghostty_config_path() -> PathBuf {
     #[cfg(not(target_os = "macos"))]
     {
         get_xdg_or_default_config_path("ghostty/config")
+    }
+}
+
+fn xdg_config_home_dir() -> Option<PathBuf> {
+    match std::env::var_os("XDG_CONFIG_HOME") {
+        Some(value) if !value.is_empty() => Some(PathBuf::from(value)),
+        _ => None,
     }
 }

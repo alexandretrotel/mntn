@@ -17,13 +17,13 @@ All notable changes to this project are documented in this file.
   - Reason: mntn is not meant for extra sensitive files. It is fine to back up SSH config (content is encrypted), but if you need filename encryption you likely should not back it up in your dotfiles repo.
   - Migration: encrypted backups that used filename hashing will not be found. Run `mntn backup` again to recreate them.
 
-Migration:
+### Migration
 1. Rename `~/.mntn/profile.json` to `~/.mntn/profiles.json`.
 2. Rename `~/.mntn/configs_registry.json` or `~/.mntn/configs.registry.json` to `~/.mntn/config.registry.json`.
 3. Rename `~/.mntn/package_registry.json` to `~/.mntn/package.registry.json`.
 4. Rename `~/.mntn/encrypted_registry.json` or `~/.mntn/encrypted_configs_registry.json` to `~/.mntn/encrypted.registry.json`.
 
-Commands:
+### Commands
 ```bash
 mv ~/.mntn/profile.json ~/.mntn/profiles.json
 

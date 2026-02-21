@@ -6,12 +6,12 @@ use super::json_files::JsonFilesValidator;
 use super::layer_resolution::LayerResolutionValidator;
 use super::registry_files::RegistryFilesValidator;
 
-pub struct ValidationSuite {
+pub(crate) struct ValidationSuite {
     validators: Vec<Box<dyn Validator>>,
 }
 
 impl ValidationSuite {
-    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    pub(crate) fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
         let validators: Vec<Box<dyn Validator>> = vec![
             Box::new(RegistryFilesValidator),
             Box::new(LayerResolutionValidator::new(profile.clone())),
