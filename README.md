@@ -1,8 +1,10 @@
 # mntn
 
-mntn is built to keep your dotfiles organized, safe, and consistent across machines. A profile is a named set of configuration choices that represents a context, like work, personal, or minimal. With profiles, you can keep multiple setups and switch between them so the right settings are active for the situation. At a high level, mntn helps you manage these configurations, keep them in sync, and recover them when needed.
+mntn is built to keep your dotfiles organized, safe, and consistent across machines using profiles.
 
-Indeed, profiles let you separate shared settings from profile-specific ones so you can reuse common files while still having context-specific overrides.
+A profile is a named set of configuration choices that represents a context, like work, personal, or minimal. With profiles, you can keep multiple setups and switch between them so the right settings are active for the situation.
+
+At a high level, mntn helps you manage these configurations, keep them in sync, and recover them when needed.
 
 ![Demo Video](./assets/mntn.gif)
 

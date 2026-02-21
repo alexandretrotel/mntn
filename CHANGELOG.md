@@ -26,11 +26,44 @@ Migration:
 Commands:
 ```bash
 mv ~/.mntn/profile.json ~/.mntn/profiles.json
-mv ~/.mntn/configs_registry.json ~/.mntn/config.registry.json 2>/dev/null || true
-mv ~/.mntn/configs.registry.json ~/.mntn/config.registry.json 2>/dev/null || true
-mv ~/.mntn/package_registry.json ~/.mntn/package.registry.json
-mv ~/.mntn/encrypted_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null || true
-mv ~/.mntn/encrypted_configs_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null || true
+
+safe_migrate_registry() {
+  local destination="$1"
+  shift
+
+  local existing_sources=()
+  local source
+  for source in "$@"; do
+    if [ -e "$source" ]; then
+      existing_sources+=("$source")
+    fi
+  done
+
+  if [ "${#existing_sources[@]}" -gt 1 ]; then
+    echo "WARN: Multiple source files found for $destination: ${existing_sources[*]}. Skipping to avoid overwrite."
+    return 1
+  fi
+
+  if [ "${#existing_sources[@]}" -eq 1 ]; then
+    if [ -e "$destination" ]; then
+      echo "WARN: Destination already exists: $destination. Skipping ${existing_sources[0]}."
+      return 1
+    fi
+
+    mv "${existing_sources[0]}" "$destination"
+  fi
+}
+
+safe_migrate_registry ~/.mntn/config.registry.json \
+  ~/.mntn/configs_registry.json \
+  ~/.mntn/configs.registry.json
+
+safe_migrate_registry ~/.mntn/package.registry.json \
+  ~/.mntn/package_registry.json
+
+safe_migrate_registry ~/.mntn/encrypted.registry.json \
+  ~/.mntn/encrypted_registry.json \
+  ~/.mntn/encrypted_configs_registry.json
 ```
 
 ### Changed
