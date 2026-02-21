@@ -13,6 +13,9 @@ All notable changes to this project are documented in this file.
 - Replaced `git` subcommands with passthrough `mntn git <args>`.
 - Unified `registry-configs`, `registry-packages`, and `registry-encrypted` into `registry --type`.
 - Renamed registry and profile files.
+- Removed encrypted filename support for encrypted registry entries. Encrypted files now always use plain relative paths with `.age`.
+- Reason: mntn is not meant for extra sensitive files. It is fine to back up SSH config (content is encrypted), but if you need filename encryption you likely should not back it up in your dotfiles repo.
+- Migration: encrypted backups that used filename hashing will not be found. Run `mntn backup` again to recreate them.
 
 Migration:
 1. Rename `~/.mntn/profile.json` to `~/.mntn/profiles.json`.

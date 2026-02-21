@@ -19,11 +19,9 @@ path = "src/main.rs"
 [dependencies]
 age = "0.11.2"
 anyhow = "1.0.83"
-base64 = "0.22"
 chrono = "0.4.42"
 rayon = "1.11.0"
 rpassword = "7"
-sha2 = "0.10"
 clap = { version = "4.5.53", features = ["derive"] }
 directories-next = "2.0.0"
 regex = "1.11.2"

@@ -19,7 +19,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf640be7658959746f1f0f2faab798f6098a9436a8e18e148d18bc9875e13c4b"
 dependencies = [
  "age-core",
- "base64 0.21.7",
+ "base64",
  "bech32",
  "chacha20poly1305",
  "cookie-factory",
@@ -44,7 +44,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2bf6a89c984ca9d850913ece2da39e1d200563b0a94b002b253beee4c5acf99"
 dependencies = [
- "base64 0.21.7",
+ "base64",
  "chacha20poly1305",
  "cookie-factory",
  "hkdf",
@@ -149,12 +149,6 @@ name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
-
-[[package]]
-name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "basic-toml"
@@ -878,7 +872,6 @@ version = "2.3.0"
 dependencies = [
  "age",
  "anyhow",
- "base64 0.22.1",
  "chrono",
  "clap",
  "directories-next",
@@ -887,7 +880,6 @@ dependencies = [
  "rpassword",
  "serde",
  "serde_json",
- "sha2",
  "shellexpand",
  "thiserror 2.0.18",
  "which",
