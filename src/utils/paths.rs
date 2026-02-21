@@ -58,3 +58,33 @@ pub fn get_profiles_config_path() -> PathBuf {
 pub fn get_active_profile_path() -> PathBuf {
     get_mntn_dir().join(ACTIVE_PROFILE_FILE)
 }
+
+pub fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
+    if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
+        return PathBuf::from(xdg_config).join(relative_path);
+    }
+    BaseDirs::new()
+        .unwrap()
+        .home_dir()
+        .join(".config")
+        .join(relative_path)
+}
+
+pub fn get_ghostty_config_path() -> PathBuf {
+    if std::env::var_os("XDG_CONFIG_HOME").is_some() {
+        return get_xdg_or_default_config_path("ghostty/config");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        BaseDirs::new()
+            .unwrap()
+            .home_dir()
+            .join("Library/Application Support/com.mitchellh.ghostty/config")
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        get_xdg_or_default_config_path("ghostty/config")
+    }
+}
