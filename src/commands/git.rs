@@ -1,4 +1,5 @@
 use crate::cli::GitArgs;
+use crate::utils::display::red;
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd;
 use anyhow::bail;
@@ -8,7 +9,7 @@ use std::process::{Command, Stdio};
 
 pub(crate) fn run(args: GitArgs) {
     if let Err(e) = run_git_passthrough(args.args) {
-        eprintln!("Git command failed: {}", e);
+        eprintln!("{}", red(&format!("Git command failed: {}", e)));
     }
 }
 
@@ -20,7 +21,11 @@ fn run_git_passthrough(args: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_cmd_passthrough(cmd: &str, args: &[&str], dir: Option<&Path>) -> anyhow::Result<()> {
+pub(crate) fn run_cmd_passthrough(
+    cmd: &str,
+    args: &[&str],
+    dir: Option<&Path>,
+) -> anyhow::Result<()> {
     let mut command = Command::new(cmd);
     command
         .args(args)
@@ -40,7 +45,7 @@ fn run_cmd_passthrough(cmd: &str, args: &[&str], dir: Option<&Path>) -> anyhow::
     Ok(())
 }
 
-fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
+pub(crate) fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
     if !mntn_dir.join(".git").exists() {
         bail!("No git repository found in ~/.mntn. Run 'mntn backup' to initialize it.");
     }

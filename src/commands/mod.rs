@@ -3,5 +3,6 @@ pub(crate) mod core;
 pub(crate) mod git;
 pub(crate) mod profile;
 pub(crate) mod restore;
+pub(crate) mod sync;
 pub(crate) mod r#use;
 pub(crate) mod validate;

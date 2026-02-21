@@ -2,8 +2,10 @@ use crate::commands::core::Command;
 use crate::encryption::prompt_password;
 use crate::profiles::ActiveProfile;
 use crate::registry::config::ConfigRegistry;
-use crate::utils::paths::get_config_registry_path;
-
+use crate::utils::{
+    display::{green, yellow},
+    paths::get_config_registry_path,
+};
 mod config;
 mod encrypted;
 
@@ -27,29 +29,38 @@ impl Command for RestoreTask {
     }
 
     fn execute(&mut self) -> anyhow::Result<()> {
-        println!("Starting restore process...");
-        println!("   Profile: {}", self.profile);
-
         let config_registry_path = get_config_registry_path();
         let config_registry = ConfigRegistry::load_or_create(&config_registry_path)?;
+
+        let enabled_entries: Vec<_> = config_registry.get_enabled_entries().collect();
+        println!(
+            "   Configurations: {} entries ({})",
+            enabled_entries.len(),
+            self.profile
+        );
 
         let mut restored_count = 0;
         let mut skipped_count = 0;
 
-        for (id, entry) in config_registry.get_enabled_entries() {
+        for (id, entry) in enabled_entries {
             let target_path = &entry.target_path;
-
             match self.profile.resolve_source(&entry.source_path) {
                 Some(resolved) => {
-                    println!("Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
-                    if config::restore_configs(&resolved.path, target_path, &entry.name) {
+                    if config::restore_configs(&resolved.path, target_path) {
                         restored_count += 1;
+                        println!("     {} {}", green("✔"), entry.source_path);
                     } else {
                         skipped_count += 1;
                     }
                 }
                 None => {
-                    println!("No backup found for {} in any layer", entry.name);
+                    println!(
+                        "{}",
+                        yellow(&format!(
+                            "     skipped {} ({}): no backup in any layer",
+                            entry.source_path, id
+                        ))
+                    );
                     skipped_count += 1;
                 }
             }

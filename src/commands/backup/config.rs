@@ -1,11 +1,12 @@
 use super::utils::{backup_directory, backup_file};
 use crate::registry::config::ConfigRegistry;
+use crate::utils::display::{green, yellow};
 use crate::utils::paths::get_config_registry_path;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
-pub fn backup_configs(configs_path: &Path) -> Result<()> {
+pub fn backup_configs(configs_path: &Path) -> Result<(u32, u32)> {
     let config_registry_path = get_config_registry_path();
     let config_registry = ConfigRegistry::load_or_create(&config_registry_path)
         .with_context(|| format!("Load config registry: {}", config_registry_path.display()))?;
@@ -14,39 +15,61 @@ pub fn backup_configs(configs_path: &Path) -> Result<()> {
 
     if enabled_entries.is_empty() {
         println!("No configuration files found to backup");
-        return Ok(());
+        return Ok((0, 0));
     }
 
-    println!(
-        "Backing up {} configuration files...",
-        enabled_entries.len()
-    );
+    println!("   Configurations: {} entries", enabled_entries.len());
+
+    let mut succeeded = 0;
+    let mut skipped = 0;
 
     for (id, entry) in enabled_entries {
         let target_path = &entry.target_path;
         let backup_destination = configs_path.join(&entry.source_path);
 
-        if let Some(parent) = backup_destination.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "Failed to create backup directory for {}: {}",
-                    entry.name,
-                    parent.display()
-                )
-            })?;
-        }
+        let entry_result: Result<()> = (|| {
+            if let Some(parent) = backup_destination.parent() {
+                fs::create_dir_all(parent).with_context(|| {
+                    format!("Prepare backup path {} ({})", parent.display(), id)
+                })?;
+            }
 
-        if target_path.is_dir() {
-            backup_directory(target_path, &backup_destination)
-                .with_context(|| format!("Failed to backup directory {} ({})", entry.name, id))?;
-        } else {
-            backup_file(target_path, &backup_destination)
-                .with_context(|| format!("Failed to backup {} ({})", entry.name, id))?;
-        }
+            if target_path.is_dir() {
+                backup_directory(target_path, &backup_destination).with_context(|| {
+                    format!(
+                        "Copy directory {} -> {}",
+                        target_path.display(),
+                        backup_destination.display()
+                    )
+                })
+            } else {
+                backup_file(target_path, &backup_destination).with_context(|| {
+                    format!(
+                        "Copy file {} -> {}",
+                        target_path.display(),
+                        backup_destination.display()
+                    )
+                })
+            }
+        })();
 
-        println!("Backed up {} ({})", entry.name, id);
-        println!("Backed up {} from {}", entry.name, target_path.display());
+        match entry_result {
+            Ok(()) => {
+                succeeded += 1;
+                println!("     {} {}", green("✔"), entry.source_path);
+            }
+            Err(e) => {
+                skipped += 1;
+                eprintln!(
+                    "{}",
+                    yellow(&format!(
+                        "     skipped {} ({}): {}",
+                        entry.source_path, id, e
+                    ))
+                );
+            }
+        }
     }
 
-    Ok(())
+    Ok((succeeded, skipped))
 }

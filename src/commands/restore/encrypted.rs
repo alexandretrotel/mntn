@@ -1,7 +1,10 @@
 use crate::encryption::{decrypt_file, get_encrypted_path};
 use crate::profiles::ActiveProfile;
 use crate::registry::encrypted::EncryptedRegistry;
-use crate::utils::paths::get_encrypted_registry_path;
+use crate::utils::{
+    display::{green, red, short_component, yellow},
+    paths::get_encrypted_registry_path,
+};
 use age::secrecy::SecretString;
 use std::fs;
 
@@ -25,43 +28,57 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
         return (0, 0);
     }
 
-    println!(
-        "Restoring {} encrypted configuration files...",
-        enabled_entries.len()
-    );
+    println!("   Encrypted configs: {} entries", enabled_entries.len());
 
     let mut restored_count = 0;
     let mut skipped_count = 0;
 
     for (id, entry) in enabled_entries {
         let target_path = &entry.target_path;
+        let target_label = short_component(target_path);
         let encrypted_path = get_encrypted_path(&entry.source_path);
 
         match profile.resolve_encrypted_source(&encrypted_path) {
             Some(resolved) => {
-                println!("Restoring: {} ({}) [{}]", entry.name, id, resolved.layer);
-
                 if let Some(parent) = target_path.parent()
                     && let Err(e) = fs::create_dir_all(parent)
                 {
-                    eprintln!("Failed to create directory for {}: {}", entry.name, e);
+                    eprintln!(
+                        "{}",
+                        red(&format!(
+                            "Failed to create directory {}: {}",
+                            target_label, e
+                        ))
+                    );
                     skipped_count += 1;
                     continue;
                 }
 
                 match decrypt_file(&resolved.path, target_path, password) {
                     Ok(()) => {
-                        println!("Restored encrypted {}", entry.name);
                         restored_count += 1;
+                        println!("     {} {}", green("✔"), entry.source_path);
                     }
                     Err(e) => {
-                        eprintln!("Failed to restore encrypted {}: {}", entry.name, e);
+                        eprintln!(
+                            "{}",
+                            red(&format!(
+                                "Failed to decrypt {} ({}): {}",
+                                entry.source_path, target_label, e
+                            ))
+                        );
                         skipped_count += 1;
                     }
                 }
             }
             None => {
-                println!("No encrypted backup found for {} in any layer", entry.name);
+                println!(
+                    "{}",
+                    yellow(&format!(
+                        "     skipped {} ({}): no encrypted backup in any layer",
+                        entry.source_path, id
+                    ))
+                );
                 skipped_count += 1;
             }
         }

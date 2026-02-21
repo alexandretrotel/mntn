@@ -1,5 +1,6 @@
 use crate::commands::core::{Command, CommandExecutor};
 use crate::profiles::{ActiveProfile, ProfileConfig};
+use crate::utils::display::{green, red};
 
 mod types;
 mod utils;
@@ -39,11 +40,14 @@ impl Command for ValidateTask {
         let error_count = report.error_count();
         let warning_count = report.warning_count();
         if error_count == 0 && warning_count == 0 {
-            println!("All checks passed");
+            println!("{}", green("All checks passed"));
         } else {
             eprintln!(
-                "Validation complete: {} error(s), {} warning(s)",
-                error_count, warning_count
+                "{}",
+                red(&format!(
+                    "Validation complete: {} error(s), {} warning(s)",
+                    error_count, warning_count
+                ))
             );
         }
         if error_count > 0 {
