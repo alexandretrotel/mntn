@@ -1,5 +1,6 @@
 use crate::cli::SyncArgs;
 use crate::commands::core::{Command, CommandExecutor};
+use crate::commands::git::run_cmd_passthrough;
 use crate::utils::display::yellow;
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd;
@@ -63,7 +64,7 @@ impl Command for SyncTask {
             println!("{}", yellow("   No changes to commit"));
         }
 
-        run_cmd("git", &["push"], Some(&repo_dir))?;
+        run_cmd_passthrough("git", &["push"], Some(&repo_dir))?;
         Ok(())
     }
 }

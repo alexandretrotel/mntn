@@ -40,8 +40,6 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
 
         match profile.resolve_encrypted_source(&encrypted_path) {
             Some(resolved) => {
-                println!("     {} {}", green("✔"), entry.source_path);
-
                 if let Some(parent) = target_path.parent()
                     && let Err(e) = fs::create_dir_all(parent)
                 {
@@ -59,6 +57,7 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
                 match decrypt_file(&resolved.path, target_path, password) {
                     Ok(()) => {
                         restored_count += 1;
+                        println!("     {} {}", green("✔"), entry.source_path);
                     }
                     Err(e) => {
                         eprintln!(

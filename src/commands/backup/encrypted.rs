@@ -39,7 +39,7 @@ fn backup_encrypted_configs_with_password(
     for (id, entry) in enabled_entries {
         if !entry.target_path.exists() {
             skipped += 1;
-            eprintln!(
+            println!(
                 "{}",
                 yellow(&format!(
                     "     skipped missing source {} ({})",
@@ -76,7 +76,7 @@ fn backup_encrypted_configs_with_password(
             }
             Err(e) => {
                 skipped += 1;
-                eprintln!(
+                println!(
                     "{}",
                     yellow(&format!(
                         "     skipped {} ({}): {}",

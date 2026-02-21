@@ -46,10 +46,9 @@ impl Command for RestoreTask {
             let target_path = &entry.target_path;
             match self.profile.resolve_source(&entry.source_path) {
                 Some(resolved) => {
-                    println!("     {} {}", green("✔"), entry.source_path);
-
                     if config::restore_configs(&resolved.path, target_path) {
                         restored_count += 1;
+                        println!("     {} {}", green("✔"), entry.source_path);
                     } else {
                         skipped_count += 1;
                     }

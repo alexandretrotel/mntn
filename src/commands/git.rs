@@ -21,7 +21,11 @@ fn run_git_passthrough(args: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_cmd_passthrough(cmd: &str, args: &[&str], dir: Option<&Path>) -> anyhow::Result<()> {
+pub(crate) fn run_cmd_passthrough(
+    cmd: &str,
+    args: &[&str],
+    dir: Option<&Path>,
+) -> anyhow::Result<()> {
     let mut command = Command::new(cmd);
     command
         .args(args)
