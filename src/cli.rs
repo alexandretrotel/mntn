@@ -13,6 +13,27 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+#[derive(Subcommand)]
+pub enum Commands {
+    #[command(about = "Backup system configurations and user data to a safe location")]
+    Backup(BackupArgs),
+
+    #[command(about = "Restore system state from a previously created backup")]
+    Restore(RestoreArgs),
+
+    #[command(about = "Switch to a different profile")]
+    Use(UseArgs),
+
+    #[command(about = "Manage profiles (list, create, delete)")]
+    Profile(ProfileArgs),
+
+    #[command(about = "Run git commands in the mntn repository")]
+    Git(GitArgs),
+
+    #[command(about = "Validate JSON configs, symlinks, and registry files")]
+    Validate(ValidateArgs),
+}
+
 #[derive(Args)]
 pub struct BackupArgs {
     #[arg(long, short = 'p', help = "Target a specific profile for backup")]
@@ -90,25 +111,4 @@ pub enum ProfileActions {
         #[arg(help = "Name of the profile to delete")]
         name: String,
     },
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    #[command(about = "Backup system configurations and user data to a safe location")]
-    Backup(BackupArgs),
-
-    #[command(about = "Restore system state from a previously created backup")]
-    Restore(RestoreArgs),
-
-    #[command(about = "Switch to a different profile")]
-    Use(UseArgs),
-
-    #[command(about = "Manage profiles (list, create, delete)")]
-    Profile(ProfileArgs),
-
-    #[command(about = "Run git commands in the mntn repository")]
-    Git(GitArgs),
-
-    #[command(about = "Validate JSON configs, symlinks, and registry files")]
-    Validate(ValidateArgs),
 }
