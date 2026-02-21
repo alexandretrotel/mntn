@@ -33,6 +33,9 @@ mv ~/.mntn/encrypted_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null |
 mv ~/.mntn/encrypted_configs_registry.json ~/.mntn/encrypted.registry.json 2>/dev/null || true
 ```
 
+### Changed
+- Switched project license from MIT to GNU GPL v3.0 or later (Free Software Foundation).
+
 ### Added
 - Initialize git repository when `mntn backup` creates `~/.mntn`.
 

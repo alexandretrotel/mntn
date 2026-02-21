@@ -6,7 +6,7 @@ description = "A Rust-based command-line tool for dotfiles management with profi
 documentation = "https://docs.rs/mntn"
 repository = "https://github.com/trotelalexandre/mntn"
 homepage = "https://github.com/trotelalexandre/mntn"
-license = "MIT"
+license = "GPL-3.0-or-later"
 exclude = [
     "assets/*",
     ".github/*",
