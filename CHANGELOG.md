@@ -2,6 +2,76 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.0.0
+
+### Breaking
+- Removed `install`, `setup`, and `migrate` commands.
+- Removed `delete` and `purge` commands.
+- Removed `biometric-sudo` command.
+- Removed `clean` command.
+- Removed `registry` command.
+- Replaced `git` subcommands with passthrough `mntn git <args>`.
+- Unified `registry-configs`, `registry-packages`, and `registry-encrypted` into `registry --type`.
+- Renamed registry and profile files.
+- Removed encrypted filename support for encrypted registry entries. Encrypted files now always use plain relative paths with `.age`.
+  - Reason: mntn is not meant for extra sensitive files. It is fine to back up SSH config (content is encrypted), but if you need filename encryption you likely should not back it up in your dotfiles repo.
+  - Migration: encrypted backups that used filename hashing will not be found. Run `mntn backup` again to recreate them.
+
+### Migration
+1. Rename `~/.mntn/profile.json` to `~/.mntn/profiles.json`.
+2. Rename `~/.mntn/configs_registry.json` or `~/.mntn/configs.registry.json` to `~/.mntn/config.registry.json`.
+3. Rename `~/.mntn/package_registry.json` to `~/.mntn/package.registry.json`.
+4. Rename `~/.mntn/encrypted_registry.json` or `~/.mntn/encrypted_configs_registry.json` to `~/.mntn/encrypted.registry.json`.
+
+### Commands
+```bash
+mv ~/.mntn/profile.json ~/.mntn/profiles.json
+
+safe_migrate_registry() {
+  local destination="$1"
+  shift
+
+  local existing_sources=()
+  local source
+  for source in "$@"; do
+    if [ -e "$source" ]; then
+      existing_sources+=("$source")
+    fi
+  done
+
+  if [ "${#existing_sources[@]}" -gt 1 ]; then
+    echo "WARN: Multiple source files found for $destination: ${existing_sources[*]}. Skipping to avoid overwrite."
+    return 1
+  fi
+
+  if [ "${#existing_sources[@]}" -eq 1 ]; then
+    if [ -e "$destination" ]; then
+      echo "WARN: Destination already exists: $destination. Skipping ${existing_sources[0]}."
+      return 1
+    fi
+
+    mv "${existing_sources[0]}" "$destination"
+  fi
+}
+
+safe_migrate_registry ~/.mntn/config.registry.json \
+  ~/.mntn/configs_registry.json \
+  ~/.mntn/configs.registry.json
+
+safe_migrate_registry ~/.mntn/package.registry.json \
+  ~/.mntn/package_registry.json
+
+safe_migrate_registry ~/.mntn/encrypted.registry.json \
+  ~/.mntn/encrypted_registry.json \
+  ~/.mntn/encrypted_configs_registry.json
+```
+
+### Changed
+- Switched project license from MIT to GNU GPL v3.0 or later (Free Software Foundation).
+
+### Added
+- Initialize git repository when `mntn backup` creates `~/.mntn`.
+
 ## v2.3.0
 
 ### Added
