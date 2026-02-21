@@ -1,0 +1,68 @@
+use crate::cli::GitArgs;
+use crate::utils::paths::get_mntn_dir;
+use crate::utils::system::run_cmd;
+use anyhow::bail;
+use std::fs;
+use std::path::Path;
+
+pub fn run(args: GitArgs) {
+    if let Err(e) = run_git_passthrough(args.args) {
+        eprintln!("Git command failed: {}", e);
+    }
+}
+
+fn run_git_passthrough(args: Vec<String>) -> anyhow::Result<()> {
+    let mntn_dir = get_mntn_dir();
+    ensure_git_repo(&mntn_dir)?;
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = run_cmd("git", &args_ref, Some(&mntn_dir))?;
+    print!("{}", output);
+    Ok(())
+}
+
+fn ensure_git_repo(mntn_dir: &Path) -> anyhow::Result<()> {
+    if !mntn_dir.join(".git").exists() {
+        bail!("No git repository found in ~/.mntn. Run 'mntn backup' to initialize it.");
+    }
+
+    ensure_gitignore_exists(mntn_dir)?;
+    Ok(())
+}
+
+pub fn init_repo_if_missing(mntn_dir: &Path) -> anyhow::Result<()> {
+    if mntn_dir.join(".git").exists() {
+        ensure_gitignore_exists(mntn_dir)?;
+        return Ok(());
+    }
+
+    println!("Initializing git repository in {}", mntn_dir.display());
+    run_cmd("git", &["init"], Some(mntn_dir))?;
+    run_cmd("git", &["branch", "-M", "main"], Some(mntn_dir))?;
+    println!("Git repository initialized");
+    ensure_gitignore_exists(mntn_dir)?;
+    Ok(())
+}
+
+fn ensure_gitignore_exists(mntn_dir: &Path) -> anyhow::Result<()> {
+    let gitignore_path = mntn_dir.join(".gitignore");
+    if !gitignore_path.exists() {
+        let default_gitignore = "# mntn
+.active-profile
+
+ # log files
+*.log
+
+# temporary files
+.DS_Store
+Thumbs.db
+
+# os generated files
+*~
+*.swp
+*.swo
+";
+        fs::write(&gitignore_path, default_gitignore)?;
+        println!("Created default .gitignore with mntn.log excluded");
+    }
+    Ok(())
+}
