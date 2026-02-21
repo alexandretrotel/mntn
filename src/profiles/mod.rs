@@ -1,8 +1,8 @@
-pub mod active;
-pub mod config;
-pub mod sources;
+mod active;
+mod config;
+mod sources;
 
-pub use active::{
+pub(crate) use active::{
     ActiveProfile, clear_active_profile, get_active_profile_name, set_active_profile,
 };
-pub use config::ProfileConfig;
+pub(crate) use config::ProfileConfig;

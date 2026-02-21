@@ -5,7 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::registry::{Registry, RegistryEntryLike};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncryptedRegistryEntry {
+pub(crate) struct EncryptedRegistryEntry {
     pub name: String,
     pub description: Option<String>,
     pub enabled: bool,
@@ -17,7 +17,7 @@ use crate::impl_registry_entry_like;
 
 impl_registry_entry_like!(EncryptedRegistryEntry);
 
-pub type EncryptedRegistry = Registry<EncryptedRegistryEntry>;
+pub(crate) type EncryptedRegistry = Registry<EncryptedRegistryEntry>;
 
 impl Default for EncryptedRegistry {
     fn default() -> Self {

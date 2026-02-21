@@ -8,13 +8,13 @@ use crate::profiles::ActiveProfile;
     version = env!("CARGO_PKG_VERSION"),
     about = "A Rust-based command-line tool for dotfiles management with profiles."
 )]
-pub struct Cli {
+pub(crate) struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
-pub enum Commands {
+pub(crate) enum Commands {
     #[command(about = "Backup system configurations and user data to a safe location")]
     Backup(BackupArgs),
 
@@ -35,7 +35,7 @@ pub enum Commands {
 }
 
 #[derive(Args)]
-pub struct BackupArgs {
+pub(crate) struct BackupArgs {
     #[arg(long, short = 'p', help = "Target a specific profile for backup")]
     pub profile: Option<String>,
     #[arg(
@@ -52,7 +52,7 @@ impl BackupArgs {
 }
 
 #[derive(Args)]
-pub struct RestoreArgs {
+pub(crate) struct RestoreArgs {
     #[arg(
         long,
         help = "Skip encrypted configs restore (will not prompt for password)"
@@ -67,7 +67,7 @@ impl RestoreArgs {
 }
 
 #[derive(Args)]
-pub struct ValidateArgs {
+pub(crate) struct ValidateArgs {
     #[arg(
         long,
         help = "Skip encrypted configs validation (will not prompt for password)"
@@ -82,25 +82,25 @@ impl ValidateArgs {
 }
 
 #[derive(Args)]
-pub struct GitArgs {
+pub(crate) struct GitArgs {
     #[arg(trailing_var_arg = true, required = true)]
     pub args: Vec<String>,
 }
 
 #[derive(Args)]
-pub struct UseArgs {
+pub(crate) struct UseArgs {
     #[arg(help = "Profile name to switch to")]
     pub profile: String,
 }
 
 #[derive(Args)]
-pub struct ProfileArgs {
+pub(crate) struct ProfileArgs {
     #[command(subcommand)]
     pub action: Option<ProfileActions>,
 }
 
 #[derive(Subcommand)]
-pub enum ProfileActions {
+pub(crate) enum ProfileActions {
     #[command(about = "List all available profiles")]
     List,
 

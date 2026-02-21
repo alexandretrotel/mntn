@@ -24,7 +24,7 @@ impl ValidationSuite {
         Self { validators }
     }
 
-    pub fn run_all(&self) -> ValidationReport {
+    pub(crate) fn run_all(&self) -> ValidationReport {
         let mut report = ValidationReport::new();
         for validator in &self.validators {
             let errors = validator.validate();

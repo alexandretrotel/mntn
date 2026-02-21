@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
+pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();

@@ -7,13 +7,13 @@ mod validators;
 
 use validators::ValidationSuite;
 
-pub struct ValidateTask {
+struct ValidateTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
 }
 
 impl ValidateTask {
-    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
@@ -50,7 +50,7 @@ impl Command for ValidateTask {
     }
 }
 
-pub fn run(args: crate::cli::ValidateArgs) {
+pub(crate) fn run(args: crate::cli::ValidateArgs) {
     if let Ok(true) = ProfileConfig::save_default_if_missing() {
         println!("Created default profile config at ~/.mntn/profiles.json");
     }

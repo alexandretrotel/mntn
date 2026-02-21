@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
-pub fn strip_ansi_codes(input: &str) -> String {
+pub(crate) fn strip_ansi_codes(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
 
@@ -24,7 +24,7 @@ pub fn strip_ansi_codes(input: &str) -> String {
     output
 }
 
-pub fn run_cmd(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
+pub(crate) fn run_cmd(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
     let mut command = Command::new(cmd);
     command.args(args);
 
@@ -50,7 +50,7 @@ pub fn run_cmd(cmd: &str, args: &[&str], dir: Option<&Path>) -> Result<String> {
     Ok(stdout)
 }
 
-pub fn sync_directory_contents(source: &Path, dest: &Path) -> io::Result<()> {
+pub(crate) fn sync_directory_contents(source: &Path, dest: &Path) -> io::Result<()> {
     let output = Command::new("rsync")
         .args(["-av", "--delete"])
         .arg(format!("{}/", source.display()))
@@ -66,7 +66,7 @@ pub fn sync_directory_contents(source: &Path, dest: &Path) -> io::Result<()> {
     Ok(())
 }
 
-pub fn is_command_available(command: &str) -> bool {
+pub(crate) fn is_command_available(command: &str) -> bool {
     let command_path = Path::new(command);
     if command_path.components().count() > 1 {
         return command_path.is_file();

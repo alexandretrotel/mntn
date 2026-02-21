@@ -7,8 +7,8 @@ use crate::utils::paths::get_encrypted_profiles_path;
 use crate::utils::paths::{get_active_profile_path, get_common_path, get_profiles_path};
 
 #[derive(Debug, Clone)]
-pub struct ActiveProfile {
-    pub name: Option<String>,
+pub(crate) struct ActiveProfile {
+    pub(crate) name: Option<String>,
 }
 
 impl std::fmt::Display for ActiveProfile {
@@ -21,17 +21,17 @@ impl std::fmt::Display for ActiveProfile {
 }
 
 impl ActiveProfile {
-    pub fn with_profile(name: &str) -> Self {
+    pub(crate) fn with_profile(name: &str) -> Self {
         Self {
             name: Some(name.to_string()),
         }
     }
 
-    pub fn common_only() -> Self {
+    pub(crate) fn common_only() -> Self {
         Self { name: None }
     }
 
-    pub fn resolve(cli_profile: Option<&str>) -> Self {
+    pub(crate) fn resolve(cli_profile: Option<&str>) -> Self {
         if let Some(profile) = cli_profile {
             return Self::with_profile(profile);
         }
@@ -43,14 +43,14 @@ impl ActiveProfile {
         Self::common_only()
     }
 
-    pub fn get_backup_path(&self) -> PathBuf {
+    pub(crate) fn get_backup_path(&self) -> PathBuf {
         match &self.name {
             Some(name) => get_profiles_path(name),
             None => get_common_path(),
         }
     }
 
-    pub fn get_encrypted_backup_path(&self) -> PathBuf {
+    pub(crate) fn get_encrypted_backup_path(&self) -> PathBuf {
         match &self.name {
             Some(name) => get_encrypted_profiles_path(name),
             None => get_encrypted_common_path(),
@@ -58,7 +58,7 @@ impl ActiveProfile {
     }
 }
 
-pub fn get_active_profile_name() -> Option<String> {
+pub(crate) fn get_active_profile_name() -> Option<String> {
     if let Ok(profile) = std::env::var("MNTN_PROFILE") {
         let trimmed = profile.trim();
         if !trimmed.is_empty() {
@@ -77,7 +77,7 @@ pub fn get_active_profile_name() -> Option<String> {
     None
 }
 
-pub fn set_active_profile(profile_name: &str) -> io::Result<()> {
+pub(crate) fn set_active_profile(profile_name: &str) -> io::Result<()> {
     let active_profile_path = get_active_profile_path();
     if let Some(parent) = active_profile_path.parent() {
         fs::create_dir_all(parent)?;
@@ -85,7 +85,7 @@ pub fn set_active_profile(profile_name: &str) -> io::Result<()> {
     fs::write(active_profile_path, profile_name)
 }
 
-pub fn clear_active_profile() -> io::Result<()> {
+pub(crate) fn clear_active_profile() -> io::Result<()> {
     let active_profile_path = get_active_profile_path();
     if active_profile_path.exists() {
         fs::remove_file(active_profile_path)?;

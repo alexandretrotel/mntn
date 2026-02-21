@@ -1,7 +1,7 @@
-pub mod backup;
-pub mod core;
-pub mod git;
-pub mod profile;
-pub mod restore;
-pub mod r#use;
-pub mod validate;
+pub(crate) mod backup;
+pub(crate) mod core;
+pub(crate) mod git;
+pub(crate) mod profile;
+pub(crate) mod restore;
+pub(crate) mod r#use;
+pub(crate) mod validate;

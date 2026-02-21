@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 
-pub fn prompt_password(confirm: bool) -> Result<SecretString> {
+pub(crate) fn prompt_password(confirm: bool) -> Result<SecretString> {
     let password =
         rpassword::prompt_password("Enter encryption password: ").context("Read password")?;
 
@@ -23,7 +23,7 @@ pub fn prompt_password(confirm: bool) -> Result<SecretString> {
     Ok(SecretString::new(password.into()))
 }
 
-pub fn encrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
+pub(crate) fn encrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
     let content = fs::read(source)
         .with_context(|| format!("Read source file for encryption: {}", source.display()))?;
 
@@ -48,7 +48,7 @@ pub fn encrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Resu
     Ok(())
 }
 
-pub fn decrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
+pub(crate) fn decrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
     let encrypted = fs::read(source)
         .with_context(|| format!("Read encrypted file for decryption: {}", source.display()))?;
 
@@ -83,6 +83,6 @@ pub fn decrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Resu
     Ok(())
 }
 
-pub fn get_encrypted_path(source_path: &str) -> String {
+pub(crate) fn get_encrypted_path(source_path: &str) -> String {
     format!("{}.age", source_path)
 }

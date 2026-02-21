@@ -8,12 +8,12 @@ use anyhow::bail;
 const COMMON: &str = "common";
 const NONE: &str = "none";
 
-pub struct UseTask {
+struct UseTask {
     profile_name: String,
 }
 
 impl UseTask {
-    pub fn new(profile_name: String) -> Self {
+    fn new(profile_name: String) -> Self {
         Self { profile_name }
     }
 
@@ -59,7 +59,7 @@ impl Command for UseTask {
     }
 }
 
-pub fn run(args: UseArgs) {
+pub(crate) fn run(args: UseArgs) {
     let mut task = UseTask::new(args.profile);
     CommandExecutor::run(&mut task);
 }

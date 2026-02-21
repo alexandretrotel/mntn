@@ -4,7 +4,7 @@ mod create;
 mod delete;
 mod list;
 
-pub fn run(args: ProfileArgs) {
+pub(crate) fn run(args: ProfileArgs) {
     match args.action {
         Some(ProfileActions::List) => list::list_profiles(),
         Some(ProfileActions::Create { name, description }) => {

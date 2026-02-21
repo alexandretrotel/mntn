@@ -6,7 +6,7 @@ use crate::errors::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, collections::HashMap, path::PathBuf};
 
-pub trait RegistryEntryLike {
+pub(crate) trait RegistryEntryLike {
     fn is_enabled(&self) -> bool;
 }
 
@@ -22,7 +22,7 @@ macro_rules! impl_registry_entry_like {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Registry<T> {
+pub(crate) struct Registry<T> {
     pub version: String,
     pub entries: HashMap<String, T>,
 }
@@ -31,7 +31,7 @@ impl<T> Registry<T>
 where
     T: RegistryEntryLike + Clone + Serialize + for<'a> Deserialize<'a>,
 {
-    pub fn load_or_create(path: &PathBuf) -> Result<Self>
+    pub(crate) fn load_or_create(path: &PathBuf) -> Result<Self>
     where
         Self: Default,
     {
@@ -46,7 +46,7 @@ where
         }
     }
 
-    pub fn save(&self, path: &PathBuf) -> Result<()> {
+    pub(crate) fn save(&self, path: &PathBuf) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -62,7 +62,7 @@ where
         Ok(())
     }
 
-    pub fn get_enabled_entries(&self) -> impl Iterator<Item = (&String, &T)> {
+    pub(crate) fn get_enabled_entries(&self) -> impl Iterator<Item = (&String, &T)> {
         self.entries.iter().filter(|(_, e)| e.is_enabled())
     }
 }

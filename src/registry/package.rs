@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::registry::{Registry, RegistryEntryLike};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackageRegistryEntry {
+pub(crate) struct PackageRegistryEntry {
     pub name: String,
     pub description: Option<String>,
     pub enabled: bool,
@@ -18,7 +18,7 @@ use crate::impl_registry_entry_like;
 
 impl_registry_entry_like!(PackageRegistryEntry);
 
-pub type PackageRegistry = Registry<PackageRegistryEntry>;
+pub(crate) type PackageRegistry = Registry<PackageRegistryEntry>;
 
 impl Default for PackageRegistry {
     fn default() -> Self {

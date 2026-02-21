@@ -6,7 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-pub fn run(args: GitArgs) {
+pub(crate) fn run(args: GitArgs) {
     if let Err(e) = run_git_passthrough(args.args) {
         eprintln!("Git command failed: {}", e);
     }

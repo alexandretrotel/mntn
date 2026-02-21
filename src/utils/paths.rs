@@ -1,65 +1,65 @@
 use directories_next::BaseDirs;
 use std::path::PathBuf;
 
-pub const BACKUP_DIR: &str = "backup";
-pub const COMMON_DIR: &str = "common";
-pub const ENCRYPTED_DIR: &str = "encrypted";
+pub(crate) const BACKUP_DIR: &str = "backup";
+pub(crate) const COMMON_DIR: &str = "common";
+pub(crate) const ENCRYPTED_DIR: &str = "encrypted";
 
-pub const PROFILES_DIR: &str = "profiles";
-pub const PROFILE_CONFIG_FILE: &str = "profiles.json";
-pub const ACTIVE_PROFILE_FILE: &str = ".active-profile";
+pub(crate) const PROFILES_DIR: &str = "profiles";
+pub(crate) const PROFILE_CONFIG_FILE: &str = "profiles.json";
+pub(crate) const ACTIVE_PROFILE_FILE: &str = ".active-profile";
 
-pub fn get_mntn_dir() -> PathBuf {
+pub(crate) fn get_mntn_dir() -> PathBuf {
     let base_dirs = BaseDirs::new().unwrap();
     let home_dir = base_dirs.home_dir();
     home_dir.join(".mntn")
 }
 
-pub fn get_backup_path() -> PathBuf {
+pub(crate) fn get_backup_path() -> PathBuf {
     get_mntn_dir().join(BACKUP_DIR)
 }
 
-pub fn get_common_path() -> PathBuf {
+pub(crate) fn get_common_path() -> PathBuf {
     get_backup_path().join(COMMON_DIR)
 }
 
-pub fn get_encrypted_common_path() -> PathBuf {
+pub(crate) fn get_encrypted_common_path() -> PathBuf {
     get_common_path().join(ENCRYPTED_DIR)
 }
 
-pub fn get_profiles_path(profile_name: &str) -> PathBuf {
+pub(crate) fn get_profiles_path(profile_name: &str) -> PathBuf {
     get_backup_path().join(PROFILES_DIR).join(profile_name)
 }
 
-pub fn get_encrypted_profiles_path(profile_name: &str) -> PathBuf {
+pub(crate) fn get_encrypted_profiles_path(profile_name: &str) -> PathBuf {
     get_profiles_path(profile_name).join(ENCRYPTED_DIR)
 }
 
-pub fn get_config_registry_path() -> PathBuf {
+pub(crate) fn get_config_registry_path() -> PathBuf {
     get_mntn_dir().join("config.registry.json")
 }
 
-pub fn get_package_registry_path() -> PathBuf {
+pub(crate) fn get_package_registry_path() -> PathBuf {
     get_mntn_dir().join("package.registry.json")
 }
 
-pub fn get_encrypted_registry_path() -> PathBuf {
+pub(crate) fn get_encrypted_registry_path() -> PathBuf {
     get_mntn_dir().join("encrypted.registry.json")
 }
 
-pub fn get_packages_path() -> PathBuf {
+pub(crate) fn get_packages_path() -> PathBuf {
     get_backup_path().join("packages")
 }
 
-pub fn get_profiles_config_path() -> PathBuf {
+pub(crate) fn get_profiles_config_path() -> PathBuf {
     get_mntn_dir().join(PROFILE_CONFIG_FILE)
 }
 
-pub fn get_active_profile_path() -> PathBuf {
+pub(crate) fn get_active_profile_path() -> PathBuf {
     get_mntn_dir().join(ACTIVE_PROFILE_FILE)
 }
 
-pub fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
+pub(crate) fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
     if let Some(xdg_config) = std::env::var_os("XDG_CONFIG_HOME") {
         return PathBuf::from(xdg_config).join(relative_path);
     }
@@ -70,7 +70,7 @@ pub fn get_xdg_or_default_config_path(relative_path: &str) -> PathBuf {
         .join(relative_path)
 }
 
-pub fn get_ghostty_config_path() -> PathBuf {
+pub(crate) fn get_ghostty_config_path() -> PathBuf {
     if std::env::var_os("XDG_CONFIG_HOME").is_some() {
         return get_xdg_or_default_config_path("ghostty/config");
     }

@@ -8,13 +8,13 @@ mod encrypted;
 mod package;
 mod utils;
 
-pub struct BackupTask {
+struct BackupTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
 }
 
 impl BackupTask {
-    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
@@ -54,7 +54,7 @@ impl Command for BackupTask {
     }
 }
 
-pub fn run(args: crate::cli::BackupArgs) {
+pub(crate) fn run(args: crate::cli::BackupArgs) {
     use crate::commands::core::CommandExecutor;
 
     let profile = args.resolve_profile();

@@ -1,9 +1,9 @@
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, AppError>;
+pub(crate) type Result<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug, Error)]
-pub enum AppError {
+pub(crate) enum AppError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

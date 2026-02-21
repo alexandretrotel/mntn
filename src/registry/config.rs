@@ -5,7 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::registry::{Registry, RegistryEntryLike};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigRegistryEntry {
+pub(crate) struct ConfigRegistryEntry {
     pub name: String,
     pub description: Option<String>,
     pub enabled: bool,
@@ -18,7 +18,7 @@ use crate::utils::paths::{get_ghostty_config_path, get_xdg_or_default_config_pat
 
 impl_registry_entry_like!(ConfigRegistryEntry);
 
-pub type ConfigRegistry = Registry<ConfigRegistryEntry>;
+pub(crate) type ConfigRegistry = Registry<ConfigRegistryEntry>;
 
 impl Default for ConfigRegistry {
     fn default() -> Self {

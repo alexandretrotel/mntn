@@ -7,7 +7,7 @@ use crate::utils::paths::{
 use super::ActiveProfile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceLayer {
+pub(crate) enum SourceLayer {
     Common,
     Profile,
 }
@@ -22,13 +22,13 @@ impl std::fmt::Display for SourceLayer {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResolvedSource {
-    pub path: PathBuf,
-    pub layer: SourceLayer,
+pub(crate) struct ResolvedSource {
+    pub(crate) path: PathBuf,
+    pub(crate) layer: SourceLayer,
 }
 
 impl ActiveProfile {
-    pub fn resolve_source(&self, source_path: &str) -> Option<ResolvedSource> {
+    pub(crate) fn resolve_source(&self, source_path: &str) -> Option<ResolvedSource> {
         if !is_valid_source_path(source_path) {
             return None;
         }
@@ -44,7 +44,7 @@ impl ActiveProfile {
         None
     }
 
-    pub fn get_candidate_sources(&self, source_path: &str) -> Vec<(PathBuf, SourceLayer)> {
+    pub(crate) fn get_candidate_sources(&self, source_path: &str) -> Vec<(PathBuf, SourceLayer)> {
         if !is_valid_source_path(source_path) {
             return Vec::new();
         }
@@ -62,7 +62,7 @@ impl ActiveProfile {
         candidates
     }
 
-    pub fn get_all_resolved_sources(&self, source_path: &str) -> Vec<ResolvedSource> {
+    pub(crate) fn get_all_resolved_sources(&self, source_path: &str) -> Vec<ResolvedSource> {
         self.get_candidate_sources(source_path)
             .into_iter()
             .filter(|(path, _)| path.exists())
@@ -70,7 +70,7 @@ impl ActiveProfile {
             .collect()
     }
 
-    pub fn resolve_encrypted_source(&self, source_path: &str) -> Option<ResolvedSource> {
+    pub(crate) fn resolve_encrypted_source(&self, source_path: &str) -> Option<ResolvedSource> {
         if !is_valid_source_path(source_path) {
             return None;
         }
@@ -86,7 +86,7 @@ impl ActiveProfile {
         None
     }
 
-    pub fn get_candidate_encrypted_sources(
+    pub(crate) fn get_candidate_encrypted_sources(
         &self,
         source_path: &str,
     ) -> Vec<(PathBuf, SourceLayer)> {

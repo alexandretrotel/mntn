@@ -7,12 +7,12 @@ use std::path::Path;
 use crate::utils::paths::get_profiles_config_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ProfileDefinition {
+pub(crate) struct ProfileDefinition {
     pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProfileConfig {
+pub(crate) struct ProfileConfig {
     pub version: String,
     pub profiles: HashMap<String, ProfileDefinition>,
 }
@@ -27,17 +27,17 @@ impl Default for ProfileConfig {
 }
 
 impl ProfileConfig {
-    pub fn load(path: &Path) -> io::Result<Self> {
+    pub(crate) fn load(path: &Path) -> io::Result<Self> {
         let content = fs::read_to_string(path)?;
         serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    pub fn load_or_default() -> Self {
+    pub(crate) fn load_or_default() -> Self {
         let path = get_profiles_config_path();
         Self::load(&path).unwrap_or_default()
     }
 
-    pub fn save(&self, path: &Path) -> io::Result<()> {
+    pub(crate) fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -45,30 +45,30 @@ impl ProfileConfig {
         fs::write(path, content)
     }
 
-    pub fn get_profile(&self, name: &str) -> Option<&ProfileDefinition> {
+    pub(crate) fn get_profile(&self, name: &str) -> Option<&ProfileDefinition> {
         self.profiles.get(name)
     }
 
-    pub fn profile_exists(&self, name: &str) -> bool {
+    pub(crate) fn profile_exists(&self, name: &str) -> bool {
         self.profiles.contains_key(name)
     }
 
-    pub fn list_profiles(&self) -> Vec<&String> {
+    pub(crate) fn list_profiles(&self) -> Vec<&String> {
         let mut names: Vec<_> = self.profiles.keys().collect();
         names.sort();
         names
     }
 
-    pub fn create_profile(&mut self, name: &str, description: Option<String>) {
+    pub(crate) fn create_profile(&mut self, name: &str, description: Option<String>) {
         self.profiles
             .insert(name.to_string(), ProfileDefinition { description });
     }
 
-    pub fn delete_profile(&mut self, name: &str) -> bool {
+    pub(crate) fn delete_profile(&mut self, name: &str) -> bool {
         self.profiles.remove(name).is_some()
     }
 
-    pub fn save_default_if_missing() -> io::Result<bool> {
+    pub(crate) fn save_default_if_missing() -> io::Result<bool> {
         let path = get_profiles_config_path();
         if path.exists() {
             return Ok(false);
