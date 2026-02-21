@@ -69,7 +69,7 @@ fn ensure_gitignore_exists(mntn_dir: &Path) -> anyhow::Result<()> {
         let default_gitignore = "# mntn
 .active-profile
 
- # log files
+# log files
 *.log
 
 # temporary files

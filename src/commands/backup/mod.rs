@@ -40,13 +40,13 @@ impl Command for BackupTask {
         let packages_path = crate::utils::paths::get_packages_path();
         fs::create_dir_all(&packages_path)?;
 
-        config::backup_configs(&backup_path);
-        package::backup_packages(&packages_path);
+        config::backup_configs(&backup_path)?;
+        package::backup_packages(&packages_path)?;
 
         if !self.skip_encrypted {
             let encrypted_backup_path = self.profile.get_encrypted_backup_path();
             fs::create_dir_all(&encrypted_backup_path)?;
-            encrypted::backup_encrypted_configs(&encrypted_backup_path);
+            encrypted::backup_encrypted_configs(&encrypted_backup_path)?;
         }
 
         println!("Backup complete");

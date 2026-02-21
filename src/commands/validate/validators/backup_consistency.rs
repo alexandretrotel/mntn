@@ -203,6 +203,7 @@ impl Validator for BackupConsistencyValidator {
                         errors.push(ValidationError::warning(
                             "Skipping encrypted file validation: Incorrect password".to_string(),
                         ));
+                        let _ = fs::remove_file(&temp_path);
                         return errors;
                     } else {
                         errors.push(ValidationError::warning(format!(

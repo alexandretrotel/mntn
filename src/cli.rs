@@ -83,7 +83,7 @@ impl ValidateArgs {
 
 #[derive(Args)]
 pub(crate) struct GitArgs {
-    #[arg(trailing_var_arg = true, required = true)]
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
     pub args: Vec<String>,
 }
 

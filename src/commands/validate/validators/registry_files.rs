@@ -54,8 +54,8 @@ impl Validator for RegistryFilesValidator {
                                 entry.name, id
                             ))
                             .with_fix(format!(
-                                "Install {} or disable this entry with 'mntn registry toggle --type packages {} -e false'",
-                                entry.command, id
+                                "Install {} or disable this entry in your profile config",
+                                entry.command
                             )),
                         );
                     }

@@ -46,6 +46,14 @@ impl Command for ValidateTask {
                 error_count, warning_count
             );
         }
+        if error_count > 0 {
+            return Err(anyhow::anyhow!(
+                "Validation failed: {} error(s), {} warning(s)",
+                error_count,
+                warning_count
+            ));
+        }
+
         Ok(())
     }
 }
