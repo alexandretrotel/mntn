@@ -1,3 +1,4 @@
+use crate::utils::display::{green, red};
 use anyhow::Result;
 
 pub(crate) trait Command {
@@ -11,11 +12,10 @@ impl CommandExecutor {
     pub(crate) fn run<T: Command>(task: &mut T) {
         let name = task.name().to_string();
 
-        println!("Starting {}", name);
         if let Err(e) = task.execute() {
-            eprintln!("Error during {}: {}", name, e);
+            eprintln!("{}", red(&format!("Error during {}: {}", name, e)));
             return;
         }
-        println!("{} complete", name);
+        println!("{}", green(&format!("{} complete", name)));
     }
 }

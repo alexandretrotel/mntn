@@ -1,4 +1,5 @@
 use crate::cli::GitArgs;
+use crate::utils::display::red;
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd;
 use anyhow::bail;
@@ -8,7 +9,7 @@ use std::process::{Command, Stdio};
 
 pub(crate) fn run(args: GitArgs) {
     if let Err(e) = run_git_passthrough(args.args) {
-        eprintln!("Git command failed: {}", e);
+        eprintln!("{}", red(&format!("Git command failed: {}", e)));
     }
 }
 

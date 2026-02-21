@@ -1,18 +1,10 @@
+use crate::utils::display::{green, red, yellow};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     Error,
     Warning,
     Info,
-}
-
-impl std::fmt::Display for Severity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Severity::Error => write!(f, "ERROR"),
-            Severity::Warning => write!(f, "WARNING"),
-            Severity::Info => write!(f, "INFO"),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,14 +87,14 @@ impl ValidationReport {
             } else {
                 println!(" {}", name);
                 for error in errors {
-                    let icon = match error.severity {
-                        Severity::Error => " x",
-                        Severity::Warning => " !",
-                        Severity::Info => " i",
+                    let line = match error.severity {
+                        Severity::Error => red(&format!(" x {}", error.message)),
+                        Severity::Warning => yellow(&format!(" ! {}", error.message)),
+                        Severity::Info => green(&format!(" i {}", error.message)),
                     };
-                    println!("{} {}", icon, error.message);
+                    println!("{}", line);
                     if let Some(fix) = &error.fix_suggestion {
-                        println!(" Fix: {}", fix);
+                        println!("{}", yellow(&format!(" Fix: {}", fix)));
                     }
                 }
             }

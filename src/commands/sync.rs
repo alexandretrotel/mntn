@@ -1,5 +1,6 @@
 use crate::cli::SyncArgs;
 use crate::commands::core::{Command, CommandExecutor};
+use crate::utils::display::yellow;
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd;
 use anyhow::{Context, Result, bail};
@@ -59,7 +60,7 @@ impl Command for SyncTask {
             let message = self.commit_message()?;
             run_cmd("git", &["commit", "-m", &message], Some(&repo_dir))?;
         } else {
-            println!("   No changes to commit");
+            println!("{}", yellow("   No changes to commit"));
         }
 
         run_cmd("git", &["push"], Some(&repo_dir))?;
