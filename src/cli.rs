@@ -67,7 +67,13 @@ impl RestoreArgs {
 }
 
 #[derive(Args)]
-pub struct ValidateArgs {}
+pub struct ValidateArgs {
+    #[arg(
+        long,
+        help = "Skip encrypted configs validation (will not prompt for password)"
+    )]
+    pub skip_encrypted: bool,
+}
 
 impl ValidateArgs {
     pub fn resolve_profile(&self) -> ActiveProfile {
