@@ -47,7 +47,7 @@ pub fn get_encrypted_registry_path() -> PathBuf {
     get_mntn_dir().join("encrypted.registry.json")
 }
 
-pub fn get_packages_dir() -> PathBuf {
+pub fn get_packages_path() -> PathBuf {
     get_backup_path().join("packages")
 }
 
