@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.1.0
+
+### Changed
+- **Encrypted backups** now produce a single file per encrypted backup root: `mntn-encrypted-bundle.age`. It contains a tar archive of all registered sensitive files (one passphrase-based age encryption for the whole bundle, so backup and restore spend much less time in key derivation). Paths inside the archive match `source_path` entries in `encrypted.registry.json`.
+- **Restore** and **validate** prefer the bundle when present. Older per-path backups (`<source_path>.age`) are still supported if the bundle is missing or cannot be read.
+- **`mntn sync` default commit message** now appends the UTC date and time, for example `chore: sync mntn (2026-04-04 14:30:00 UTC)`. Pass `--message` to use a fixed subject without a timestamp.
+
+### Added
+- **Parallel package backup:** enabled package-manager export commands run concurrently; results are still reported in stable order.
+
 ## v3.0.1
 
 ### Added

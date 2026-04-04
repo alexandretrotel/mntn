@@ -95,7 +95,7 @@ pub(crate) struct SyncArgs {
     #[arg(
         long,
         short = 'm',
-        help = "Custom commit message; defaults to \"chore: sync mntn\" when omitted"
+        help = "Custom commit message; defaults to chore: sync mntn (<UTC date time>) when omitted"
     )]
     pub message: Option<String>,
 }

@@ -31,7 +31,7 @@ mntn use work
 - `profile` - list/create/delete profiles
 - `use` - switch active profile
 - `git` - run any git command inside `~/.mntn`
-- `sync` - run `git add .`, `git commit -m "chore: sync mntn"` (with `--message` to override), and `git push` inside `~/.mntn`
+- `sync` - run `git add .`, commit with default message `chore: sync mntn (YYYY-MM-DD HH:MM:SS UTC)` (use `--message` to override), then `git push` inside `~/.mntn`
 
 ## Directory Layout
 
@@ -39,7 +39,10 @@ mntn use work
 ~/.mntn/
 ├── backup/
 │   ├── common/
+│   │   └── encrypted/          # optional: encrypted bundle + legacy per-file .age
 │   └── profiles/
+│       └── <name>/
+│           └── encrypted/
 ├── profiles.json
 ├── .active-profile
 ├── config.registry.json
@@ -51,6 +54,12 @@ Registry notes:
 - `config.registry.json` tracks regular dotfiles and their targets.
 - `package.registry.json` tracks package managers and how to export package lists.
 - `encrypted.registry.json` tracks sensitive files that are stored encrypted.
+
+### Encrypted backups
+
+After `mntn backup`, sensitive files are stored under `backup/common/encrypted/` or `backup/profiles/<profile>/encrypted/` as **`mntn-encrypted-bundle.age`**: one age-encrypted tar containing all backed-up entries. Restore and validate use this file when it exists. Older layouts with separate `<path>.age` files next to each logical path are still recognized for restore and validation until you remove them.
+
+Package list exports under `backup/packages/` are generated in parallel when multiple package managers are enabled.
 
 ## License
 

@@ -5,6 +5,7 @@ use crate::utils::display::yellow;
 use crate::utils::paths::get_mntn_dir;
 use crate::utils::system::run_cmd;
 use anyhow::{Context, Result, bail};
+use chrono::Utc;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
@@ -18,7 +19,6 @@ impl SyncTask {
     }
 
     fn commit_message(&self) -> Result<String> {
-        let default = "chore: sync mntn";
         match self
             .message
             .as_ref()
@@ -26,7 +26,10 @@ impl SyncTask {
             .filter(|msg| !msg.is_empty())
         {
             Some(msg) => Ok(msg.to_string()),
-            None => Ok(default.to_string()),
+            None => {
+                let stamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
+                Ok(format!("chore: sync mntn ({stamp})"))
+            }
         }
     }
 
