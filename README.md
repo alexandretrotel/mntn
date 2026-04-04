@@ -55,12 +55,6 @@ Registry notes:
 - `package.registry.json` tracks package managers and how to export package lists.
 - `encrypted.registry.json` tracks sensitive files that are stored encrypted.
 
-### Encrypted backups
-
-After `mntn backup`, sensitive files are stored under `backup/common/encrypted/` or `backup/profiles/<profile>/encrypted/` as **`mntn-encrypted-bundle.age`**: one age-encrypted tar containing all backed-up entries. Restore and validate use this file when it exists. Older layouts with separate `<path>.age` files next to each logical path are still recognized for restore and validation until you remove them.
-
-Package list exports under `backup/packages/` are generated in parallel when multiple package managers are enabled.
-
 ## License
 
 GNU General Public License v3.0 or later (GPL-3.0-or-later), published by the Free Software Foundation.
