@@ -8,46 +8,6 @@ use std::io::Write;
 use std::path::Path;
 use std::thread;
 
-struct PackageBackupOutcome {
-    id: String,
-    output_file: String,
-    result: Result<()>,
-}
-
-fn run_single_package_backup(
-    packages_path: &Path,
-    id: String,
-    entry: PackageRegistryEntry,
-) -> PackageBackupOutcome {
-    let output_file = entry.output_file.clone();
-
-    let result: Result<()> = (|| {
-        let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
-        let content = run_cmd(&entry.command, &args, None)
-            .with_context(|| format!("Command {} failed for {}", entry.command, id))?;
-
-        let content = strip_ansi_codes(&content);
-        let output_path = packages_path.join(&entry.output_file);
-        let tmp_path = output_path.with_extension("tmp");
-
-        let mut tmp_file = fs::File::create(&tmp_path)
-            .with_context(|| format!("Create temp file for {}", entry.output_file))?;
-        tmp_file
-            .write_all(content.as_bytes())
-            .with_context(|| format!("Write temp file for {}", entry.output_file))?;
-
-        fs::rename(&tmp_path, &output_path)
-            .with_context(|| format!("Move {} into place", entry.output_file))?;
-        Ok(())
-    })();
-
-    PackageBackupOutcome {
-        id,
-        output_file,
-        result,
-    }
-}
-
 pub fn backup_packages(packages_path: &Path) -> Result<(u32, u32)> {
     let package_registry_path = get_package_registry_path();
     let package_registry = PackageRegistry::load_or_create(&package_registry_path)
@@ -100,4 +60,44 @@ pub fn backup_packages(packages_path: &Path) -> Result<(u32, u32)> {
     }
 
     Ok((succeeded, skipped))
+}
+
+struct PackageBackupOutcome {
+    id: String,
+    output_file: String,
+    result: Result<()>,
+}
+
+fn run_single_package_backup(
+    packages_path: &Path,
+    id: String,
+    entry: PackageRegistryEntry,
+) -> PackageBackupOutcome {
+    let output_file = entry.output_file.clone();
+
+    let result: Result<()> = (|| {
+        let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
+        let content = run_cmd(&entry.command, &args, None)
+            .with_context(|| format!("Command {} failed for {}", entry.command, id))?;
+
+        let content = strip_ansi_codes(&content);
+        let output_path = packages_path.join(&entry.output_file);
+        let tmp_path = output_path.with_extension("tmp");
+
+        let mut tmp_file = fs::File::create(&tmp_path)
+            .with_context(|| format!("Create temp file for {}", entry.output_file))?;
+        tmp_file
+            .write_all(content.as_bytes())
+            .with_context(|| format!("Write temp file for {}", entry.output_file))?;
+
+        fs::rename(&tmp_path, &output_path)
+            .with_context(|| format!("Move {} into place", entry.output_file))?;
+        Ok(())
+    })();
+
+    PackageBackupOutcome {
+        id,
+        output_file,
+        result,
+    }
 }
