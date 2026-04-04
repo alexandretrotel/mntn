@@ -1,10 +1,8 @@
-use crate::encryption::{
-    create_temp_path, encrypt_file, prompt_password, write_entries_tar,
-};
+use crate::encryption::{create_temp_path, encrypt_file, prompt_password, write_entries_tar};
 use crate::registry::encrypted::EncryptedRegistry;
 use crate::utils::{
     display::{green, yellow},
-    paths::{get_encrypted_registry_path, ENCRYPTED_BUNDLE_FILE},
+    paths::{ENCRYPTED_BUNDLE_FILE, get_encrypted_registry_path},
 };
 use age::secrecy::SecretString;
 use anyhow::{Context, Result};

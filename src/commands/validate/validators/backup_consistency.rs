@@ -204,7 +204,8 @@ impl Validator for BackupConsistencyValidator {
                             || error_msg.contains("identity")
                         {
                             errors.push(ValidationError::warning(
-                                "Skipping encrypted file validation: Incorrect password".to_string(),
+                                "Skipping encrypted file validation: Incorrect password"
+                                    .to_string(),
                             ));
                             let _ = fs::remove_file(&tar_temp);
                             return errors;

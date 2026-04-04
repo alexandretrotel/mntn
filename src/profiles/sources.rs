@@ -1,8 +1,8 @@
 use std::path::{Component, Path, PathBuf};
 
 use crate::utils::paths::{
-    get_common_path, get_encrypted_common_path, get_encrypted_profiles_path, get_profiles_path,
-    ENCRYPTED_BUNDLE_FILE,
+    ENCRYPTED_BUNDLE_FILE, get_common_path, get_encrypted_common_path, get_encrypted_profiles_path,
+    get_profiles_path,
 };
 
 use super::ActiveProfile;
