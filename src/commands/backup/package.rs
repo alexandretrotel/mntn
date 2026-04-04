@@ -1,4 +1,4 @@
-use crate::registry::package::PackageRegistry;
+use crate::registry::package::{PackageRegistry, PackageRegistryEntry};
 use crate::utils::display::{green, yellow};
 use crate::utils::paths::get_package_registry_path;
 use crate::utils::system::{run_cmd, strip_ansi_codes};
@@ -6,6 +6,47 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::thread;
+
+struct PackageBackupOutcome {
+    id: String,
+    output_file: String,
+    result: Result<()>,
+}
+
+fn run_single_package_backup(
+    packages_path: &Path,
+    id: String,
+    entry: PackageRegistryEntry,
+) -> PackageBackupOutcome {
+    let output_file = entry.output_file.clone();
+
+    let result: Result<()> = (|| {
+        let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
+        let content = run_cmd(&entry.command, &args, None)
+            .with_context(|| format!("Command {} failed for {}", entry.command, id))?;
+
+        let content = strip_ansi_codes(&content);
+        let output_path = packages_path.join(&entry.output_file);
+        let tmp_path = output_path.with_extension("tmp");
+
+        let mut tmp_file = fs::File::create(&tmp_path)
+            .with_context(|| format!("Create temp file for {}", entry.output_file))?;
+        tmp_file
+            .write_all(content.as_bytes())
+            .with_context(|| format!("Write temp file for {}", entry.output_file))?;
+
+        fs::rename(&tmp_path, &output_path)
+            .with_context(|| format!("Move {} into place", entry.output_file))?;
+        Ok(())
+    })();
+
+    PackageBackupOutcome {
+        id,
+        output_file,
+        result,
+    }
+}
 
 pub fn backup_packages(packages_path: &Path) -> Result<(u32, u32)> {
     let package_registry_path = get_package_registry_path();
@@ -24,43 +65,35 @@ pub fn backup_packages(packages_path: &Path) -> Result<(u32, u32)> {
 
     println!("   Package managers: {} entries", compatible_entries.len());
 
+    let mut outcomes: Vec<PackageBackupOutcome> = thread::scope(|s| {
+        let mut handles = Vec::with_capacity(compatible_entries.len());
+        for (id, entry) in compatible_entries {
+            let id = id.clone();
+            let entry = entry.clone();
+            handles.push(s.spawn(|| run_single_package_backup(packages_path, id, entry)));
+        }
+        handles
+            .into_iter()
+            .map(|h| h.join().expect("package backup thread panicked"))
+            .collect()
+    });
+
+    outcomes.sort_by(|a, b| a.output_file.cmp(&b.output_file));
+
     let mut succeeded = 0;
     let mut skipped = 0;
 
-    for (id, entry) in compatible_entries {
-        let entry_result: Result<()> = (|| {
-            let args: Vec<&str> = entry.args.iter().map(|s| s.as_str()).collect();
-            let content = run_cmd(&entry.command, &args, None)
-                .with_context(|| format!("Command {} failed for {}", entry.command, id))?;
-
-            let content = strip_ansi_codes(&content);
-            let output_path = packages_path.join(&entry.output_file);
-            let tmp_path = output_path.with_extension("tmp");
-
-            let mut tmp_file = fs::File::create(&tmp_path)
-                .with_context(|| format!("Create temp file for {}", entry.output_file))?;
-            tmp_file
-                .write_all(content.as_bytes())
-                .with_context(|| format!("Write temp file for {}", entry.output_file))?;
-
-            fs::rename(&tmp_path, &output_path)
-                .with_context(|| format!("Move {} into place", entry.output_file))?;
-            Ok(())
-        })();
-
-        match entry_result {
+    for o in outcomes {
+        match o.result {
             Ok(()) => {
                 succeeded += 1;
-                println!("     {} {}", green("✔"), entry.output_file);
+                println!("     {} {}", green("✔"), o.output_file);
             }
             Err(e) => {
                 skipped += 1;
                 eprintln!(
                     "{}",
-                    yellow(&format!(
-                        "     skipped {} ({}): {}",
-                        entry.output_file, id, e
-                    ))
+                    yellow(&format!("     skipped {} ({}): {}", o.output_file, o.id, e))
                 );
             }
         }
