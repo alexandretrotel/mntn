@@ -2,6 +2,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::utils::paths::{
     get_common_path, get_encrypted_common_path, get_encrypted_profiles_path, get_profiles_path,
+    ENCRYPTED_BUNDLE_FILE,
 };
 
 use super::ActiveProfile;
@@ -68,6 +69,10 @@ impl ActiveProfile {
             .filter(|(path, _)| path.exists())
             .map(|(path, layer)| ResolvedSource { path, layer })
             .collect()
+    }
+
+    pub(crate) fn resolve_encrypted_bundle(&self) -> Option<ResolvedSource> {
+        self.resolve_encrypted_source(ENCRYPTED_BUNDLE_FILE)
     }
 
     pub(crate) fn resolve_encrypted_source(&self, source_path: &str) -> Option<ResolvedSource> {

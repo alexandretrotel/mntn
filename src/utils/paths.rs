@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub(crate) const BACKUP_DIR: &str = "backup";
 pub(crate) const COMMON_DIR: &str = "common";
 pub(crate) const ENCRYPTED_DIR: &str = "encrypted";
+pub(crate) const ENCRYPTED_BUNDLE_FILE: &str = "mntn-encrypted-bundle.age";
 
 pub(crate) const PROFILES_DIR: &str = "profiles";
 pub(crate) const PROFILE_CONFIG_FILE: &str = "profiles.json";

@@ -1,8 +1,14 @@
+mod bundle;
+
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
+
+pub(crate) use bundle::{
+    create_temp_path, load_tar_member_map, set_private_file_permissions, write_entries_tar,
+};
 
 pub(crate) fn prompt_password(confirm: bool) -> Result<SecretString> {
     let password =

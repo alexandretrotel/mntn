@@ -1,11 +1,15 @@
-use crate::encryption::{decrypt_file, get_encrypted_path};
+use crate::encryption::{
+    create_temp_path, decrypt_file, get_encrypted_path, load_tar_member_map,
+    set_private_file_permissions,
+};
 use crate::profiles::ActiveProfile;
-use crate::registry::encrypted::EncryptedRegistry;
+use crate::registry::encrypted::{EncryptedRegistry, EncryptedRegistryEntry};
 use crate::utils::{
     display::{green, red, short_component, yellow},
     paths::get_encrypted_registry_path,
 };
 use age::secrecy::SecretString;
+use std::collections::HashMap;
 use std::fs;
 
 pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretString) -> (u32, u32) {
@@ -21,7 +25,10 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
         }
     };
 
-    let enabled_entries: Vec<_> = encrypted_registry.get_enabled_entries().collect();
+    let enabled_entries: Vec<_> = encrypted_registry
+        .get_enabled_entries()
+        .map(|(id, e)| (id.clone(), e.clone()))
+        .collect();
 
     if enabled_entries.is_empty() {
         println!("No encrypted configuration files found to restore");
@@ -30,6 +37,122 @@ pub fn restore_encrypted_configs(profile: &ActiveProfile, password: &SecretStrin
 
     println!("   Encrypted configs: {} entries", enabled_entries.len());
 
+    if let Some(bundle) = profile.resolve_encrypted_bundle()
+        && bundle.path.is_file()
+    {
+        let tar_temp = match create_temp_path("enc-restore-tar") {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!(
+                    "Could not create temp file for bundle restore: {}, using per-file backups",
+                    e
+                );
+                return restore_encrypted_legacy(profile, password, enabled_entries);
+            }
+        };
+
+        match decrypt_file(&bundle.path, &tar_temp, password) {
+            Ok(()) => match load_tar_member_map(&tar_temp) {
+                Ok(members) => {
+                    let _ = fs::remove_file(&tar_temp);
+                    return restore_from_bundle_members(&enabled_entries, &members);
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Could not read encrypted bundle archive: {}, trying per-file backups",
+                        e
+                    );
+                    let _ = fs::remove_file(&tar_temp);
+                }
+            },
+            Err(e) => {
+                eprintln!(
+                    "Could not decrypt {} ({}), trying per-file backups",
+                    bundle.path.display(),
+                    e
+                );
+                let _ = fs::remove_file(&tar_temp);
+            }
+        }
+    }
+
+    restore_encrypted_legacy(profile, password, enabled_entries)
+}
+
+fn restore_from_bundle_members(
+    enabled_entries: &[(String, EncryptedRegistryEntry)],
+    members: &HashMap<String, Vec<u8>>,
+) -> (u32, u32) {
+    let mut restored_count = 0;
+    let mut skipped_count = 0;
+
+    for (id, entry) in enabled_entries {
+        let target_path = &entry.target_path;
+        let target_label = short_component(target_path);
+
+        match members.get(&entry.source_path) {
+            Some(contents) => {
+                if let Some(parent) = target_path.parent()
+                    && let Err(e) = fs::create_dir_all(parent)
+                {
+                    eprintln!(
+                        "{}",
+                        red(&format!(
+                            "Failed to create directory {}: {}",
+                            target_label, e
+                        ))
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+
+                match fs::write(target_path, contents) {
+                    Ok(()) => {
+                        if let Err(e) = set_private_file_permissions(target_path) {
+                            eprintln!(
+                                "{}",
+                                red(&format!(
+                                    "Failed to set permissions on {}: {}",
+                                    target_label, e
+                                ))
+                            );
+                        }
+                        restored_count += 1;
+                        println!("     {} {}", green("✔"), entry.source_path);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "{}",
+                            red(&format!(
+                                "Failed to write {} ({}): {}",
+                                entry.source_path, target_label, e
+                            ))
+                        );
+                        skipped_count += 1;
+                    }
+                }
+            }
+            None => {
+                println!(
+                    "{}",
+                    yellow(&format!(
+                        "     skipped {} ({}): not in encrypted bundle",
+                        entry.source_path, id
+                    ))
+                );
+                skipped_count += 1;
+            }
+        }
+    }
+
+    (restored_count, skipped_count)
+}
+
+fn restore_encrypted_legacy(
+    profile: &ActiveProfile,
+    password: &SecretString,
+    enabled_entries: Vec<(String, EncryptedRegistryEntry)>,
+) -> (u32, u32) {
     let mut restored_count = 0;
     let mut skipped_count = 0;
 

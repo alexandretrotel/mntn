@@ -1,6 +1,8 @@
 use crate::commands::validate::types::{ValidationError, Validator};
 use crate::commands::validate::utils::create_temp_file_path;
-use crate::encryption::{decrypt_file, get_encrypted_path, prompt_password};
+use crate::encryption::{
+    create_temp_path, decrypt_file, get_encrypted_path, load_tar_member_map, prompt_password,
+};
 use crate::profiles::ActiveProfile;
 use crate::registry::config::ConfigRegistry;
 use crate::registry::encrypted::EncryptedRegistry;
@@ -105,7 +107,7 @@ impl Validator for BackupConsistencyValidator {
             }
         };
 
-        let mut entries_to_validate = Vec::new();
+        let mut encrypted_candidates = Vec::new();
         for (id, entry) in encrypted_registry.get_enabled_entries() {
             if !entry.target_path.exists() {
                 continue;
@@ -115,22 +117,10 @@ impl Validator for BackupConsistencyValidator {
                 continue;
             }
 
-            let encrypted_path = get_encrypted_path(&entry.source_path);
-
-            if let Some(resolved) = self.profile.resolve_encrypted_source(&encrypted_path) {
-                if !resolved.path.exists() {
-                    continue;
-                }
-
-                if resolved.path.is_dir() {
-                    continue;
-                }
-
-                entries_to_validate.push((id.clone(), entry.clone(), resolved));
-            }
+            encrypted_candidates.push((id.clone(), entry.clone()));
         }
 
-        if entries_to_validate.is_empty() {
+        if encrypted_candidates.is_empty() {
             return errors;
         }
 
@@ -144,6 +134,115 @@ impl Validator for BackupConsistencyValidator {
                 return errors;
             }
         };
+
+        let mut used_bundle = false;
+        if let Some(bundle) = self.profile.resolve_encrypted_bundle()
+            && bundle.path.is_file()
+        {
+            let tar_temp = match create_temp_path("validate-bundle-tar") {
+                Ok(path) => Some(path),
+                Err(e) => {
+                    errors.push(ValidationError::warning(format!(
+                        "Could not create temporary file for bundle validation: {}",
+                        e
+                    )));
+                    None
+                }
+            };
+
+            if let Some(tar_temp) = tar_temp {
+                match decrypt_file(&bundle.path, &tar_temp, &password) {
+                    Ok(()) => match load_tar_member_map(&tar_temp) {
+                        Ok(members) => {
+                            let _ = fs::remove_file(&tar_temp);
+                            used_bundle = true;
+                            for (id, entry) in &encrypted_candidates {
+                                let current_content = match fs::read(&entry.target_path) {
+                                    Ok(content) => content,
+                                    Err(e) => {
+                                        errors.push(ValidationError::warning(format!(
+                                            "Could not read current file for {} ({}): {}",
+                                            entry.name, id, e
+                                        )));
+                                        continue;
+                                    }
+                                };
+
+                                match members.get(&entry.source_path) {
+                                    Some(backup_content) => {
+                                        if backup_content != &current_content {
+                                            errors.push(
+                                                ValidationError::warning(format!(
+                                                    "{} ({}): Encrypted file differs from backup",
+                                                    entry.name, id
+                                                ))
+                                                .with_fix("Run 'mntn backup' to update backup or 'mntn restore' to restore from backup"),
+                                            );
+                                        }
+                                    }
+                                    None => {
+                                        errors.push(ValidationError::warning(format!(
+                                            "{} ({}): Missing from encrypted bundle backup",
+                                            entry.name, id
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            errors.push(ValidationError::warning(format!(
+                                "Could not read encrypted bundle (trying per-file backups): {}",
+                                e
+                            )));
+                            let _ = fs::remove_file(&tar_temp);
+                        }
+                    },
+                    Err(e) => {
+                        let error_msg = e.to_string().to_lowercase();
+                        if error_msg.contains("password")
+                            || error_msg.contains("decrypt")
+                            || error_msg.contains("identity")
+                        {
+                            errors.push(ValidationError::warning(
+                                "Skipping encrypted file validation: Incorrect password".to_string(),
+                            ));
+                            let _ = fs::remove_file(&tar_temp);
+                            return errors;
+                        }
+                        errors.push(ValidationError::warning(format!(
+                            "Could not decrypt bundle (trying per-file backups): {}",
+                            e
+                        )));
+                        let _ = fs::remove_file(&tar_temp);
+                    }
+                }
+            }
+        }
+
+        if used_bundle {
+            return errors;
+        }
+
+        let mut entries_to_validate = Vec::new();
+        for (id, entry) in encrypted_candidates {
+            let encrypted_path = get_encrypted_path(&entry.source_path);
+
+            if let Some(resolved) = self.profile.resolve_encrypted_source(&encrypted_path) {
+                if !resolved.path.exists() {
+                    continue;
+                }
+
+                if resolved.path.is_dir() {
+                    continue;
+                }
+
+                entries_to_validate.push((id, entry, resolved));
+            }
+        }
+
+        if entries_to_validate.is_empty() {
+            return errors;
+        }
 
         for (id, entry, resolved) in entries_to_validate {
             let temp_path = match create_temp_file_path() {
