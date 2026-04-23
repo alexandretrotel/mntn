@@ -35,6 +35,18 @@ pub(crate) enum Commands {
 
     #[command(about = "Validate JSON configs, symlinks, and registry files")]
     Validate(ValidateArgs),
+
+    #[command(about = "Manage the encryption password in the system keychain")]
+    Secret {
+        #[command(subcommand)]
+        action: SecretActions,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SecretActions {
+    #[command(about = "Store the encryption password in the system keychain")]
+    Set,
 }
 
 #[derive(Args)]
@@ -46,6 +58,11 @@ pub(crate) struct BackupArgs {
         help = "Skip encrypted configs backup (will not prompt for password)"
     )]
     pub skip_encrypted: bool,
+    #[arg(
+        long,
+        help = "Always prompt for the encryption password instead of using the one stored in the system keychain"
+    )]
+    pub ask_password: bool,
 }
 
 impl BackupArgs {
@@ -61,6 +78,11 @@ pub(crate) struct RestoreArgs {
         help = "Skip encrypted configs restore (will not prompt for password)"
     )]
     pub skip_encrypted: bool,
+    #[arg(
+        long,
+        help = "Always prompt for the encryption password instead of using the one stored in the system keychain"
+    )]
+    pub ask_password: bool,
 }
 
 impl RestoreArgs {
@@ -76,6 +98,11 @@ pub(crate) struct ValidateArgs {
         help = "Skip encrypted configs validation (will not prompt for password)"
     )]
     pub skip_encrypted: bool,
+    #[arg(
+        long,
+        help = "Always prompt for the encryption password instead of using the one stored in the system keychain"
+    )]
+    pub ask_password: bool,
 }
 
 impl ValidateArgs {

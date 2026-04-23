@@ -12,13 +12,15 @@ mod encrypted;
 struct RestoreTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
+    ask_password: bool,
 }
 
 impl RestoreTask {
-    fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
+            ask_password,
         }
     }
 }
@@ -67,7 +69,7 @@ impl Command for RestoreTask {
         }
 
         if !self.skip_encrypted {
-            match resolve_encryption_password(false) {
+            match resolve_encryption_password(self.ask_password, false) {
                 Ok(password) => {
                     let (encrypted_restored, encrypted_skipped) =
                         encrypted::restore_encrypted_configs(&self.profile, &password);
@@ -92,5 +94,9 @@ impl Command for RestoreTask {
 pub(crate) fn run(args: crate::cli::RestoreArgs) {
     use crate::commands::core::CommandExecutor;
     let profile = args.resolve_profile();
-    CommandExecutor::run(&mut RestoreTask::new(profile, args.skip_encrypted));
+    CommandExecutor::run(&mut RestoreTask::new(
+        profile,
+        args.skip_encrypted,
+        args.ask_password,
+    ));
 }

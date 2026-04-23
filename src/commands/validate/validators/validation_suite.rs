@@ -11,7 +11,7 @@ pub(crate) struct ValidationSuite {
 }
 
 impl ValidationSuite {
-    pub(crate) fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    pub(crate) fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         let validators: Vec<Box<dyn Validator>> = vec![
             Box::new(RegistryFilesValidator),
             Box::new(LayerResolutionValidator::new(profile.clone())),
@@ -19,6 +19,7 @@ impl ValidationSuite {
             Box::new(BackupConsistencyValidator::new(
                 profile.clone(),
                 skip_encrypted,
+                ask_password,
             )),
         ];
         Self { validators }

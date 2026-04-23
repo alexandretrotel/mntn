@@ -13,13 +13,15 @@ use std::fs;
 pub struct BackupConsistencyValidator {
     profile: ActiveProfile,
     skip_encrypted: bool,
+    ask_password: bool,
 }
 
 impl BackupConsistencyValidator {
-    pub fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    pub fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
+            ask_password,
         }
     }
 }
@@ -125,7 +127,7 @@ impl Validator for BackupConsistencyValidator {
             return errors;
         }
 
-        let password = match resolve_encryption_password(false) {
+        let password = match resolve_encryption_password(self.ask_password, false) {
             Ok(pwd) => pwd,
             Err(e) => {
                 errors.push(ValidationError::warning(format!(

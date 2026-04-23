@@ -11,8 +11,11 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
-pub fn backup_encrypted_configs(encrypted_backup_path: &Path) -> Result<(u32, u32)> {
-    let password = resolve_encryption_password(true)
+pub fn backup_encrypted_configs(
+    encrypted_backup_path: &Path,
+    ask_password: bool,
+) -> Result<(u32, u32)> {
+    let password = resolve_encryption_password(ask_password, true)
         .context("Prompt for encryption password before encrypted backup")?;
 
     backup_encrypted_configs_with_password(encrypted_backup_path, &password)

@@ -5,7 +5,7 @@ use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
 use keyring::Entry;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
 
 const KEYRING_SERVICE: &str = "mntn";
@@ -40,32 +40,30 @@ fn read_stored_password() -> Option<SecretString> {
     (!password.is_empty()).then_some(SecretString::new(password.into()))
 }
 
-fn offer_store_password(password: &SecretString) {
-    print!("Store this password in the system keychain for next time? [y/N] ");
-    let _ = io::stdout().flush();
-    let mut line = String::new();
-    if io::stdin().read_line(&mut line).is_err() {
-        return;
-    }
-    let line = line.trim().to_ascii_lowercase();
-    if !matches!(line.as_str(), "y" | "yes") {
-        return;
-    }
-    let Ok(entry) = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME) else {
-        eprintln!("Could not access system keychain");
-        return;
-    };
-    if let Err(e) = entry.set_password(password.expose_secret()) {
-        eprintln!("Could not save password to system keychain: {e}");
-    }
+pub(crate) fn persist_encryption_password() -> Result<()> {
+    let password = prompt_password(true).context("Read encryption password for system keychain")?;
+    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).context("Open system keychain")?;
+    entry
+        .set_password(password.expose_secret())
+        .context("Save encryption password to system keychain")?;
+    Ok(())
 }
 
-pub(crate) fn resolve_encryption_password(confirm: bool) -> Result<SecretString> {
-    if !confirm && let Some(password) = read_stored_password() {
+pub(crate) fn resolve_encryption_password(
+    ask_password: bool,
+    confirm_on_prompt: bool,
+) -> Result<SecretString> {
+    let stored = read_stored_password();
+    let had_stored = stored.is_some();
+    if !ask_password && let Some(password) = stored {
         return Ok(password);
     }
-    let password = prompt_password(confirm)?;
-    offer_store_password(&password);
+    let password = prompt_password(confirm_on_prompt)?;
+    if !had_stored {
+        eprintln!(
+            "Tip: run `mntn secret set` to save this password in your system keychain and skip prompts later."
+        );
+    }
     Ok(password)
 }
 

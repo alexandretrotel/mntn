@@ -11,13 +11,15 @@ use validators::ValidationSuite;
 struct ValidateTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
+    ask_password: bool,
 }
 
 impl ValidateTask {
-    fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
+            ask_password,
         }
     }
 }
@@ -32,7 +34,8 @@ impl Command for ValidateTask {
         println!("   Profile: {}", self.profile);
         println!("Starting validation");
 
-        let validator = ValidationSuite::new(self.profile.clone(), self.skip_encrypted);
+        let validator =
+            ValidationSuite::new(self.profile.clone(), self.skip_encrypted, self.ask_password);
         let report = validator.run_all();
         println!();
         report.print();
@@ -68,5 +71,9 @@ pub(crate) fn run(args: crate::cli::ValidateArgs) {
     }
 
     let profile = args.resolve_profile();
-    CommandExecutor::run(&mut ValidateTask::new(profile, args.skip_encrypted));
+    CommandExecutor::run(&mut ValidateTask::new(
+        profile,
+        args.skip_encrypted,
+        args.ask_password,
+    ));
 }

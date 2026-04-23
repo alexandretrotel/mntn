@@ -11,13 +11,15 @@ mod utils;
 struct BackupTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
+    ask_password: bool,
 }
 
 impl BackupTask {
-    fn new(profile: ActiveProfile, skip_encrypted: bool) -> Self {
+    fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         Self {
             profile,
             skip_encrypted,
+            ask_password,
         }
     }
 }
@@ -56,7 +58,7 @@ impl Command for BackupTask {
             let encrypted_backup_path = self.profile.get_encrypted_backup_path();
             fs::create_dir_all(&encrypted_backup_path)?;
             let (encrypted_success, encrypted_skipped) =
-                encrypted::backup_encrypted_configs(&encrypted_backup_path)?;
+                encrypted::backup_encrypted_configs(&encrypted_backup_path, self.ask_password)?;
             println!(
                 "   Encrypted configs completed: {} succeeded, {} skipped",
                 encrypted_success, encrypted_skipped
@@ -71,5 +73,9 @@ pub(crate) fn run(args: crate::cli::BackupArgs) {
     use crate::commands::core::CommandExecutor;
 
     let profile = args.resolve_profile();
-    CommandExecutor::run(&mut BackupTask::new(profile, args.skip_encrypted));
+    CommandExecutor::run(&mut BackupTask::new(
+        profile,
+        args.skip_encrypted,
+        args.ask_password,
+    ));
 }
