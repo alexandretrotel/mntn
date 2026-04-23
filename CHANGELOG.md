@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.2.1
+
+### Added
+- **`mntn secret delete`** removes the stored encryption passphrase from the OS keychain (via [keyring](https://crates.io/crates/keyring) `Entry::delete_credential`). If nothing was stored, the command still succeeds.
+
 ## v3.2.0
 
 ### Added

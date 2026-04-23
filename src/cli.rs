@@ -47,6 +47,9 @@ pub(crate) enum Commands {
 pub(crate) enum SecretActions {
     #[command(about = "Store the encryption password in the system keychain")]
     Set,
+
+    #[command(about = "Remove the encryption password from the system keychain")]
+    Delete,
 }
 
 #[derive(Args)]

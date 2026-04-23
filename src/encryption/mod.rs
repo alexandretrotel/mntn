@@ -3,7 +3,7 @@ mod bundle;
 use age::secrecy::ExposeSecret;
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
-use keyring::Entry;
+use keyring::{Entry, Error as KeyringError};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -47,6 +47,17 @@ pub(crate) fn persist_encryption_password() -> Result<()> {
         .set_password(password.expose_secret())
         .context("Save encryption password to system keychain")?;
     Ok(())
+}
+
+pub(crate) fn clear_stored_encryption_password() -> Result<()> {
+    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).context("Open system keychain")?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(KeyringError::NoEntry) => Ok(()),
+        Err(e) => {
+            Err(anyhow::Error::from(e)).context("Remove encryption password from system keychain")
+        }
+    }
 }
 
 pub(crate) fn resolve_encryption_password(

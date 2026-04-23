@@ -1,6 +1,6 @@
 use crate::cli::SecretActions;
 use crate::commands::core::{Command, CommandExecutor};
-use crate::encryption::persist_encryption_password;
+use crate::encryption::{clear_stored_encryption_password, persist_encryption_password};
 use anyhow::Result;
 
 struct SecretSetTask;
@@ -15,8 +15,21 @@ impl Command for SecretSetTask {
     }
 }
 
+struct SecretDeleteTask;
+
+impl Command for SecretDeleteTask {
+    fn name(&self) -> &str {
+        "Secret delete"
+    }
+
+    fn execute(&mut self) -> Result<()> {
+        clear_stored_encryption_password()
+    }
+}
+
 pub(crate) fn run(action: SecretActions) {
     match action {
         SecretActions::Set => CommandExecutor::run(&mut SecretSetTask),
+        SecretActions::Delete => CommandExecutor::run(&mut SecretDeleteTask),
     }
 }

@@ -28,7 +28,7 @@ mntn use work
 - `backup` - copy tracked configs into `~/.mntn/backup/`
 - `restore` - restore configs from backup
 - `validate` - check registry files and config drift
-- `secret` - store the encryption passphrase in the OS keychain (`secret set`) so `backup` / `restore` / `validate` can reuse it without prompting
+- `secret` - store (`secret set`) or remove (`secret delete`) the encryption passphrase in the OS keychain so `backup` / `restore` / `validate` can reuse it without prompting
 - `profile` - list/create/delete profiles
 - `use` - switch active profile
 - `git` - run any git command inside `~/.mntn`
