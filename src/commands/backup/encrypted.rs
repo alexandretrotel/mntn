@@ -1,4 +1,6 @@
-use crate::encryption::{create_temp_path, encrypt_file, prompt_password, write_entries_tar};
+use crate::encryption::{
+    create_temp_path, encrypt_file, resolve_encryption_password, write_entries_tar,
+};
 use crate::registry::encrypted::EncryptedRegistry;
 use crate::utils::{
     display::{green, yellow},
@@ -10,8 +12,8 @@ use std::fs;
 use std::path::Path;
 
 pub fn backup_encrypted_configs(encrypted_backup_path: &Path) -> Result<(u32, u32)> {
-    let password =
-        prompt_password(true).context("Prompt for encryption password before encrypted backup")?;
+    let password = resolve_encryption_password(true)
+        .context("Prompt for encryption password before encrypted backup")?;
 
     backup_encrypted_configs_with_password(encrypted_backup_path, &password)
 }

@@ -1,5 +1,5 @@
 use crate::commands::core::Command;
-use crate::encryption::prompt_password;
+use crate::encryption::resolve_encryption_password;
 use crate::profiles::ActiveProfile;
 use crate::registry::config::ConfigRegistry;
 use crate::utils::{
@@ -67,7 +67,7 @@ impl Command for RestoreTask {
         }
 
         if !self.skip_encrypted {
-            match prompt_password(false) {
+            match resolve_encryption_password(false) {
                 Ok(password) => {
                     let (encrypted_restored, encrypted_skipped) =
                         encrypted::restore_encrypted_configs(&self.profile, &password);

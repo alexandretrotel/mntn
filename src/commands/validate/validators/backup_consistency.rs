@@ -1,7 +1,8 @@
 use crate::commands::validate::types::{ValidationError, Validator};
 use crate::commands::validate::utils::create_temp_file_path;
 use crate::encryption::{
-    create_temp_path, decrypt_file, get_encrypted_path, load_tar_member_map, prompt_password,
+    create_temp_path, decrypt_file, get_encrypted_path, load_tar_member_map,
+    resolve_encryption_password,
 };
 use crate::profiles::ActiveProfile;
 use crate::registry::config::ConfigRegistry;
@@ -124,7 +125,7 @@ impl Validator for BackupConsistencyValidator {
             return errors;
         }
 
-        let password = match prompt_password(false) {
+        let password = match resolve_encryption_password(false) {
             Ok(pwd) => pwd,
             Err(e) => {
                 errors.push(ValidationError::warning(format!(

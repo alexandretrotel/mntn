@@ -1,10 +1,15 @@
 mod bundle;
 
+use age::secrecy::ExposeSecret;
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
+use keyring::Entry;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
+
+const KEYRING_SERVICE: &str = "mntn";
+const KEYRING_USERNAME: &str = "encryption";
 
 pub(crate) use bundle::{
     create_temp_path, load_tar_member_map, set_private_file_permissions, write_entries_tar,
@@ -27,6 +32,41 @@ pub(crate) fn prompt_password(confirm: bool) -> Result<SecretString> {
     }
 
     Ok(SecretString::new(password.into()))
+}
+
+fn read_stored_password() -> Option<SecretString> {
+    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).ok()?;
+    let password = entry.get_password().ok()?;
+    (!password.is_empty()).then_some(SecretString::new(password.into()))
+}
+
+fn offer_store_password(password: &SecretString) {
+    print!("Store this password in the system keychain for next time? [y/N] ");
+    let _ = io::stdout().flush();
+    let mut line = String::new();
+    if io::stdin().read_line(&mut line).is_err() {
+        return;
+    }
+    let line = line.trim().to_ascii_lowercase();
+    if !matches!(line.as_str(), "y" | "yes") {
+        return;
+    }
+    let Ok(entry) = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME) else {
+        eprintln!("Could not access system keychain");
+        return;
+    };
+    if let Err(e) = entry.set_password(password.expose_secret()) {
+        eprintln!("Could not save password to system keychain: {e}");
+    }
+}
+
+pub(crate) fn resolve_encryption_password(confirm: bool) -> Result<SecretString> {
+    if !confirm && let Some(password) = read_stored_password() {
+        return Ok(password);
+    }
+    let password = prompt_password(confirm)?;
+    offer_store_password(&password);
+    Ok(password)
 }
 
 pub(crate) fn encrypt_file(source: &Path, dest: &Path, password: &SecretString) -> Result<()> {
