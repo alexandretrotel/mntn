@@ -1,27 +1,25 @@
 use crate::profiles::ProfileConfig;
 use crate::utils::paths::{get_profiles_config_path, get_profiles_path};
+use anyhow::{Context, Result, bail};
 use std::fs;
 
-pub fn create_profile(name: &str, description: Option<String>) {
+pub(crate) fn create_profile(name: &str, description: Option<String>) -> Result<()> {
     let path = get_profiles_config_path();
     let mut config = ProfileConfig::load_or_default();
 
     if config.profile_exists(name) {
-        eprintln!("Profile '{}' already exists", name);
-        return;
+        bail!("Profile '{}' already exists", name);
     }
 
     if name.is_empty() {
-        eprintln!("Profile name cannot be empty");
-        return;
+        bail!("Profile name cannot be empty");
     }
 
     if name
         .chars()
         .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
     {
-        eprintln!("Profile name can only contain letters, numbers, hyphens, and underscores");
-        return;
+        bail!("Profile name can only contain letters, numbers, hyphens, and underscores");
     }
 
     config.create_profile(name, description.clone());
@@ -29,15 +27,17 @@ pub fn create_profile(name: &str, description: Option<String>) {
         config.version = "1.0.0".to_string();
     }
 
-    if let Err(e) = config.save(&path) {
-        eprintln!("Failed to save profile config: {}", e);
-        return;
-    }
+    config
+        .save(&path)
+        .with_context(|| format!("Save profile config to {}", path.display()))?;
 
     let profile_dir = get_profiles_path(name);
-    if let Err(e) = fs::create_dir_all(&profile_dir) {
-        eprintln!("Profile created but failed to create directory: {}", e);
-    }
+    fs::create_dir_all(&profile_dir).with_context(|| {
+        format!(
+            "Create profile directory at {} (config was saved)",
+            profile_dir.display()
+        )
+    })?;
 
     println!("Created profile '{}'", name);
     if let Some(desc) = description {
@@ -45,4 +45,5 @@ pub fn create_profile(name: &str, description: Option<String>) {
     }
     println!();
     println!("Switch to this profile with: mntn use {}", name);
+    Ok(())
 }

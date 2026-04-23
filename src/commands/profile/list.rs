@@ -1,6 +1,7 @@
 use crate::profiles::{ProfileConfig, get_active_profile_name};
+use anyhow::Result;
 
-pub fn list_profiles() {
+pub(crate) fn list_profiles() -> Result<()> {
     let config = ProfileConfig::load_or_default();
     let profiles = config.list_profiles();
     let current = get_active_profile_name();
@@ -9,7 +10,7 @@ pub fn list_profiles() {
         println!("No profiles configured");
         println!();
         println!("Create a profile with: mntn profile create <name>");
-        return;
+        return Ok(());
     }
 
     println!("Available profiles:");
@@ -27,4 +28,5 @@ pub fn list_profiles() {
             println!("   {}{}", name, marker);
         }
     }
+    Ok(())
 }
