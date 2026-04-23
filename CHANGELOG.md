@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## v3.2.0
+
+### Added
+- **`mntn secret set`** stores the encryption passphrase in the OS keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Run it once to skip passphrase prompts on later **`backup`**, **`restore`**, and **`validate`** when encrypted configs are involved.
+- **`--ask-password`** on **`backup`**, **`restore`**, and **`validate`** forces an interactive passphrase prompt instead of using the stored one.
+
+### Changed
+- When no passphrase is stored yet, mntn still prompts as before and prints a short tip pointing to **`mntn secret set`**.
+
 ## v3.1.0
 
 ### Changed

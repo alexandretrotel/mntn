@@ -28,10 +28,13 @@ mntn use work
 - `backup` - copy tracked configs into `~/.mntn/backup/`
 - `restore` - restore configs from backup
 - `validate` - check registry files and config drift
+- `secret` - store the encryption passphrase in the OS keychain (`secret set`) so `backup` / `restore` / `validate` can reuse it without prompting
 - `profile` - list/create/delete profiles
 - `use` - switch active profile
 - `git` - run any git command inside `~/.mntn`
 - `sync` - run `git add .`, commit with default message `chore: sync mntn (YYYY-MM-DD HH:MM:SS UTC)` (use `--message` to override), then `git push` inside `~/.mntn`
+
+Encrypted configs: run `mntn secret set` after you know your passphrase to persist it. Use `--ask-password` on `backup`, `restore`, or `validate` if you want to type it for that run only.
 
 ## Directory Layout
 
