@@ -3,13 +3,22 @@ mod bundle;
 use age::secrecy::ExposeSecret;
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
-use keyring::{Entry, Error as KeyringError};
+use keyring_core::{Entry, Error as KeyringError};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::OnceLock;
 
 const KEYRING_SERVICE: &str = "mntn";
 const KEYRING_USERNAME: &str = "encryption";
+
+fn keyring_entry() -> anyhow::Result<Entry> {
+    static INIT: OnceLock<()> = OnceLock::new();
+    INIT.get_or_init(|| {
+        keyring::use_native_store(false).ok();
+    });
+    Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).map_err(anyhow::Error::from)
+}
 
 pub(crate) use bundle::{
     create_temp_path, load_tar_member_map, set_private_file_permissions, write_entries_tar,
@@ -35,14 +44,14 @@ pub(crate) fn prompt_password(confirm: bool) -> Result<SecretString> {
 }
 
 fn read_stored_password() -> Option<SecretString> {
-    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).ok()?;
+    let entry = keyring_entry().ok()?;
     let password = entry.get_password().ok()?;
     (!password.is_empty()).then_some(SecretString::new(password.into()))
 }
 
 pub(crate) fn persist_encryption_password() -> Result<()> {
     let password = prompt_password(true).context("Read encryption password for system keychain")?;
-    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).context("Open system keychain")?;
+    let entry = keyring_entry().context("Open system keychain")?;
     entry
         .set_password(password.expose_secret())
         .context("Save encryption password to system keychain")?;
@@ -50,7 +59,7 @@ pub(crate) fn persist_encryption_password() -> Result<()> {
 }
 
 pub(crate) fn clear_stored_encryption_password() -> Result<()> {
-    let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).context("Open system keychain")?;
+    let entry = keyring_entry().context("Open system keychain")?;
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(KeyringError::NoEntry) => Ok(()),
