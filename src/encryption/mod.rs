@@ -3,7 +3,7 @@ mod bundle;
 use age::secrecy::ExposeSecret;
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
-use keyring_core::{Entry, Error as KeyringError};
+use keyring_core::{Entry, Error as KeyringError, set_default_store};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -12,11 +12,34 @@ use std::sync::OnceLock;
 const KEYRING_SERVICE: &str = "mntn";
 const KEYRING_USERNAME: &str = "encryption";
 
+#[cfg(target_os = "macos")]
+fn init_default_keyring_store() -> Result<()> {
+    set_default_store(apple_native_keyring_store::keychain::Store::new()?);
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn init_default_keyring_store() -> Result<()> {
+    set_default_store(windows_native_keyring_store::Store::new()?);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn init_default_keyring_store() -> Result<()> {
+    set_default_store(zbus_secret_service_keyring_store::Store::new()?);
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+fn init_default_keyring_store() -> Result<()> {
+    bail!("No supported keyring store configured for this operating system");
+}
+
 fn keyring_entry() -> anyhow::Result<Entry> {
-    static INIT: OnceLock<()> = OnceLock::new();
-    INIT.get_or_init(|| {
-        keyring::use_native_store(false).ok();
-    });
+    static INIT: OnceLock<Result<()>> = OnceLock::new();
+    INIT.get_or_init(init_default_keyring_store)
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).map_err(anyhow::Error::from)
 }
 
