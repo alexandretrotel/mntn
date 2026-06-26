@@ -1,20 +1,22 @@
+use crate::cli::DoctorActions;
 use crate::commands::core::{Command, CommandExecutor};
 use crate::profiles::{ActiveProfile, ProfileConfig};
 use crate::utils::display::{green, red};
 
+mod fix;
 mod types;
 mod utils;
 mod validators;
 
 use validators::ValidationSuite;
 
-struct ValidateTask {
+struct DoctorTask {
     profile: ActiveProfile,
     skip_encrypted: bool,
     ask_password: bool,
 }
 
-impl ValidateTask {
+impl DoctorTask {
     fn new(profile: ActiveProfile, skip_encrypted: bool, ask_password: bool) -> Self {
         Self {
             profile,
@@ -24,9 +26,9 @@ impl ValidateTask {
     }
 }
 
-impl Command for ValidateTask {
+impl Command for DoctorTask {
     fn name(&self) -> &str {
-        "Validate"
+        "Doctor"
     }
 
     fn execute(&mut self) -> anyhow::Result<()> {
@@ -65,15 +67,23 @@ impl Command for ValidateTask {
     }
 }
 
-pub(crate) fn run(args: crate::cli::ValidateArgs) {
+pub(crate) fn run(args: crate::cli::DoctorArgs) {
     if let Ok(true) = ProfileConfig::save_default_if_missing() {
         println!("Created default profile config at ~/.mntn/profiles.json");
     }
 
-    let profile = args.resolve_profile();
-    CommandExecutor::run(&mut ValidateTask::new(
-        profile,
-        args.skip_encrypted,
-        args.ask_password,
-    ));
+    match args.action {
+        Some(DoctorActions::Fix(fix_args)) => {
+            let profile = fix_args.resolve_profile();
+            CommandExecutor::run(&mut fix::FixTask::new(profile, fix_args.dry_run));
+        }
+        None => {
+            let profile = args.resolve_profile();
+            CommandExecutor::run(&mut DoctorTask::new(
+                profile,
+                args.skip_encrypted,
+                args.ask_password,
+            ));
+        }
+    }
 }

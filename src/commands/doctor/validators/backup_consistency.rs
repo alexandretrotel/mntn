@@ -1,5 +1,5 @@
-use crate::commands::validate::types::{ValidationError, Validator};
-use crate::commands::validate::utils::create_temp_file_path;
+use crate::commands::doctor::types::{ValidationError, Validator};
+use crate::commands::doctor::utils::create_temp_file_path;
 use crate::encryption::{
     create_temp_path, decrypt_file, get_encrypted_path, load_tar_member_map,
     resolve_encryption_password,

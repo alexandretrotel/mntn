@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## v4.0.0
+
+### Changed
+- **BREAKING:** Renamed the **`validate`** command to **`doctor`**. Run `mntn doctor` instead of `mntn validate`; behavior is unchanged. `--ask-password` and `--skip-encrypted` now live on `doctor`.
+
+### Added
+- **`mntn doctor fix`** reformats valid JSON config files with `serde_json`'s pretty printer (atomic write). It normalizes formatting only — it cannot repair true syntax errors, which are reported as unfixable. Pass `--dry-run` to preview changes without writing.
+
 ## v3.2.1
 
 ### Added

@@ -1,4 +1,4 @@
-use crate::commands::validate::types::{ValidationReport, Validator};
+use crate::commands::doctor::types::{ValidationReport, Validator};
 use crate::profiles::ActiveProfile;
 
 use super::backup_consistency::BackupConsistencyValidator;

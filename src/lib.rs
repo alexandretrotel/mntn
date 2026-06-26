@@ -8,7 +8,7 @@ mod utils;
 
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
-use commands::{backup, git, profile, restore, secret, sync, r#use, validate};
+use commands::{backup, doctor, git, profile, restore, secret, sync, r#use};
 
 pub fn run() {
     let cli = Cli::parse();
@@ -20,7 +20,7 @@ pub fn run() {
         Some(Commands::Profile(args)) => profile::run(args),
         Some(Commands::Git(args)) => git::run(args),
         Some(Commands::Sync(args)) => sync::run(args),
-        Some(Commands::Validate(args)) => validate::run(args),
+        Some(Commands::Doctor(args)) => doctor::run(args),
         Some(Commands::Secret { action }) => secret::run(action),
         None => {
             Cli::command().print_help().expect("Failed to print help");
