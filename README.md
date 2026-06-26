@@ -13,7 +13,7 @@ At a high level, mntn helps you manage these configurations, keep them in sync, 
 ```bash
 mntn backup
 mntn restore
-mntn validate
+mntn doctor
 ```
 
 Switch profiles:
@@ -27,14 +27,14 @@ mntn use work
 
 - `backup` - copy tracked configs into `~/.mntn/backup/`
 - `restore` - restore configs from backup
-- `validate` - check registry files and config drift
-- `secret` - store (`secret set`) or remove (`secret delete`) the encryption passphrase in the OS keychain so `backup` / `restore` / `validate` can reuse it without prompting
+- `doctor` - check registry files and config drift; `doctor fix` reformats valid JSON configs with serde_json's pretty printer (it cannot repair true syntax errors, only normalize formatting)
+- `secret` - store (`secret set`) or remove (`secret delete`) the encryption passphrase in the OS keychain so `backup` / `restore` / `doctor` can reuse it without prompting
 - `profile` - list/create/delete profiles
 - `use` - switch active profile
 - `git` - run any git command inside `~/.mntn`
 - `sync` - run `git add .`, commit with default message `chore: sync mntn (YYYY-MM-DD HH:MM:SS UTC)` (use `--message` to override), then `git push` inside `~/.mntn`
 
-Encrypted configs: run `mntn secret set` after you know your passphrase to persist it. Use `--ask-password` on `backup`, `restore`, or `validate` if you want to type it for that run only.
+Encrypted configs: run `mntn secret set` after you know your passphrase to persist it. Use `--ask-password` on `backup`, `restore`, or `doctor` if you want to type it for that run only.
 
 ## Directory Layout
 

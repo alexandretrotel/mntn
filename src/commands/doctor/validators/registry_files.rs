@@ -1,4 +1,4 @@
-use crate::commands::validate::types::{ValidationError, Validator};
+use crate::commands::doctor::types::{ValidationError, Validator};
 use crate::registry::config::ConfigRegistry;
 use crate::registry::package::PackageRegistry;
 use crate::utils::paths::{get_config_registry_path, get_package_registry_path};

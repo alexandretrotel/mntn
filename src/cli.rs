@@ -33,8 +33,10 @@ pub(crate) enum Commands {
     #[command(about = "Stage, commit, and push to the mntn repository")]
     Sync(SyncArgs),
 
-    #[command(about = "Validate JSON configs, symlinks, and registry files")]
-    Validate(ValidateArgs),
+    #[command(
+        about = "Diagnose JSON configs, symlinks, and registry files (run `doctor fix` to repair)"
+    )]
+    Doctor(DoctorArgs),
 
     #[command(about = "Manage the encryption password in the system keychain")]
     Secret {
@@ -95,7 +97,9 @@ impl RestoreArgs {
 }
 
 #[derive(Args)]
-pub(crate) struct ValidateArgs {
+pub(crate) struct DoctorArgs {
+    #[command(subcommand)]
+    pub action: Option<DoctorActions>,
     #[arg(
         long,
         help = "Skip encrypted configs validation (will not prompt for password)"
@@ -108,7 +112,27 @@ pub(crate) struct ValidateArgs {
     pub ask_password: bool,
 }
 
-impl ValidateArgs {
+impl DoctorArgs {
+    pub fn resolve_profile(&self) -> ActiveProfile {
+        ActiveProfile::resolve(None)
+    }
+}
+
+#[derive(Subcommand)]
+pub(crate) enum DoctorActions {
+    #[command(
+        about = "Reformat valid JSON config files with serde_json's pretty printer (cannot repair true syntax errors)"
+    )]
+    Fix(DoctorFixArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct DoctorFixArgs {
+    #[arg(long, help = "Show which files would change without writing anything")]
+    pub dry_run: bool,
+}
+
+impl DoctorFixArgs {
     pub fn resolve_profile(&self) -> ActiveProfile {
         ActiveProfile::resolve(None)
     }
