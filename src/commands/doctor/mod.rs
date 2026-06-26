@@ -46,7 +46,7 @@ impl Command for DoctorTask {
         let warning_count = report.warning_count();
         if error_count == 0 && warning_count == 0 {
             println!("{}", green("All checks passed"));
-        } else {
+        } else if error_count == 0 {
             eprintln!(
                 "{}",
                 red(&format!(
